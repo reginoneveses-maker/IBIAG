@@ -1,0 +1,36 @@
+{
+  "summary": "First-finish smoke test of AgroBrasil Export CRM. Backend endpoints (products, leads, trade-data, templates, tasks, dashboard/stats, interactions, add-to-crm, task toggle/delete, patch stage) all return 200 with valid JSON, no ObjectId leaks. Frontend loads correctly with all 6 pages: Dashboard KPIs render, PT/EN language toggle switches labels (Painel<->Dashboard, Catalogo<->Catalog), Catalog shows 8 seed products with working category filter (acai=2) and offer-generation dialog, Pipeline has 6 kanban columns and successfully creates a lead (3->4), Trade Intel lists 12 records with add-to-CRM buttons, Templates page shows 4 copy buttons (filtered by current lang), Tasks create+toggle works and delete button renders.",
+  "tested_scope": ["backend", "frontend", "integration"],
+  "passed": [
+    "GET /api/dashboard/stats returns total_leads, pipeline_value, by_stage, by_industry",
+    "GET /api/products (8 items), /api/leads, /api/trade-data (12), /api/templates, /api/tasks all 200",
+    "POST /api/leads creates lead and it appears in Kanban",
+    "PATCH /api/leads/{id}/stage with JSON body {stage:...} works (200)",
+    "POST /api/interactions works (200)",
+    "POST /api/trade-data/{id}/add-to-crm returns lead payload (200)",
+    "POST /api/tasks, PATCH /api/tasks/{id}/toggle, DELETE /api/tasks/{id} all 200",
+    "No _id (Mongo ObjectId) leak in /api/leads response",
+    "Dashboard loads with 4 KPI cards + stage/industry breakdown",
+    "Language toggle PT<->EN swaps navigation labels (Painel/Dashboard, Catalogo/Catalog)",
+    "Catalog: 8 products, filter-acai narrows to 2, generate-offer opens dialog",
+    "Pipeline: 6 kanban-column-* elements, new-lead-button opens dialog, save-lead-button creates lead visible in board",
+    "Trade Intel: 12 add-crm-* buttons rendered",
+    "Templates: 4 copy-tpl-* buttons rendered (PT language active)",
+    "Tasks: title input + add-task-button creates task, toggle- moves to Concluidas section"
+  ],
+  "failed": [
+    {
+      "area": "Dashboard KPI testid naming",
+      "issue": "Review request specifies data-testids kpi-active-leads, kpi-pipeline-value, kpi-samples, kpi-conversion but code exposes kpi-total-leads, kpi-won, kpi-lost, kpi-samples. Visible KPI cards on UI correctly display Leads Ativos / Valor em Pipeline / Amostras Enviadas / Taxa de Conversao, so it is a testid vs UI mismatch.",
+      "evidence": "grep in /app/frontend/src/pages/Dashboard.jsx shows kpi-total-leads, kpi-won, kpi-lost, kpi-samples only",
+      "priority": "MEDIUM"
+    }
+  ],
+  "action_items": [
+    "Optional: align KPI data-testid names in Dashboard.jsx with review-request spec (kpi-active-leads, kpi-pipeline-value, kpi-conversion) or update the spec/tests to reflect current names."
+  ],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "mocked_apis_confirmed": ["/api/trade-data returns 12 seeded mocked importer records (no live ComexStat/MDIC integration) - MOCKED as declared"]
+}

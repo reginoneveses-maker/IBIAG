@@ -13,10 +13,10 @@ const Dashboard = () => {
   }, []);
 
   const kpis = [
-    { key: "kpi_active_leads", value: stats?.active_leads ?? 0, icon: Users, tone: "text-blue-600 bg-blue-50" },
-    { key: "kpi_pipeline_value", value: fmtUSD(stats?.pipeline_value ?? 0), icon: DollarSign, tone: "text-amber-700 bg-amber-50" },
-    { key: "kpi_samples_sent", value: stats?.samples_sent ?? 0, icon: Package, tone: "text-purple-700 bg-purple-50" },
-    { key: "kpi_conversion", value: `${stats?.conversion_rate ?? 0}%`, icon: TrendingUp, tone: "text-emerald-700 bg-emerald-50" },
+    { key: "kpi_active_leads", testId: "kpi-active-leads", value: stats?.active_leads ?? 0, icon: Users, tone: "text-blue-600 bg-blue-50" },
+    { key: "kpi_pipeline_value", testId: "kpi-pipeline-value", value: fmtUSD(stats?.pipeline_value ?? 0), icon: DollarSign, tone: "text-amber-700 bg-amber-50" },
+    { key: "kpi_samples_sent", testId: "kpi-samples-sent", value: stats?.samples_sent ?? 0, icon: Package, tone: "text-purple-700 bg-purple-50" },
+    { key: "kpi_conversion", testId: "kpi-conversion", value: `${stats?.conversion_rate ?? 0}%`, icon: TrendingUp, tone: "text-emerald-700 bg-emerald-50" },
   ];
 
   return (
@@ -32,8 +32,8 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {kpis.map(({ key, value, icon: Icon, tone }) => (
-          <Card key={key} data-testid={`kpi-${key}`} className="border-[#0F382C]/10 bg-white/90 hover:-translate-y-0.5 transition-transform">
+        {kpis.map(({ key, testId, value, icon: Icon, tone }) => (
+          <Card key={key} data-testid={testId} className="border-[#0F382C]/10 bg-white/90 hover:-translate-y-0.5 transition-transform">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tone}`}>
