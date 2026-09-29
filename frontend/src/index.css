@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #F9F6F0;
+    color: #111827;
+}
+
+.font-display {
+    font-family: 'Cabinet Grotesk', 'Outfit', sans-serif;
+    letter-spacing: -0.02em;
+}
+
+.font-mono-alt {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.grain-bg {
+    background-image:
+        radial-gradient(circle at 25% 15%, rgba(217, 119, 6, 0.06), transparent 40%),
+        radial-gradient(circle at 75% 85%, rgba(15, 56, 44, 0.08), transparent 45%);
+}
+
+@layer base {
+    :root {
+        --background: 40 30% 96%;
+        --foreground: 220 15% 12%;
+        --card: 0 0% 100%;
+        --card-foreground: 220 15% 12%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 220 15% 12%;
+        --primary: 158 58% 14%;
+        --primary-foreground: 40 30% 96%;
+        --secondary: 40 17% 92%;
+        --secondary-foreground: 158 58% 14%;
+        --muted: 40 17% 92%;
+        --muted-foreground: 220 10% 40%;
+        --accent: 32 95% 44%;
+        --accent-foreground: 40 30% 96%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 40 30% 96%;
+        --border: 40 15% 85%;
+        --input: 40 15% 85%;
+        --ring: 158 58% 14%;
+        --radius: 0.75rem;
+    }
+    .dark {
+        --background: 158 30% 6%;
+        --foreground: 40 30% 96%;
+        --card: 158 25% 10%;
+        --card-foreground: 40 30% 96%;
+        --popover: 158 25% 10%;
+        --popover-foreground: 40 30% 96%;
+        --primary: 40 30% 96%;
+        --primary-foreground: 158 58% 14%;
+        --secondary: 158 20% 15%;
+        --secondary-foreground: 40 30% 96%;
+        --muted: 158 20% 15%;
+        --muted-foreground: 40 10% 65%;
+        --accent: 32 95% 55%;
+        --accent-foreground: 158 58% 14%;
+        --destructive: 0 62% 40%;
+        --destructive-foreground: 40 30% 96%;
+        --border: 158 20% 18%;
+        --input: 158 20% 18%;
+        --ring: 40 30% 96%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(15, 56, 44, 0.25);
+    border-radius: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Kanban card animation */
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-card-in {
+    animation: card-in 0.35s ease-out both;
+}

@@ -1,0 +1,135 @@
+{
+  "project_title": "AgroBrasil Export CRM & Trade Intelligence",
+  "archetype": "ORGANIC & EARTHY meets SWISS PRECISION B2B",
+  "app_type": "hybrid_fullstack",
+  "theme_strategy": {
+    "default_mode": "light",
+    "toggle_supported": true,
+    "vibe": "Sophisticated B2B Agro-Commodity Intelligence with authentic Brazilian origin warmth. Clean, trustworthy, high-contrast, non-gimmicky."
+  },
+  "typography": {
+    "font_family_heading": "'Cabinet Grotesk', 'Outfit', 'Playfair Display', sans-serif",
+    "font_family_body": "'Inter', 'Manrope', system-ui, sans-serif",
+    "font_family_mono": "'JetBrains Mono', 'Source Code Pro', monospace",
+    "font_sources": [
+      "https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    ],
+    "hierarchy": {
+      "h1": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100",
+      "h3": "text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100",
+      "h4": "text-lg sm:text-xl font-medium text-slate-900 dark:text-slate-100",
+      "subtitle": "text-base sm:text-lg text-emerald-950/70 dark:text-emerald-200/70 font-normal leading-relaxed",
+      "body": "text-sm sm:text-base text-slate-700 dark:text-slate-300 leading-normal",
+      "caption": "text-xs font-mono uppercase tracking-widest text-slate-500 dark:text-slate-400"
+    }
+  },
+  "colors": {
+    "brand_palette": {
+      "forest_green": "#0F382C",
+      "forest_green_hover": "#0A2920",
+      "amazon_emerald": "#1B5E4B",
+      "ochre_gold": "#D97706",
+      "warm_sand": "#F9F6F0",
+      "stone_beige": "#EFECE6",
+      "deep_charcoal": "#111827",
+      "clay_terracotta": "#9A3412"
+    },
+    "semantic": {
+      "primary": "bg-[#0F382C] text-white hover:bg-[#0A2920]",
+      "secondary": "bg-[#EFECE6] text-[#0F382C] hover:bg-[#E5E0D8] dark:bg-slate-800 dark:text-slate-100",
+      "accent_gold": "bg-amber-600 text-white hover:bg-amber-700",
+      "background_light": "#F9F6F0",
+      "background_dark": "#0B1310",
+      "card_light": "bg-white/90 border border-slate-200/80 shadow-sm",
+      "card_dark": "bg-slate-900/90 border border-slate-800 shadow-sm"
+    },
+    "status": {
+      "new_lead": "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-200",
+      "initial_contact": "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border-purple-200",
+      "sample_sent": "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-200",
+      "negotiation": "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200",
+      "closed_won": "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300 border-green-200",
+      "closed_lost": "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-200"
+    }
+  },
+  "layout_and_grids": {
+    "spacing_scale": "p-3 sm:p-4 md:p-6 lg:p-8 gap-4 sm:gap-6 lg:gap-8",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "dashboard_grid": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6",
+    "kanban_grid": "flex sm:grid sm:grid-cols-3 lg:grid-cols-5 gap-4 overflow-x-auto pb-4 scrollbar-thin",
+    "catalog_grid": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border border-slate-200/70 dark:border-slate-800",
+    "card_hover": "transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-800/30",
+    "badge_style": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+  },
+  "responsive": {
+    "breakpoint": "mobile-first - default single column stacked layout, scaling to multi-column on sm (640px), md (768px), lg (1024px), xl (1280px)",
+    "layout": "Mobile drawer navigation + responsive header; Kanban columns scroll horizontally on small screens or collapse into tabbed stage views; Catalog cards stack vertically on mobile with responsive image height limits max-h-[220px]",
+    "typography": "Fluid typography with mobile-friendly font sizes (H1: text-2xl on mobile, text-5xl on desktop). Form inputs maintain minimum 16px text to prevent unwanted mobile browser zoom",
+    "overflow_guard": "Use flex-wrap or overflow-x-auto with touch momentum on tables and kanban boards. Prevent body horizontal overflow with max-w-full overflow-x-hidden on layout wrappers",
+    "tap_targets": "Minimum 44x44px touch targets for all primary buttons, language toggles, tab triggers, and kanban card actions"
+  },
+  "image_urls": {
+    "acai_berries": {
+      "url": "https://images.unsplash.com/photo-1698610641100-565cc749fc60?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwxfHxhY2FpJTIwZnJ1aXR8ZW58MHx8fHwxNzkwNjc1OTY4fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Organic Açaí Freeze Dried Powder & Puree",
+      "description": "Authentic wild harvested Amazonian Açaí berry palm cluster"
+    },
+    "acai_pulp": {
+      "url": "https://images.unsplash.com/photo-1709139068234-f83a548f3bec?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHw0fHxhY2FpJTIwZnJ1aXR8ZW58MHx8fHwxNzkwNjc1OTY4fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Açaí Food Grade Spec",
+      "description": "Premium industrial grade Açaí pulp puree bowl"
+    },
+    "green_coconuts": {
+      "url": "https://images.unsplash.com/photo-1537191072641-5e19cc173c6a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxjb2NvbnV0JTIwd2F0ZXJ8ZW58MHx8fHwxNzkwNjc1OTY4fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Coconut Water & Concentrates",
+      "description": "Fresh Brazilian green coconuts on palm tree"
+    },
+    "coconut_water_glass": {
+      "url": "https://images.unsplash.com/photo-1628692945318-f44a3c346afb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHw0fHxjb2NvbnV0JTIwd2F0ZXJ8ZW58MHx8fHwxNzkwNjc1OTY4fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Pure Coconut Water Derivatives",
+      "description": "Ultra-clear pure young coconut water"
+    },
+    "cashew_nuts": {
+      "url": "https://images.unsplash.com/photo-1723466998040-78d7e2ef6d72?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzV8MHwxfHNlYXJjaHw0fHxjYXNoZXclMjBudXRzfGVufDB8fHx8MTc5MDY3NTkyfDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Brazil Nuts & Premium Cashews",
+      "description": "Premium export grade whole cashew nuts and Brazil nuts"
+    },
+    "cashews_bowl": {
+      "url": "https://images.unsplash.com/photo-1615485925873-7ecbbe90a866?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzV8MHwxfHNlYXJjaHwxfHxjYXNoZXclMjBudXRzfGVufDB8fHx8MTc5MDY3NTkyfDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Nuts Technical Packaging Spec",
+      "description": "Whole raw export cashew and Brazil nut lot"
+    },
+    "passion_fruit_juice": {
+      "url": "https://images.pexels.com/photos/17612801/pexels-photo-17612801.jpeg",
+      "category": "Catalog - Tropical Fruit Juices & Purees (Maracujá/Acerola)",
+      "description": "Chilled Brazilian passion fruit puree juice concentrate"
+    },
+    "acerola_berries": {
+      "url": "https://images.unsplash.com/photo-1610441009633-b6ca9c6d4be2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzh8MHwxfHNlYXJjaHwzfHxhY2FpJTIwZnJ1aXR8ZW58MHx8fHwxNzkwNjc1OTY4fDA&ixlib=rb-4.1.0&q=85",
+      "category": "Catalog - Organic Acerola Powder High Vitamin C",
+      "description": "Fresh acerola cherries & natural antioxidant extracts"
+    }
+  },
+  "instructions_to_main_agent": [
+    "EVERY key element MUST include a clear role-based data-testid attribute (e.g. data-testid='kpi-active-leads', data-testid='crm-lead-card-1', data-testid='language-toggle-button', data-testid='trade-data-search-input').",
+    "BILINGUAL SUPPORT (EN/PT): Provide a global toggle (PT-BR / EN) in the top navbar. All tab labels, lead statuses, catalog specs (MOQ, Incoterms, HS Codes, Certifications), email template body, trade data headers, and KPI cards must switch seamlessly between Portuguese and English.",
+    "B2B EXPORT CRM FEATURES:",
+    "- 1. KPI Dashboard: Active Leads count, Pipeline Deals value ($), Conversion Rate (%), Samples Dispatched metric, Hot Leads overview.",
+    "- 2. Digital Product Catalog: Filterable by category (Açaí, Acerola Powder, Tropical Juices/Purees, Coconut Water, Brazil & Cashew Nuts). Include high-res photo, HS Code, Brix level / Purity specs, MOQ (e.g. 1 Metric Ton / 20ft FCL), Packaging types (Aseptic Drums, Flexitanks, Bulk Bags), FSSC 22000 / USDA Organic / Halal / Kosher badges, and a direct 'Generate Sample Offer' modal button.",
+    "- 3. Interactive CRM & Pipeline Kanban: Stages (New Lead / Novo Lead -> Initial Contact / Contato Inicial -> Sample Sent / Amostra Enviada -> Negotiation / Negociação -> Closed Won / Fechado Ganho -> Closed Lost / Fechado Perdido). Drag/click stage change, filter by target industry (Beverage, Cosmetics/Nutraceuticals, Food Service, Importers/Distributors), lead search, and country flag indicators.",
+    "- 4. Export Trade Intelligence & Lead Finder: Searchable global database of Brazilian ingredient importers/exporters. Filter by HS Code, Destination Country (USA, Germany, Japan, France, UAE, UK), Volume (Tons), and Industry Segment. Include mock live export transaction data with 'Add to CRM' action.",
+    "- 5. Message Templates Library: Bilingual templates (Intro Email, Technical Spec & COA Sheet Follow-up, Sample Dispatch Notification, Price Quotation CIF/FOB). Copy to clipboard & quick fill with lead info.",
+    "- 6. Follow-up Tasks & Interaction Log: Log emails, calls, WhatsApp messages, sample tracking numbers, and set reminder dates for follow-ups.",
+    "NO COMPLETE TRANSPARENT BACKGROUNDS: Headers, modals, popovers, and select dropdowns must use solid or glassmorphism backgrounds (bg-white/95 dark:bg-slate-900/95 with backdrop-blur-md) with 1px border so dropdown options are 100% legible.",
+    "TOAST NOTIFICATIONS: Use sonner toast notifications for key actions like creating a lead, moving pipeline stages, copying email templates, or adding trade leads to CRM."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": {
+    "anti_slop_rule": "Avoid generic centered white cards with soft grey text. Use rich forest greens (#0F382C), warm Ochre gold (#D97706), and crisp typography. Emphasize B2B trade credibility with HS codes, Incoterms (FOB Santos, CIF Hamburg), and quality certs.",
+    "component_reuse": "Use installed shadcn components from src/components/ui/ (Tabs, Dialog, Table, Badge, Button, Input, Select, DropdownMenu, Card, ScrollArea, Tooltip). Override fixed heights like h-9 on TabList if needed.",
+    "accessibility": "Ensure text contrast meets APCA standard (minimum 4.5:1). Every interactive button must have hover/active state with explicitly stated text color."
+  }
+}
