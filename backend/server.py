@@ -957,6 +957,32 @@ async def comexstat_ncm(search: str = "", page: int = 1, per_page: int = 50, use
         logging.exception("Comex Stat NCM search failed")
         raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
+@api.post("/comexstat/prospect")
+async def comexstat_prospect(payload: dict, user=Depends(get_current_user)):
+    """Build a prospecting snapshot from official Comex Stat aggregates."""
+    try:
+        flow = payload.get("flow", "export")
+        period = payload.get("period") or {"from": "2026-01", "to": "2026-08"}
+        ncm = str(payload.get("ncm", "")).strip()
+        details = ["country"]
+        filters = []
+        if ncm:
+            details.insert(0, "ncm")
+            filters.append({"filter": "ncm", "values": [int(ncm)]})
+        query = {
+            "flow": flow,
+            "monthDetail": False,
+            "period": period,
+            "filters": filters,
+            "details": details,
+            "metrics": ["metricFOB", "metricKG"],
+        }
+        data = comex_general(query)
+        return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data}
+    except (requests.RequestException, ValueError) as e:
+        logging.exception("Comex Stat prospect query failed")
+        raise HTTPException(502, f"Não foi possível montar o prospecting snapshot: {str(e)[:180]}")
+
 @api.post("/comexstat/general")
 async def comexstat_general(payload: dict, user=Depends(get_current_user)):
     try:
