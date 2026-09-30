@@ -8,6 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
+from comexstat_client import ncm_search, general as comex_general
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -946,6 +947,23 @@ async def list_tpl(language: Optional[str] = None, category: Optional[str] = Non
     if language: q["language"] = language
     if category: q["category"] = category
     return await db.templates.find(q, {"_id": 0}).to_list(200)
+
+# ============ COMEX STAT / MDIC ============
+@api.get("/comexstat/ncm")
+async def comexstat_ncm(search: str = "", page: int = 1, per_page: int = 50, user=Depends(get_current_user)):
+    try:
+        return ncm_search(search=search, page=page, per_page=per_page)
+    except requests.RequestException as e:
+        logging.exception("Comex Stat NCM search failed")
+        raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
+
+@api.post("/comexstat/general")
+async def comexstat_general(payload: dict, user=Depends(get_current_user)):
+    try:
+        return comex_general(payload)
+    except requests.RequestException as e:
+        logging.exception("Comex Stat general query failed")
+        raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
 # ============ TRADE (public) ============
 class TradeRecord(BaseModel):
