@@ -6,7 +6,7 @@ load_dotenv(ROOT_DIR / '.env')
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, bcrypt, jwt, requests, io, re
+import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
@@ -732,15 +732,48 @@ class LeadImportResult(BaseModel):
     skipped: int
     errors: List[str] = []
 
+def _norm_text(value: str) -> str:
+    text = "" if value is None else str(value).strip()
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
 def _norm_col(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+    return re.sub(r"[^a-z0-9]+", "_", _norm_text(value).lower()).strip("_")
+
+def _clean_value(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
 
 def _pick(row: dict, aliases: List[str]) -> str:
     for alias in aliases:
         key = _norm_col(alias)
         if key in row and row[key] not in (None, ""):
-            return str(row[key]).strip()
+            return _clean_value(row[key])
     return ""
+
+def _parse_number(value) -> float:
+    raw = _clean_value(value).replace("R$", "").replace("$", "").replace(" ", "")
+    if not raw:
+        return 0.0
+    if "," in raw and "." in raw:
+        if raw.rfind(",") > raw.rfind("."):
+            raw = raw.replace(".", "").replace(",", ".")
+        else:
+            raw = raw.replace(",", "")
+    elif "," in raw:
+        raw = raw.replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.0
+
+def _norm_company(value: str) -> str:
+    text = _norm_text(value).lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 @api.post("/leads/import", response_model=LeadImportResult)
 async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
@@ -801,16 +834,24 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
             if field == "company": continue
             value = _pick(row, names)
             if field == "deal_value":
-                try: value = float(str(value).replace(".","").replace(",", ".")) if value else 0.0
+                try: value = _parse_number(value)
                 except Exception: value = 0.0
             if value != "":
                 data[field] = value
 
-        existing_q = {"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}}
-        country = data.get("country", "")
-        if country:
-            existing_q["country"] = {"$regex": f"^{re.escape(country)}$", "$options": "i"}
-        existing = await db.leads.find_one(existing_q, {"_id": 0})
+        # Match legacy CRM records using normalized company/country values.
+        # Keep the match conservative: no fuzzy merge is done.
+        existing = None
+        company_norm = _norm_company(company)
+        country_norm = _norm_company(data.get("country", ""))
+        candidates = await db.leads.find({}, {"_id": 0}).to_list(5000)
+        for candidate in candidates:
+            if _norm_company(candidate.get("company", "")) != company_norm:
+                continue
+            if country_norm and _norm_company(candidate.get("country", "")) != country_norm:
+                continue
+            existing = candidate
+            break
         if existing:
             updates = {k:v for k,v in data.items() if v not in ("", None) and not existing.get(k)}
             if updates:
