@@ -25,7 +25,8 @@ const TradeIntel = () => {
   const [comexRows, setComexRows] = useState([]);
   const [prospectSummary, setProspectSummary] = useState(null);
   const [comexLoading, setComexLoading] = useState(false);
-  const [marketRows, setMarketRows] = useState([]);\n  const [marketTotals, setMarketTotals] = useState({ volume_kg: 0, fob_usd: 0 });
+  const [marketRows, setMarketRows] = useState([]);
+  const [marketTotals, setMarketTotals] = useState({ volume_kg: 0, fob_usd: 0 });
 
   const load = () => {
     const params = {};
