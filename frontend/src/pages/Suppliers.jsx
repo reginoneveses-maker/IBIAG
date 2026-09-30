@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "@/AuthContext";
-import { PageHeader, Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, toast, Plus, Trash2 } from "@/components/erp";
+import { PageHeader, SectionBar, Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, toast, Plus, Trash2 } from "@/components/erp";
 
 const empty = { name: "", cnpj: "", contact: "", email: "", phone: "", address: "", products: "", notes: "" };
 
-export default function Suppliers() {
+export default function Suppliers({ embedded }) {
   const [items, setItems] = useState([]);
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(empty);
@@ -19,8 +19,10 @@ export default function Suppliers() {
 
   return (
     <div data-testid="suppliers-page">
-      <PageHeader number="03 · Fornecedores" title="Fornecedores" subtitle="Cadastro de fornecedores e parceiros"
-        action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-supplier-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo</Button>} />
+      {embedded
+        ? <SectionBar title="Cadastro de Fornecedores" subtitle="Dados completos: CNPJ, contato, produtos fornecidos" action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-supplier-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Fornecedor</Button>} />
+        : <PageHeader number="03 · Fornecedores" title="Fornecedores" subtitle="Cadastro de fornecedores e parceiros"
+        action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-supplier-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo</Button>} />}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {items.map(s => (
           <Card key={s.id} className="bg-white border-[#0F382C]/10">

@@ -222,6 +222,7 @@ class Contract(BaseModel):
     title: str
     kind: str = "contract"  # contract ou certification
     party: str = ""
+    supplier_id: str = ""
     start_date: str = ""
     end_date: str = ""
     value: float = 0
@@ -241,6 +242,81 @@ class Document(BaseModel):
     size: int = 0
     tags: List[str] = []
     notes: str = ""
+    created_at: str = Field(default_factory=now_iso)
+
+class Certification(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supplier_id: str
+    supplier_name: str = ""
+    name: str
+    kind: str = "organic"  # organic ou other
+    issuer: str = ""
+    number: str = ""
+    issue_date: str = ""
+    expiry_date: str = ""
+    alert_days: int = 30
+    file_path: str = ""
+    file_name: str = ""
+    notes: str = ""
+    created_at: str = Field(default_factory=now_iso)
+
+class Purchase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supplier_id: str = ""
+    supplier_name: str = ""
+    product: str
+    quantity: float = 0
+    unit: str = "kg"
+    unit_price: float = 0
+    total: float = 0
+    currency: str = "BRL"
+    date: str = ""
+    status: str = "ordered"  # ordered, received, paid, cancelled
+    invoice_number: str = ""
+    file_path: str = ""
+    file_name: str = ""
+    notes: str = ""
+    created_at: str = Field(default_factory=now_iso)
+
+class Spec(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    supplier_id: str
+    supplier_name: str = ""
+    product_name: str
+    code: str = ""
+    version: str = "1.0"
+    description: str = ""
+    original_file_path: str = ""
+    original_file_name: str = ""
+    ibiag_file_path: str = ""
+    ibiag_file_name: str = ""
+    notes: str = ""
+    updated_at: str = Field(default_factory=now_iso)
+    created_at: str = Field(default_factory=now_iso)
+
+class PriceEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_name: str
+    supplier_id: str = ""
+    supplier_name: str = ""
+    unit: str = "kg"
+    supplier_price: float = 0  # BRL por unidade
+    extra_costs: float = 0  # BRL por unidade (frete, embalagem, etc)
+    extras: List[dict] = []
+    taxes: List[dict] = []
+    taxes_pct: float = 0
+    margin_pct: float = 0
+    margin_mode: str = "margin"  # margin (sobre venda) ou markup (sobre custo)
+    currency: str = "BRL"
+    exchange_rate: float = 5.0
+    sell_price_brl: float = 0
+    sell_price_usd: float = 0
+    notes: str = ""
+    updated_at: str = Field(default_factory=now_iso)
     created_at: str = Field(default_factory=now_iso)
 
 # ============ AUTH ============
@@ -428,9 +504,186 @@ async def list_con(kind: Optional[str] = None, user=Depends(get_current_user)):
 async def create_con(c: Contract, user=Depends(get_current_user)):
     await db.contracts.insert_one(c.model_dump()); return c
 
+@api.put("/contracts/{cid}", response_model=Contract)
+async def upd_con(cid: str, c: Contract, user=Depends(get_current_user)):
+    c.id = cid; await db.contracts.replace_one({"id": cid}, c.model_dump()); return c
+
 @api.delete("/contracts/{cid}")
 async def del_con(cid: str, user=Depends(get_current_user)):
     r = await db.contracts.delete_one({"id": cid}); return {"deleted": r.deleted_count}
+
+# ============ CERTIFICATIONS (por fornecedor) ============
+@api.get("/certifications", response_model=List[Certification])
+async def list_cert(supplier_id: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"supplier_id": supplier_id} if supplier_id else {}
+    return await db.certifications.find(q, {"_id": 0}).sort("expiry_date", 1).to_list(1000)
+
+@api.post("/certifications", response_model=Certification)
+async def create_cert(c: Certification, user=Depends(get_current_user)):
+    await db.certifications.insert_one(c.model_dump()); return c
+
+@api.put("/certifications/{cid}", response_model=Certification)
+async def upd_cert(cid: str, c: Certification, user=Depends(get_current_user)):
+    c.id = cid; await db.certifications.replace_one({"id": cid}, c.model_dump()); return c
+
+@api.delete("/certifications/{cid}")
+async def del_cert(cid: str, user=Depends(get_current_user)):
+    r = await db.certifications.delete_one({"id": cid}); return {"deleted": r.deleted_count}
+
+# ============ PURCHASES (Compras) ============
+@api.get("/purchases", response_model=List[Purchase])
+async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = None, user=Depends(get_current_user)):
+    q = {}
+    if status: q["status"] = status
+    if supplier_id: q["supplier_id"] = supplier_id
+    return await db.purchases.find(q, {"_id": 0}).sort("date", -1).to_list(1000)
+
+@api.post("/purchases", response_model=Purchase)
+async def create_pur(p: Purchase, user=Depends(get_current_user)):
+    p.total = round(p.quantity * p.unit_price, 2) if not p.total else p.total
+    await db.purchases.insert_one(p.model_dump()); return p
+
+@api.put("/purchases/{pid}", response_model=Purchase)
+async def upd_pur(pid: str, p: Purchase, user=Depends(get_current_user)):
+    p.id = pid
+    p.total = round(p.quantity * p.unit_price, 2) if not p.total else p.total
+    await db.purchases.replace_one({"id": pid}, p.model_dump()); return p
+
+@api.delete("/purchases/{pid}")
+async def del_pur(pid: str, user=Depends(get_current_user)):
+    r = await db.purchases.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+
+# ============ SPECS (Prospecção IBIAG) ============
+@api.get("/specs", response_model=List[Spec])
+async def list_specs(supplier_id: Optional[str] = None, user=Depends(get_current_user)):
+    q = {"supplier_id": supplier_id} if supplier_id else {}
+    return await db.specs.find(q, {"_id": 0}).sort("product_name", 1).to_list(1000)
+
+@api.post("/specs", response_model=Spec)
+async def create_spec(s: Spec, user=Depends(get_current_user)):
+    await db.specs.insert_one(s.model_dump()); return s
+
+@api.put("/specs/{sid}", response_model=Spec)
+async def upd_spec(sid: str, s: Spec, user=Depends(get_current_user)):
+    s.id = sid; s.updated_at = now_iso()
+    await db.specs.replace_one({"id": sid}, s.model_dump()); return s
+
+@api.delete("/specs/{sid}")
+async def del_spec(sid: str, user=Depends(get_current_user)):
+    r = await db.specs.delete_one({"id": sid}); return {"deleted": r.deleted_count}
+
+# ============ PRICES ============
+def compute_price(p: PriceEntry) -> PriceEntry:
+    extras_sum = sum(float(e.get("value", 0) or 0) for e in p.extras) if p.extras else p.extra_costs
+    p.extra_costs = round(extras_sum, 4)
+    taxes_pct = sum(float(t.get("pct", 0) or 0) for t in p.taxes) if p.taxes else p.taxes_pct
+    p.taxes_pct = round(taxes_pct, 4)
+    cost = p.supplier_price + p.extra_costs
+    if p.margin_mode == "markup":
+        base = cost * (1 + p.margin_pct / 100)
+        price = base / (1 - taxes_pct / 100) if taxes_pct < 100 else base
+    else:
+        divisor = 1 - (p.margin_pct + taxes_pct) / 100
+        price = cost / divisor if divisor > 0 else cost
+    p.sell_price_brl = round(price, 4)
+    p.sell_price_usd = round(price / p.exchange_rate, 4) if p.exchange_rate > 0 else 0
+    return p
+
+@api.get("/prices", response_model=List[PriceEntry])
+async def list_prices(user=Depends(get_current_user)):
+    return await db.prices.find({}, {"_id": 0}).sort("product_name", 1).to_list(1000)
+
+@api.post("/prices/calculate", response_model=PriceEntry)
+async def calc_price(p: PriceEntry, user=Depends(get_current_user)):
+    return compute_price(p)
+
+@api.post("/prices", response_model=PriceEntry)
+async def create_price(p: PriceEntry, user=Depends(get_current_user)):
+    p = compute_price(p)
+    await db.prices.insert_one(p.model_dump()); return p
+
+@api.put("/prices/{pid}", response_model=PriceEntry)
+async def upd_price(pid: str, p: PriceEntry, user=Depends(get_current_user)):
+    p.id = pid; p.updated_at = now_iso(); p = compute_price(p)
+    await db.prices.replace_one({"id": pid}, p.model_dump()); return p
+
+@api.delete("/prices/{pid}")
+async def del_price(pid: str, user=Depends(get_current_user)):
+    r = await db.prices.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+
+# ============ CASHFLOW ============
+@api.get("/finance/cashflow")
+async def cashflow(months: int = 12, user=Depends(get_current_user)):
+    today = datetime.now(timezone.utc)
+    keys = []
+    y, m = today.year, today.month
+    for _ in range(months):
+        keys.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m == 0: m = 12; y -= 1
+    keys.reverse()
+    data = {k: {"month": k, "receivable": 0.0, "payable": 0.0, "received": 0.0, "paid": 0.0, "nf_saida": 0.0, "nf_entrada": 0.0} for k in keys}
+    async for f in db.finance.find({}, {"_id": 0}):
+        k = (f.get("due_date") or "")[:7]
+        if k not in data: continue
+        amt = float(f.get("amount", 0) or 0)
+        if f.get("kind") == "receivable":
+            data[k]["receivable"] += amt
+            if f.get("paid"): data[k]["received"] += amt
+        else:
+            data[k]["payable"] += amt
+            if f.get("paid"): data[k]["paid"] += amt
+    async for i in db.invoices.find({}, {"_id": 0}):
+        k = (i.get("issue_date") or "")[:7]
+        if k not in data: continue
+        amt = float(i.get("total", 0) or 0)
+        if i.get("kind") == "saida": data[k]["nf_saida"] += amt
+        else: data[k]["nf_entrada"] += amt
+    out = []
+    running = 0.0
+    for k in keys:
+        d = data[k]
+        d["balance"] = round(d["receivable"] - d["payable"], 2)
+        running += d["balance"]
+        d["cumulative"] = round(running, 2)
+        for f in ("receivable", "payable", "received", "paid", "nf_saida", "nf_entrada"):
+            d[f] = round(d[f], 2)
+        out.append(d)
+    return out
+
+# ============ GESTÃO STATS ============
+@api.get("/gestao/stats")
+async def gestao_stats(user=Depends(get_current_user)):
+    today = datetime.now(timezone.utc).date()
+    certs = await db.certifications.find({}, {"_id": 0}).to_list(2000)
+    expiring, expired = [], []
+    for c in certs:
+        if not c.get("expiry_date"): continue
+        try: exp = datetime.strptime(c["expiry_date"][:10], "%Y-%m-%d").date()
+        except ValueError: continue
+        days = (exp - today).days
+        item = {"id": c["id"], "name": c["name"], "supplier_name": c.get("supplier_name", ""), "supplier_id": c.get("supplier_id", ""), "expiry_date": c["expiry_date"], "days": days}
+        if days < 0: expired.append(item)
+        elif days <= int(c.get("alert_days", 30) or 30): expiring.append(item)
+    soon = (today + timedelta(days=30)).isoformat()
+    contracts_expiring = await db.contracts.count_documents({"end_date": {"$gte": today.isoformat(), "$lte": soon}})
+    fin_recv = 0.0; fin_pay = 0.0
+    async for d in db.finance.aggregate([{"$match": {"paid": False}}, {"$group": {"_id": "$kind", "total": {"$sum": "$amount"}}}]):
+        if d["_id"] == "receivable": fin_recv = d["total"]
+        else: fin_pay = d["total"]
+    return {
+        "certs_total": len(certs), "certs_expiring": sorted(expiring, key=lambda x: x["days"]),
+        "certs_expired": sorted(expired, key=lambda x: x["days"]),
+        "contracts_expiring": contracts_expiring,
+        "purchases_open": await db.purchases.count_documents({"status": {"$in": ["ordered", "received"]}}),
+        "suppliers": await db.suppliers.count_documents({}),
+        "specs": await db.specs.count_documents({}),
+        "prices": await db.prices.count_documents({}),
+        "pops": await db.documents.count_documents({"category": {"$in": ["pop", "pop_signed"]}}),
+        "invoices_in": await db.invoices.count_documents({"kind": "entrada"}),
+        "invoices_out": await db.invoices.count_documents({"kind": "saida"}),
+        "finance_receivable": fin_recv, "finance_payable": fin_pay,
+    }
 
 # ============ INVENTORY ============
 class StockUpd(BaseModel):

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { api } from "@/AuthContext";
-import { PageHeader, Button, Input, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, Plus, Trash2, fmtBRL } from "@/components/erp";
+import { PageHeader, SectionBar, Button, Input, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, Plus, Trash2, fmtBRL } from "@/components/erp";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const empty = { kind: "receivable", description: "", party: "", amount: 0, currency: "BRL", due_date: "", category: "" };
 
-export default function Finance() {
+export default function Finance({ embedded }) {
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
   const [dialog, setDialog] = useState(false);
@@ -24,8 +24,10 @@ export default function Finance() {
 
   return (
     <div data-testid="finance-page">
-      <PageHeader number="05 · Financeiro" title="Financeiro" subtitle="Contas a pagar e a receber"
-        action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />
+      {embedded
+        ? <SectionBar title="Contas a pagar e a receber" subtitle="Lançamentos que alimentam o fluxo de caixa acima" action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />
+        : <PageHeader number="05 · Financeiro" title="Financeiro" subtitle="Contas a pagar e a receber"
+        action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />}
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
           <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">A Receber</div>

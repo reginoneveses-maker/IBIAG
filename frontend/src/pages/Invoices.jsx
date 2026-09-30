@@ -1,19 +1,20 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "@/AuthContext";
-import { PageHeader, Button, Input, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, useUpload, toast, Plus, Trash2, Upload, Download, fmtBRL } from "@/components/erp";
+import { PageHeader, SectionBar, Button, Input, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, useUpload, toast, Plus, Trash2, Upload, Download, fmtBRL } from "@/components/erp";
 
-const empty = { number: "", kind: "entrada", party_name: "", party_cnpj: "", issue_date: "", total: 0, description: "", file_path: "", file_name: "" };
+const blank = { number: "", kind: "entrada", party_name: "", party_cnpj: "", issue_date: "", total: 0, description: "", file_path: "", file_name: "" };
 
-export default function Invoices() {
+export default function Invoices({ kind, embedded }) {
+  const empty = { ...blank, kind: kind || "entrada" };
   const [items, setItems] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(kind || "all");
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(empty);
   const { el, doUpload, uploading } = useUpload();
   const xmlRef = useRef();
 
-  const load = () => api.get("/invoices").then(r => setItems(r.data));
-  useEffect(() => { load(); }, []);
+  const load = () => api.get("/invoices", { params: kind ? { kind } : {} }).then(r => setItems(r.data));
+  useEffect(() => { load(); }, [kind]); // eslint-disable-line
 
   const save = async () => {
     if (!form.number) return toast.error("Número obrigatório");
@@ -35,7 +36,7 @@ export default function Invoices() {
         // Also upload the file
         const fd2 = new FormData(); fd2.append("file", f);
         const up = await api.post("/upload", fd2, { headers: { "Content-Type": "multipart/form-data" } });
-        setForm({ ...empty, ...r.data, file_path: up.data.path, file_name: up.data.name });
+        setForm({ ...empty, ...r.data, kind: kind || r.data.kind, file_path: up.data.path, file_name: up.data.name });
         setDialog(true);
         toast.success("XML processado");
       } catch { toast.error("Falha ao ler XML"); }
@@ -51,28 +52,36 @@ export default function Invoices() {
   return (
     <div data-testid="invoices-page">
       {el}<input ref={xmlRef} type="file" accept=".xml" className="hidden" />
-      <PageHeader number="02 · Notas Fiscais" title="Notas Fiscais" subtitle="Entrada e saída — XML NF-e ou registro manual"
-        action={<div className="flex gap-2">
-          <Button onClick={parseXML} variant="outline" data-testid="parse-xml-button"><Upload className="w-4 h-4 mr-1" />Importar XML</Button>
+      {(() => {
+        const actions = <div className="flex gap-2">
+          <Button onClick={parseXML} variant="outline" data-testid="parse-xml-button"><Upload className="w-4 h-4 mr-1" />Importar XML NF-e</Button>
           <Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-invoice-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Nova NF</Button>
-        </div>} />
+        </div>;
+        return embedded
+          ? <SectionBar title={kind === "saida" ? "Notas Fiscais de Saída" : "Notas Fiscais de Entrada"} subtitle="Importe o XML da NF-e para preencher automaticamente" action={actions} />
+          : <PageHeader number="02 · Notas Fiscais" title="Notas Fiscais" subtitle="Entrada e saída — XML NF-e ou registro manual" action={actions} />;
+      })()}
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
-          <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">Entradas</div>
-          <div className="font-display text-2xl font-bold text-[#0F382C]">{fmtBRL(totalIn)}</div>
-        </CardContent></Card>
-        <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
-          <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">Saídas</div>
-          <div className="font-display text-2xl font-bold text-amber-700">{fmtBRL(totalOut)}</div>
-        </CardContent></Card>
+      <div className={`grid gap-4 mb-6 ${kind ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2"}`}>
+        {(!kind || kind === "entrada") && <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
+          <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">Total Entradas</div>
+          <div className="font-display text-2xl font-bold text-[#0F382C]" data-testid="inv-total-in">{fmtBRL(totalIn)}</div>
+        </CardContent></Card>}
+        {(!kind || kind === "saida") && <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
+          <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">Total Saídas</div>
+          <div className="font-display text-2xl font-bold text-amber-700" data-testid="inv-total-out">{fmtBRL(totalOut)}</div>
+        </CardContent></Card>}
+        {kind && <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
+          <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60">Quantidade</div>
+          <div className="font-display text-2xl font-bold text-[#0F382C]" data-testid="inv-count">{items.length}</div>
+        </CardContent></Card>}
       </div>
 
-      <div className="flex gap-2 mb-4">
+      {!kind && <div className="flex gap-2 mb-4">
         {[["all", "Todas"], ["entrada", "Entrada"], ["saida", "Saída"]].map(([k, l]) => (
           <button key={k} onClick={() => setFilter(k)} data-testid={`inv-filter-${k}`} className={`px-3 py-1.5 text-sm rounded-full border ${filter === k ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15"}`}>{l}</button>
         ))}
-      </div>
+      </div>}
 
       <div className="space-y-2">
         {filtered.map(i => (
@@ -97,8 +106,8 @@ export default function Invoices() {
           <DialogHeader><DialogTitle>Nota Fiscal</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-2">
             <Input placeholder="Número" value={form.number} onChange={e => setForm({...form, number: e.target.value})} data-testid="inv-number-input" />
-            <Select value={form.kind} onValueChange={v => setForm({...form, kind: v})}>
-              <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+            <Select value={form.kind} onValueChange={v => setForm({...form, kind: v})} disabled={!!kind}>
+              <SelectTrigger className="bg-white" data-testid="inv-kind-select"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-white"><SelectItem value="entrada">Entrada</SelectItem><SelectItem value="saida">Saída</SelectItem></SelectContent>
             </Select>
             <Input placeholder="Parte (Fornecedor/Cliente)" value={form.party_name} onChange={e => setForm({...form, party_name: e.target.value})} className="col-span-2" />
