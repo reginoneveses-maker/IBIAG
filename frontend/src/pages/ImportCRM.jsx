@@ -16,7 +16,7 @@ const ImportCRM = () => {
     try {
       const body = new FormData();
       body.append("file", file);
-      const r = await api.post("/leads/import", body, { headers: { "Content-Type": "multipart/form-data" } });
+      const r = await api.post("/leads/import", body);
       setResult(r.data);
       toast.success("Importação concluída.");
     } catch (e) {
