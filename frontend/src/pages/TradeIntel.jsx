@@ -138,6 +138,27 @@ const TradeIntel = () => {
           </Button>
         </div>
 
+        {prospectSummary && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
+              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">NCM</div>
+              <div className="font-semibold text-[#0F382C]">{prospectSummary.ncm || "Todos"}</div>
+            </div>
+            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
+              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Período</div>
+              <div className="font-semibold text-[#0F382C]">{prospectSummary.period?.from} → {prospectSummary.period?.to}</div>
+            </div>
+            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
+              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Fluxo</div>
+              <div className="font-semibold text-[#0F382C]">{prospectSummary.flow === "import" ? "Importação" : "Exportação"}</div>
+            </div>
+            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
+              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Fonte</div>
+              <div className="font-semibold text-[#0F382C]">Comex Stat / MDIC</div>
+            </div>
+          </div>
+        )}
+
         {comexRows.length > 0 && (
           <div className="overflow-x-auto rounded-lg border border-[#0F382C]/10">
             <Table>
