@@ -9,6 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
+from comexstat_market import normalize_markets
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -978,10 +979,41 @@ async def comexstat_prospect(payload: dict, user=Depends(get_current_user)):
             "metrics": ["metricFOB", "metricKG"],
         }
         data = comex_general(query)
-        return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data}
+        markets = normalize_markets(data)
+        return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data, "markets": markets}
     except (requests.RequestException, ValueError) as e:
         logging.exception("Comex Stat prospect query failed")
         raise HTTPException(502, f"Não foi possível montar o prospecting snapshot: {str(e)[:180]}")
+
+@api.post("/comexstat/markets")
+async def comexstat_markets(payload: dict, user=Depends(get_current_user)):
+    """Return normalized country-market aggregates for a product/NCM."""
+    try:
+        flow = payload.get("flow", "export")
+        period = payload.get("period") or {"from": "2026-01", "to": "2026-08"}
+        ncm = str(payload.get("ncm", "")).strip()
+        filters = []
+        if ncm:
+            filters.append({"filter": "ncm", "values": [int(ncm)]})
+        query = {
+            "flow": flow,
+            "monthDetail": False,
+            "period": period,
+            "filters": filters,
+            "details": ["country"],
+            "metrics": ["metricFOB", "metricKG"],
+        }
+        data = comex_general(query)
+        return {
+            "flow": flow,
+            "period": period,
+            "ncm": ncm,
+            "source": "Comex Stat / MDIC",
+            "markets": normalize_markets(data),
+        }
+    except (requests.RequestException, ValueError) as e:
+        logging.exception("Comex Stat markets query failed")
+        raise HTTPException(502, f"Não foi possível montar os mercados: {str(e)[:180]}")
 
 @api.post("/comexstat/general")
 async def comexstat_general(payload: dict, user=Depends(get_current_user)):
