@@ -2,7 +2,7 @@ import { NavLink, Outlet, Link } from "react-router-dom";
 import { useLang } from "@/i18n";
 import { useAuth } from "@/AuthContext";
 import { Toaster } from "@/components/ui/sonner";
-import { LayoutDashboard, Package, Kanban, Globe2, Mail, CheckSquare, Leaf, ShoppingCart, Boxes, LogOut, ClipboardList, Wallet, Truck, FlaskConical, Calculator, LayoutGrid, Building2 } from "lucide-react";
+import { LayoutDashboard, Package, Kanban, Globe2, Mail, CheckSquare, Leaf, ShoppingCart, Boxes, LogOut, ClipboardList, Wallet, Truck, FlaskConical, Calculator, LayoutGrid, Building2, Upload } from "lucide-react";
 
 const Layout = ({ module = "crm" }) => {
   const { lang, setLang, t } = useLang();
@@ -24,6 +24,7 @@ const Layout = ({ module = "crm" }) => {
     { to: "/prospects/tasks", icon: CheckSquare, label: t("nav_tasks"), testId: "nav-tasks" },
     { to: "/prospects/orders", icon: ShoppingCart, label: t("nav_orders"), testId: "nav-orders" },
     { to: "/prospects/inventory", icon: Boxes, label: t("nav_inventory"), testId: "nav-inventory" },
+    { to: "/prospects/import", icon: Upload, label: "Importar CRM", testId: "nav-import" },
   ];
 
   const brand = module === "gestao"
