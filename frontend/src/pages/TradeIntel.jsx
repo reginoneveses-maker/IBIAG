@@ -16,6 +16,14 @@ const TradeIntel = () => {
   const [country, setCountry] = useState("all");
   const [industry, setIndustry] = useState("all");
   const [countries, setCountries] = useState([]);
+  const [comexSearch, setComexSearch] = useState("");
+  const [ncmOptions, setNcmOptions] = useState([]);
+  const [selectedNcm, setSelectedNcm] = useState("");
+  const [comexFrom, setComexFrom] = useState("2026-01");
+  const [comexTo, setComexTo] = useState("2026-08");
+  const [comexFlow, setComexFlow] = useState("export");
+  const [comexRows, setComexRows] = useState([]);
+  const [comexLoading, setComexLoading] = useState(false);
 
   const load = () => {
     const params = {};
@@ -40,6 +48,46 @@ const TradeIntel = () => {
     }).catch(() => {});
   }, []);
 
+  const searchNcm = async () => {
+    if (!comexSearch.trim()) return;
+    try {
+      const r = await api.get("/comexstat/ncm", { params: { search: comexSearch, per_page: 30 } });
+      const raw = r.data?.data || r.data?.items || r.data?.results || r.data || [];
+      const list = Array.isArray(raw) ? raw : [];
+      setNcmOptions(list);
+      if (list.length === 1) {
+        const x = list[0];
+        setSelectedNcm(String(x.coNcm ?? x.co_ncm ?? x.code ?? x.codigo ?? ""));
+      }
+    } catch (e) {
+      toast.error("Não foi possível consultar os NCMs no Comex Stat.");
+    }
+  };
+
+  const queryComex = async () => {
+    setComexLoading(true);
+    try {
+      const details = selectedNcm ? ["ncm", "country"] : ["country"];
+      const filters = selectedNcm ? [{ field: "ncm", values: [selectedNcm] }] : [];
+      const payload = {
+        flow: comexFlow,
+        monthDetail: false,
+        period: { from: comexFrom, to: comexTo },
+        filters,
+        details,
+        metrics: ["metricFOB", "metricKG"]
+      };
+      const r = await api.post("/comexstat/general", payload);
+      const raw = r.data?.data || r.data?.items || r.data?.results || r.data || [];
+      setComexRows(Array.isArray(raw) ? raw : []);
+    } catch (e) {
+      toast.error("Comex Stat não respondeu. Verifique o período e o NCM.");
+      setComexRows([]);
+    } finally {
+      setComexLoading(false);
+    }
+  };
+
   const addToCrm = async (id) => {
     await api.post(`/trade-data/${id}/add-to-crm`);
     toast.success(t("added_to_crm"));
@@ -53,6 +101,65 @@ const TradeIntel = () => {
         </div>
         <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#0F382C]">{t("trade_title")}</h1>
         <p className="text-base text-[#0F382C]/70 mt-1">{t("trade_subtitle")}</p>
+      </div>
+
+
+
+      <div className="rounded-xl border border-[#0F382C]/10 bg-white/95 p-5 space-y-4" data-testid="comexstat-panel">
+        <div>
+          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#0F382C]/60">COMEX STAT · MDIC</div>
+          <h2 className="font-display text-xl font-bold text-[#0F382C]">Inteligência oficial de comércio exterior</h2>
+          <p className="text-sm text-[#0F382C]/60 mt-1">Consulte NCM, destino/mercado e valores oficiais. O Comex Stat não divulga o nome das empresas importadoras.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+          <div className="md:col-span-2 flex gap-2">
+            <Input value={comexSearch} onChange={e => setComexSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && searchNcm()} placeholder="Buscar NCM / descrição" className="bg-white" />
+            <Button onClick={searchNcm} variant="outline">Buscar NCM</Button>
+          </div>
+          <Select value={selectedNcm || "none"} onValueChange={v => setSelectedNcm(v === "none" ? "" : v)}>
+            <SelectTrigger className="bg-white"><SelectValue placeholder="NCM" /></SelectTrigger>
+            <SelectContent className="bg-white max-h-72">
+              <SelectItem value="none">Todos os NCMs</SelectItem>
+              {ncmOptions.map((x, i) => {
+                const code = String(x.coNcm ?? x.co_ncm ?? x.code ?? x.codigo ?? "");
+                const label = x.noNcm ?? x.no_ncm ?? x.description ?? x.nome ?? code;
+                return <SelectItem key={code || i} value={code}>{code} — {label}</SelectItem>;
+              })}
+            </SelectContent>
+          </Select>
+          <Select value={comexFlow} onValueChange={setComexFlow}>
+            <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectItem value="export">Exportação</SelectItem>
+              <SelectItem value="import">Importação</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="month" value={comexFrom} onChange={e => setComexFrom(e.target.value)} className="bg-white" />
+          <Input type="month" value={comexTo} onChange={e => setComexTo(e.target.value)} className="bg-white" />
+          <Button onClick={queryComex} disabled={comexLoading} className="bg-[#0F382C] hover:bg-[#0A2920] text-white">
+            {comexLoading ? "Consultando..." : "Consultar Comex Stat"}
+          </Button>
+        </div>
+
+        {comexRows.length > 0 && (
+          <div className="overflow-x-auto rounded-lg border border-[#0F382C]/10">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-[#0F382C] hover:bg-[#0F382C]">
+                  {Object.keys(comexRows[0]).slice(0, 8).map(k => <TableHead key={k} className="text-amber-300 text-[10px] uppercase">{k}</TableHead>)}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {comexRows.slice(0, 100).map((row, i) => (
+                  <TableRow key={i}>
+                    {Object.keys(comexRows[0]).slice(0, 8).map(k => <TableCell key={k} className="text-xs">{typeof row[k] === "number" ? row[k].toLocaleString("pt-BR") : String(row[k] ?? "")}</TableCell>)}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
