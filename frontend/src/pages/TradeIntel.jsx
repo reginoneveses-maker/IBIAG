@@ -68,18 +68,12 @@ const TradeIntel = () => {
   const queryComex = async () => {
     setComexLoading(true);
     try {
-      const details = selectedNcm ? ["ncm", "country"] : ["country"];
-      const filters = selectedNcm ? [{ field: "ncm", values: [selectedNcm] }] : [];
-      const payload = {
+      const r = await api.post("/comexstat/prospect", {
         flow: comexFlow,
-        monthDetail: false,
         period: { from: comexFrom, to: comexTo },
-        filters,
-        details,
-        metrics: ["metricFOB", "metricKG"]
-      };
-      const r = await api.post("/comexstat/prospect", { flow: comexFlow, period: { from: comexFrom, to: comexTo }, ncm: selectedNcm });
-      const raw = r.data?.data || r.data?.items || r.data?.results || r.data || [];
+        ncm: selectedNcm
+      });
+      const raw = r.data?.data?.list || r.data?.data?.data || r.data?.data || r.data?.items || r.data?.results || r.data || [];
       setComexRows(Array.isArray(raw) ? raw : []);
       setProspectSummary(r.data);
     } catch (e) {
