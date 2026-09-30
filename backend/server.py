@@ -798,6 +798,8 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
     df.columns = [_norm_col(c) for c in df.columns]
     imported = updated = skipped = 0
     errors = []
+    # Load existing CRM records once; avoids one database scan per imported row.
+    candidates = await db.leads.find({}, {"_id": 0}).to_list(5000)
 
     aliases = {
         "company": ["company","empresa","razao_social","razão_social","nome_empresa","cliente"],
@@ -844,7 +846,6 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
         existing = None
         company_norm = _norm_company(company)
         country_norm = _norm_company(data.get("country", ""))
-        candidates = await db.leads.find({}, {"_id": 0}).to_list(5000)
         for candidate in candidates:
             if _norm_company(candidate.get("company", "")) != company_norm:
                 continue
@@ -862,7 +863,9 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
                 skipped += 1
         else:
             lead = Lead(**data)
-            await db.leads.insert_one(lead.model_dump())
+            lead_doc = lead.model_dump()
+            await db.leads.insert_one(lead_doc)
+            candidates.append(lead_doc)
             imported += 1
 
     return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
