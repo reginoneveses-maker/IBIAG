@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { api, fmtUSD } from "@/lib/api";
 import { useLang } from "@/i18n";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Package, DollarSign, TrendingUp, Trophy, XCircle } from "lucide-react";
+import { Users, Package, DollarSign, TrendingUp, Trophy, XCircle, FileText, Receipt, Truck, ShoppingCart, Wallet, FileSignature } from "lucide-react";
+import { fmtBRL } from "@/lib/api";
+import { Link } from "react-router-dom";
 
 const Dashboard = () => {
   const { t } = useLang();
@@ -97,6 +99,43 @@ const Dashboard = () => {
             })}
           </CardContent>
         </Card>
+      </div>
+
+      <div>
+        <h2 className="font-display text-xl font-bold text-[#0F382C] mb-3">Gestão da Empresa</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Link to="/documents" className="p-4 rounded-xl bg-white border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-documents">
+            <FileText className="w-5 h-5 text-[#0F382C]" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">Documentos</div>
+            <div className="font-display text-xl font-bold text-[#0F382C]">{stats?.documents ?? 0}</div>
+          </Link>
+          <Link to="/invoices" className="p-4 rounded-xl bg-white border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-invoices">
+            <Receipt className="w-5 h-5 text-[#0F382C]" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">NFs</div>
+            <div className="font-display text-xl font-bold text-[#0F382C]">{stats?.invoices ?? 0}</div>
+          </Link>
+          <Link to="/suppliers" className="p-4 rounded-xl bg-white border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-suppliers">
+            <Truck className="w-5 h-5 text-[#0F382C]" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">Fornecedores</div>
+            <div className="font-display text-xl font-bold text-[#0F382C]">{stats?.suppliers ?? 0}</div>
+          </Link>
+          <Link to="/orders" className="p-4 rounded-xl bg-white border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-orders">
+            <ShoppingCart className="w-5 h-5 text-[#0F382C]" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">Pedidos Ativos</div>
+            <div className="font-display text-xl font-bold text-[#0F382C]">{stats?.orders_pending ?? 0}</div>
+          </Link>
+          <Link to="/finance" className="p-4 rounded-xl bg-white border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-finance">
+            <Wallet className="w-5 h-5 text-emerald-700" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">A Receber</div>
+            <div className="font-display text-base font-bold text-emerald-700">{fmtBRL(stats?.finance_receivable ?? 0)}</div>
+            <div className="text-[10px] text-rose-600 mt-1">Pagar: {fmtBRL(stats?.finance_payable ?? 0)}</div>
+          </Link>
+          <Link to="/contracts" className={`p-4 rounded-xl bg-white border transition-all ${(stats?.contracts_expiring ?? 0) > 0 ? "border-amber-500" : "border-[#0F382C]/10 hover:border-amber-600/40"}`} data-testid="erp-contracts">
+            <FileSignature className="w-5 h-5 text-[#0F382C]" />
+            <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60 mt-3">Vencendo (30d)</div>
+            <div className={`font-display text-xl font-bold ${(stats?.contracts_expiring ?? 0) > 0 ? "text-amber-700" : "text-[#0F382C]"}`}>{stats?.contracts_expiring ?? 0}</div>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

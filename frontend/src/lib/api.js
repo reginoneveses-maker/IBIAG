@@ -1,9 +1,4 @@
-import axios from "axios";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-export const API = `${BACKEND_URL}/api`;
-
-export const api = axios.create({ baseURL: API });
+export { api, API } from "@/AuthContext";
 
 export const STAGES = ["new_lead", "initial_contact", "sample_sent", "negotiation", "closed_won", "closed_lost"];
 export const INDUSTRIES = ["beverage", "cosmetics", "food_service", "distributor"];
@@ -25,3 +20,4 @@ export const flag = (code) => {
 };
 
 export const fmtUSD = (v) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v || 0);
+export const fmtBRL = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(v || 0);

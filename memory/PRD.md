@@ -36,3 +36,37 @@ Preciso criar um app para prospecção de clientes pro meu negócio, eu vendo in
 - P2: Integração real com ComexStat (dados oficiais MDIC)
 - P2: Envio direto de email/WhatsApp via templates
 - P2: Anexo de COAs e fichas técnicas nos produtos
+
+---
+
+## Iteração 2 — Sistema de Gestão Empresarial (2026-02-29)
+
+Expandido de CRM para **ERP + CRM** completo com autenticação.
+
+### Novos módulos entregues
+- **Autenticação JWT** (email/senha, bcrypt, Bearer token)
+- **Object Storage Emergent** para upload/download de arquivos
+- **Documentos**: PDFs, imagens, XMLs organizados por categoria
+- **Notas Fiscais**: entrada/saída, parse automático de XML NF-e, anexo PDF/XML
+- **Fornecedores**: cadastro com CNPJ, contato, produtos
+- **Pedidos de Venda**: com status (draft→delivered), Incoterms, USD
+- **Financeiro**: contas a pagar/receber, filtros pendentes/pagos, totalizadores BRL
+- **Estoque**: controle por SKU/produto com update rápido
+- **Contratos & Certificações**: alerta de vencimento em 30 dias, badge visual
+
+### Endpoints novos
+- `/api/auth/{register,login,me,logout}`
+- `/api/upload`, `/api/files/{path}`
+- `/api/documents`, `/api/invoices` (+ `parse-xml`), `/api/suppliers`, `/api/orders`, `/api/finance` (+ `toggle-paid`), `/api/contracts`, `/api/products/{id}/stock`
+- Dashboard estendido com KPIs de ERP: documents, invoices, suppliers, orders_pending, finance_receivable, finance_payable, contracts_expiring
+
+### Credenciais (admin/owner)
+- Email: `reginoneveses@gmail.com`
+- Senha: `AgroBrasil@2026`
+
+### Backlog restante
+- P1: Parse automático de PDF de NF-e (hoje só XML)
+- P1: Dashboard financeiro com gráfico de fluxo de caixa mensal
+- P2: Módulo de usuários (convidar funcionários com permissões)
+- P2: Alertas por email quando contrato vence (integrar Resend)
+- P2: Exportar relatórios em PDF (financeiro, pedidos, estoque)
