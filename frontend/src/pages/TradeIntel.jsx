@@ -23,6 +23,7 @@ const TradeIntel = () => {
   const [comexTo, setComexTo] = useState("2026-08");
   const [comexFlow, setComexFlow] = useState("export");
   const [comexRows, setComexRows] = useState([]);
+  const [prospectSummary, setProspectSummary] = useState(null);
   const [comexLoading, setComexLoading] = useState(false);
 
   const load = () => {
@@ -77,9 +78,10 @@ const TradeIntel = () => {
         details,
         metrics: ["metricFOB", "metricKG"]
       };
-      const r = await api.post("/comexstat/general", payload);
+      const r = await api.post("/comexstat/prospect", { flow: comexFlow, period: { from: comexFrom, to: comexTo }, ncm: selectedNcm });
       const raw = r.data?.data || r.data?.items || r.data?.results || r.data || [];
       setComexRows(Array.isArray(raw) ? raw : []);
+      setProspectSummary(r.data);
     } catch (e) {
       toast.error("Comex Stat não respondeu. Verifique o período e o NCM.");
       setComexRows([]);
