@@ -13,6 +13,7 @@ import Templates from "@/pages/Templates";
 import Tasks from "@/pages/Tasks";
 import Orders from "@/pages/Orders";
 import Inventory from "@/pages/Inventory";
+import ImportCRM from "@/pages/ImportCRM";
 import GestaoHome from "@/pages/gestao/GestaoHome";
 import Procedimentos from "@/pages/gestao/Procedimentos";
 import Financeiro from "@/pages/gestao/Financeiro";
@@ -53,6 +54,7 @@ function App() {
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="import" element={<ImportCRM />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
