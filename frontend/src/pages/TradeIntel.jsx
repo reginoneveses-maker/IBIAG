@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Globe2 } from "lucide-react";
+import { Plus, Search, Globe2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const TradeIntel = () => {
@@ -24,7 +24,7 @@ const TradeIntel = () => {
   const [comexFlow, setComexFlow] = useState("export");
   const [comexRows, setComexRows] = useState([]);
   const [prospectSummary, setProspectSummary] = useState(null);
-  const [comexLoading, setComexLoading] = useState(false);
+  const [comexLoading, setComexLoading] = useState(false);\n  const [marketRows, setMarketRows] = useState([]);\n  const [marketTotals, setMarketTotals] = useState({ volume_kg: 0, fob_usd: 0 });
 
   const load = () => {
     const params = {};
@@ -75,6 +75,33 @@ const TradeIntel = () => {
       });
       const raw = r.data?.data?.list || r.data?.data?.data || r.data?.data || r.data?.items || r.data?.results || r.data || [];
       setComexRows(Array.isArray(raw) ? raw : []);
+      const markets = r.data?.markets?.rows || [];
+      if (markets.length) {
+        setMarketRows(markets);
+        setMarketTotals(r.data?.markets?.totals || { volume_kg: 0, fob_usd: 0 });
+      } else {
+        const rows = Array.isArray(raw) ? raw : [];
+        const get = (obj, keys) => keys.map(k => obj?.[k]).find(v => v !== undefined && v !== null && v !== "");
+        const grouped = {};
+        rows.forEach(row => {
+          const country = get(row, ["country", "noPais", "countryName", "pais", "coPais"]);
+          const kg = Number(get(row, ["metricKG", "kg", "kgLiquido", "kg_liquido", "netWeight", "quantity"]) || 0);
+          const fob = Number(get(row, ["metricFOB", "fob", "vlFob", "vl_fob", "valueFOB", "value"]) || 0);
+          if (!country) return;
+          if (!grouped[country]) grouped[country] = { country: String(country), volume_kg: 0, fob_usd: 0 };
+          grouped[country].volume_kg += Number.isFinite(kg) ? kg : 0;
+          grouped[country].fob_usd += Number.isFinite(fob) ? fob : 0;
+        });
+        const values = Object.values(grouped);
+        const totalFob = values.reduce((a, x) => a + x.fob_usd, 0);
+        values.forEach(x => {
+          x.share_pct = totalFob ? (x.fob_usd * 100 / totalFob) : 0;
+          x.avg_usd_kg = x.volume_kg ? x.fob_usd / x.volume_kg : 0;
+        });
+        values.sort((a, b) => b.fob_usd - a.fob_usd);
+        setMarketRows(values);
+        setMarketTotals({ volume_kg: values.reduce((a, x) => a + x.volume_kg, 0), fob_usd: totalFob });
+      }
       setProspectSummary(r.data);
     } catch (e) {
       toast.error("Comex Stat não respondeu. Verifique o período e o NCM.");
@@ -155,6 +182,36 @@ const TradeIntel = () => {
             <div className="rounded-lg border p-3 bg-[#F9F6F0]">
               <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Fonte</div>
               <div className="font-semibold text-[#0F382C]">Comex Stat / MDIC</div>
+            </div>
+          </div>
+        )}
+
+        {marketRows.length > 0 && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Mercados</div><div className="font-semibold text-[#0F382C]">{marketRows.length}</div></div>
+              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Volume</div><div className="font-semibold text-[#0F382C]">{marketTotals.volume_kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg</div></div>
+              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">FOB</div><div className="font-semibold text-[#0F382C]">USD {marketTotals.fob_usd.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div></div>
+            </div>
+            <div className="overflow-x-auto rounded-lg border border-[#0F382C]/10">
+              <Table><TableHeader><TableRow className="bg-[#0F382C] hover:bg-[#0F382C]">
+                <TableHead className="text-amber-300 text-[10px] uppercase">Mercado / País</TableHead>
+                <TableHead className="text-amber-300 text-[10px] uppercase text-right">Volume kg</TableHead>
+                <TableHead className="text-amber-300 text-[10px] uppercase text-right">FOB USD</TableHead>
+                <TableHead className="text-amber-300 text-[10px] uppercase text-right">USD/kg</TableHead>
+                <TableHead className="text-amber-300 text-[10px] uppercase text-right">% FOB</TableHead>
+                <TableHead className="text-amber-300 text-[10px] uppercase text-right">Ação</TableHead>
+              </TableRow></TableHeader>
+              <TableBody>{marketRows.slice(0, 50).map((m, i) => (
+                <TableRow key={i}>
+                  <TableCell className="font-semibold text-[#0F382C]">{m.country}</TableCell>
+                  <TableCell className="text-right font-mono-alt text-xs">{Number(m.volume_kg || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</TableCell>
+                  <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.fob_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</TableCell>
+                  <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.avg_usd_kg || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right text-xs">{Number(m.share_pct || 0).toFixed(2)}%</TableCell>
+                  <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => toast.info("Mercado selecionado. A próxima etapa é buscar empresas compradoras reais neste mercado.")}><Users className="w-3 h-3 mr-1" />Buscar compradores</Button></TableCell>
+                </TableRow>
+              ))}</TableBody></Table>
             </div>
           </div>
         )}
