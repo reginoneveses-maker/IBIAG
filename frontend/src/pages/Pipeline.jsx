@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, MoreVertical, Trash2, Edit3, MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
 
-const emptyLead = { company: "", contact_name: "", email: "", phone: "", country: "", country_code: "", industry: "beverage", stage: "new_lead", deal_value: 0, notes: "" };
+const emptyLead = { company: "", contact_name: "", email: "", phone: "", website: "", linkedin: "", country: "", country_code: "", industry: "beverage", stage: "new_lead", product_interest: "", decision_maker: "", decision_maker_title: "", decision_maker_email: "", decision_maker_phone: "", current_supplier: "", priority: "normal", source_url: "", deal_value: 0, notes: "" };
 
 const Pipeline = () => {
   const { t } = useLang();
@@ -160,6 +160,23 @@ const Pipeline = () => {
             <Input placeholder={t("email")} value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} data-testid="lead-email-input" />
             <Input placeholder={t("phone")} value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Website" value={editing.website} onChange={(e) => setEditing({ ...editing, website: e.target.value })} />
+              <Input placeholder="LinkedIn" value={editing.linkedin} onChange={(e) => setEditing({ ...editing, linkedin: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Produto de interesse" value={editing.product_interest} onChange={(e) => setEditing({ ...editing, product_interest: e.target.value })} />
+              <Input placeholder="Prioridade (high/normal/low)" value={editing.priority} onChange={(e) => setEditing({ ...editing, priority: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Decisor de compras" value={editing.decision_maker} onChange={(e) => setEditing({ ...editing, decision_maker: e.target.value })} />
+              <Input placeholder="Cargo do decisor" value={editing.decision_maker_title} onChange={(e) => setEditing({ ...editing, decision_maker_title: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="E-mail do decisor" value={editing.decision_maker_email} onChange={(e) => setEditing({ ...editing, decision_maker_email: e.target.value })} />
+              <Input placeholder="Telefone do decisor" value={editing.decision_maker_phone} onChange={(e) => setEditing({ ...editing, decision_maker_phone: e.target.value })} />
+            </div>
+            <Input placeholder="Fornecedor atual" value={editing.current_supplier} onChange={(e) => setEditing({ ...editing, current_supplier: e.target.value })} />
+            <div className="grid grid-cols-2 gap-2">
               <Input placeholder={t("country")} value={editing.country} onChange={(e) => setEditing({ ...editing, country: e.target.value })} />
               <Input placeholder="ISO (US, BR, DE...)" maxLength={2} value={editing.country_code} onChange={(e) => setEditing({ ...editing, country_code: e.target.value.toUpperCase() })} />
             </div>
@@ -195,6 +212,8 @@ const Pipeline = () => {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("contact_name")}</span><div>{detailLead?.contact_name || "—"}</div></div>
               <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("email")}</span><div className="truncate">{detailLead?.email || "—"}</div></div>
+              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">Decisor</span><div>{detailLead?.decision_maker || "—"} {detailLead?.decision_maker_title ? <span className="text-xs text-[#0F382C]/50">({detailLead.decision_maker_title})</span> : null}</div></div>
+              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">Produto</span><div>{detailLead?.product_interest || "—"}</div></div>
               <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("country")}</span><div>{detailLead?.country || "—"}</div></div>
               <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("deal_value")}</span><div className="text-amber-700 font-mono-alt">{fmtUSD(detailLead?.deal_value)}</div></div>
             </div>
