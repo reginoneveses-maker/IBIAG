@@ -6,7 +6,8 @@ load_dotenv(ROOT_DIR / '.env')
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, bcrypt, jwt, requests
+import os, logging, uuid, bcrypt, jwt, requests, io, re
+import pandas as pd
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -725,6 +726,106 @@ async def del_product(pid: str, user=Depends(get_current_user)):
     r = await db.products.delete_one({"id": pid}); return {"deleted": r.deleted_count}
 
 # ============ LEADS (CRM) ============
+class LeadImportResult(BaseModel):
+    imported: int
+    updated: int
+    skipped: int
+    errors: List[str] = []
+
+def _norm_col(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(value).strip().lower()).strip("_")
+
+def _pick(row: dict, aliases: List[str]) -> str:
+    for alias in aliases:
+        key = _norm_col(alias)
+        if key in row and row[key] not in (None, ""):
+            return str(row[key]).strip()
+    return ""
+
+@api.post("/leads/import", response_model=LeadImportResult)
+async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
+    name = (file.filename or "").lower()
+    raw = await file.read()
+    try:
+        if name.endswith(".xlsx") or name.endswith(".xls"):
+            df = pd.read_excel(io.BytesIO(raw))
+        elif name.endswith(".csv"):
+            try:
+                df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
+            except Exception:
+                df = pd.read_csv(io.BytesIO(raw), sep=";")
+        else:
+            raise HTTPException(400, "Use CSV or XLSX")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Could not read file: {e}")
+
+    df = df.fillna("")
+    df.columns = [_norm_col(c) for c in df.columns]
+    imported = updated = skipped = 0
+    errors = []
+
+    aliases = {
+        "company": ["company","empresa","razao_social","razão_social","nome_empresa","cliente"],
+        "contact_name": ["contact_name","contato","nome_contato","contato_nome","comprador"],
+        "email": ["email","e_mail","email_comercial","commercial_email"],
+        "phone": ["phone","telefone","celular","whatsapp"],
+        "website": ["website","site","url"],
+        "linkedin": ["linkedin","linkedin_url"],
+        "country": ["country","pais","país"],
+        "country_code": ["country_code","pais_codigo","iso"],
+        "industry": ["industry","industria","setor"],
+        "stage": ["stage","estagio","etapa"],
+        "product_interest": ["product_interest","produto","produto_interesse","ingrediente"],
+        "decision_maker": ["decision_maker","decisor","decisor_compras","comprador_decisor"],
+        "decision_maker_title": ["decision_maker_title","cargo","cargo_decisor"],
+        "decision_maker_email": ["decision_maker_email","email_decisor"],
+        "decision_maker_phone": ["decision_maker_phone","telefone_decisor","celular_decisor"],
+        "current_supplier": ["current_supplier","fornecedor_atual","fornecedor"],
+        "priority": ["priority","prioridade"],
+        "source_url": ["source_url","fonte","url_fonte"],
+        "deal_value": ["deal_value","valor_negocio","valor"],
+        "notes": ["notes","observacoes","observações","notas"],
+    }
+
+    for idx, raw_row in enumerate(df.to_dict(orient="records"), start=2):
+        row = {_norm_col(k): v for k, v in raw_row.items()}
+        company = _pick(row, aliases["company"])
+        if not company:
+            skipped += 1
+            errors.append(f"Linha {idx}: empresa vazia")
+            continue
+        data = {"company": company}
+        for field, names in aliases.items():
+            if field == "company": continue
+            value = _pick(row, names)
+            if field == "deal_value":
+                try: value = float(str(value).replace(".","").replace(",", ".")) if value else 0.0
+                except Exception: value = 0.0
+            if value != "":
+                data[field] = value
+
+        existing_q = {"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}}
+        country = data.get("country", "")
+        if country:
+            existing_q["country"] = {"$regex": f"^{re.escape(country)}$", "$options": "i"}
+        existing = await db.leads.find_one(existing_q, {"_id": 0})
+        if existing:
+            updates = {k:v for k,v in data.items() if v not in ("", None) and not existing.get(k)}
+            if updates:
+                updates["updated_at"] = now_iso()
+                await db.leads.update_one({"id": existing["id"]}, {"$set": updates})
+                updated += 1
+            else:
+                skipped += 1
+        else:
+            lead = Lead(**data)
+            await db.leads.insert_one(lead.model_dump())
+            imported += 1
+
+    return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
+
 @api.get("/leads", response_model=List[Lead])
 async def list_leads(stage: Optional[str] = None, industry: Optional[str] = None):
     q = {}
