@@ -980,11 +980,30 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
     return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
 
 @api.get("/leads", response_model=List[Lead])
-async def list_leads(stage: Optional[str] = None, industry: Optional[str] = None):
+async def list_leads(
+    stage: Optional[str] = None,
+    industry: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 250,
+):
+    """List CRM leads with pagination; there is no registration/storage cap."""
     q = {}
-    if stage: q["stage"] = stage
-    if industry: q["industry"] = industry
-    return await db.leads.find(q, {"_id": 0}).to_list(1000)
+    if stage:
+        q["stage"] = stage
+    if industry:
+        q["industry"] = industry
+    skip = max(0, skip)
+    limit = min(max(1, limit), 250)
+    return await db.leads.find(q, {"_id": 0}).sort("updated_at", -1).skip(skip).limit(limit).to_list(limit)
+
+@api.get("/leads/count")
+async def count_leads(stage: Optional[str] = None, industry: Optional[str] = None, user=Depends(get_current_user)):
+    q = {}
+    if stage:
+        q["stage"] = stage
+    if industry:
+        q["industry"] = industry
+    return {"total": await db.leads.count_documents(q)}
 
 @api.post("/leads", response_model=Lead)
 async def create_lead(lead: Lead, user=Depends(get_current_user)):
@@ -1282,8 +1301,17 @@ async def dashboard():
         "finance_payable": fin_payable, "contracts_expiring": expiring
     }
 
+@api.get("/health")
+async def health():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "database": "ok", "timestamp": now_iso()}
+    except Exception:
+        logging.exception("Health check failed")
+        raise HTTPException(503, "Database unavailable")
+
 @api.get("/")
-async def root(): return {"message": "AgroBrasil ERP API"}
+async def root(): return {"message": "IBIAG API", "status": "ok"}
 
 app.include_router(api)
 
