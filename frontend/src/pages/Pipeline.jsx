@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Plus, MoreVertical, Trash2, Edit3, MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
 
-const emptyLead = { company: "", contact_name: "", email: "", phone: "", country: "", country_code: "", industry: "beverage", stage: "new_lead", deal_value: 0, notes: "" };
+const emptyLead = { company: "", contact_name: "", email: "", phone: "", website: "", linkedin: "", country: "", country_code: "", industry: "beverage", stage: "new_lead", product_interest: "", decision_maker: "", decision_maker_title: "", decision_maker_email: "", decision_maker_phone: "", current_supplier: "", priority: "normal", source_url: "", deal_value: 0, notes: "" };
 
 const Pipeline = () => {
   const { t } = useLang();
@@ -24,7 +24,22 @@ const Pipeline = () => {
   const [interactions, setInteractions] = useState([]);
   const [newInter, setNewInter] = useState({ type: "email", subject: "", content: "" });
 
-  const load = () => api.get("/leads").then(r => setLeads(r.data)).catch(() => {});
+  const load = async () => {
+    try {
+      const pageSize = 250;
+      let skip = 0;
+      const all = [];
+      while (true) {
+        const r = await api.get("/leads", { params: { skip, limit: pageSize } });
+        all.push(...r.data);
+        if (r.data.length < pageSize) break;
+        skip += pageSize;
+      }
+      setLeads(all);
+    } catch {
+      // Keep the current board visible if a reload fails.
+    }
+  };
   useEffect(() => { load(); }, []);
 
   const filtered = leads.filter(l => {
@@ -82,11 +97,11 @@ const Pipeline = () => {
     <div className="space-y-6" data-testid="pipeline-page">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#0F382C]/60 mb-2">03 · CRM</div>
-          <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#0F382C]">{t("pipeline_title")}</h1>
-          <p className="text-base text-[#0F382C]/70 mt-1">{t("pipeline_subtitle")}</p>
+          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60 mb-2">03 · CRM</div>
+          <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#104496]">{t("pipeline_title")}</h1>
+          <p className="text-base text-[#104496]/70 mt-1">{t("pipeline_subtitle")}</p>
         </div>
-        <Button onClick={openNew} data-testid="new-lead-button" className="bg-amber-600 hover:bg-amber-700 text-white">
+        <Button onClick={openNew} data-testid="new-lead-button" className="bg-[#104496] hover:bg-[#0B3274] text-white">
           <Plus className="w-4 h-4 mr-1" /> {t("new_lead")}
         </Button>
       </div>
@@ -109,24 +124,24 @@ const Pipeline = () => {
               <span className="font-semibold text-xs uppercase tracking-wider">{t(`stage_${stage}`)}</span>
               <span className="text-xs font-mono-alt">{byStage(stage).length}</span>
             </div>
-            <div className="bg-white/60 border border-t-0 border-[#0F382C]/10 rounded-b-lg p-2 min-h-[400px] space-y-2">
+            <div className="bg-white/60 border border-t-0 border-[#104496]/10 rounded-b-lg p-2 min-h-[400px] space-y-2">
               {byStage(stage).map(l => (
                 <Card
                   key={l.id}
                   data-testid={`lead-card-${l.id}`}
-                  className="p-3 bg-white border border-[#0F382C]/10 hover:border-[#0F382C]/30 hover:shadow-md transition-all cursor-pointer animate-card-in"
+                  className="p-3 bg-white border border-[#104496]/10 hover:border-[#104496]/30 hover:shadow-md transition-all cursor-pointer animate-card-in"
                   onClick={() => openDetail(l)}
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm text-[#0F382C] truncate">{l.company}</div>
-                      <div className="text-xs text-[#0F382C]/60 flex items-center gap-1">
+                      <div className="font-semibold text-sm text-[#104496] truncate">{l.company}</div>
+                      <div className="text-xs text-[#104496]/60 flex items-center gap-1">
                         <span>{flag(l.country_code)}</span> <span className="truncate">{l.country}</span>
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <button data-testid={`lead-menu-${l.id}`} className="p-1 hover:bg-[#EFECE6] rounded"><MoreVertical className="w-4 h-4" /></button>
+                        <button data-testid={`lead-menu-${l.id}`} className="p-1 hover:bg-[#EEF3FB] rounded"><MoreVertical className="w-4 h-4" /></button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="bg-white" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuItem onClick={() => openEdit(l)}><Edit3 className="w-3 h-3 mr-2" />{t("edit")}</DropdownMenuItem>
@@ -138,8 +153,8 @@ const Pipeline = () => {
                     </DropdownMenu>
                   </div>
                   <div className="mt-2 flex justify-between items-center text-xs">
-                    <span className="text-[#0F382C]/60">{t(`industry_${l.industry}`)}</span>
-                    <span className="font-mono-alt text-amber-700 font-semibold">{fmtUSD(l.deal_value)}</span>
+                    <span className="text-[#104496]/60">{t(`industry_${l.industry}`)}</span>
+                    <span className="font-mono-alt text-[#104496] font-semibold">{fmtUSD(l.deal_value)}</span>
                   </div>
                 </Card>
               ))}
@@ -152,13 +167,30 @@ const Pipeline = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg bg-white" data-testid="lead-dialog">
           <DialogHeader>
-            <DialogTitle className="font-display text-[#0F382C]">{editing.id ? t("edit") : t("new_lead")}</DialogTitle>
+            <DialogTitle className="font-display text-[#104496]">{editing.id ? t("edit") : t("new_lead")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <Input placeholder={t("company")} value={editing.company} onChange={(e) => setEditing({ ...editing, company: e.target.value })} data-testid="lead-company-input" />
             <Input placeholder={t("contact_name")} value={editing.contact_name} onChange={(e) => setEditing({ ...editing, contact_name: e.target.value })} data-testid="lead-contact-input" />
             <Input placeholder={t("email")} value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} data-testid="lead-email-input" />
             <Input placeholder={t("phone")} value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Website" value={editing.website} onChange={(e) => setEditing({ ...editing, website: e.target.value })} />
+              <Input placeholder="LinkedIn" value={editing.linkedin} onChange={(e) => setEditing({ ...editing, linkedin: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Produto de interesse" value={editing.product_interest} onChange={(e) => setEditing({ ...editing, product_interest: e.target.value })} />
+              <Input placeholder="Prioridade (high/normal/low)" value={editing.priority} onChange={(e) => setEditing({ ...editing, priority: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Decisor de compras" value={editing.decision_maker} onChange={(e) => setEditing({ ...editing, decision_maker: e.target.value })} />
+              <Input placeholder="Cargo do decisor" value={editing.decision_maker_title} onChange={(e) => setEditing({ ...editing, decision_maker_title: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="E-mail do decisor" value={editing.decision_maker_email} onChange={(e) => setEditing({ ...editing, decision_maker_email: e.target.value })} />
+              <Input placeholder="Telefone do decisor" value={editing.decision_maker_phone} onChange={(e) => setEditing({ ...editing, decision_maker_phone: e.target.value })} />
+            </div>
+            <Input placeholder="Fornecedor atual" value={editing.current_supplier} onChange={(e) => setEditing({ ...editing, current_supplier: e.target.value })} />
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder={t("country")} value={editing.country} onChange={(e) => setEditing({ ...editing, country: e.target.value })} />
               <Input placeholder="ISO (US, BR, DE...)" maxLength={2} value={editing.country_code} onChange={(e) => setEditing({ ...editing, country_code: e.target.value.toUpperCase() })} />
@@ -178,7 +210,7 @@ const Pipeline = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
-            <Button onClick={save} className="bg-[#0F382C] hover:bg-[#0A2920] text-white" data-testid="save-lead-button">{t("save")}</Button>
+            <Button onClick={save} className="bg-[#104496] hover:bg-[#0B3274] text-white" data-testid="save-lead-button">{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -187,21 +219,23 @@ const Pipeline = () => {
       <Dialog open={!!detailLead} onOpenChange={(o) => !o && setDetailLead(null)}>
         <DialogContent className="max-w-2xl bg-white max-h-[90vh] overflow-y-auto" data-testid="lead-detail-dialog">
           <DialogHeader>
-            <DialogTitle className="font-display text-[#0F382C] flex items-center gap-2">
+            <DialogTitle className="font-display text-[#104496] flex items-center gap-2">
               <span>{flag(detailLead?.country_code)}</span> {detailLead?.company}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("contact_name")}</span><div>{detailLead?.contact_name || "—"}</div></div>
-              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("email")}</span><div className="truncate">{detailLead?.email || "—"}</div></div>
-              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("country")}</span><div>{detailLead?.country || "—"}</div></div>
-              <div><span className="text-[#0F382C]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("deal_value")}</span><div className="text-amber-700 font-mono-alt">{fmtUSD(detailLead?.deal_value)}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("contact_name")}</span><div>{detailLead?.contact_name || "—"}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("email")}</span><div className="truncate">{detailLead?.email || "—"}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">Decisor</span><div>{detailLead?.decision_maker || "—"} {detailLead?.decision_maker_title ? <span className="text-xs text-[#104496]/50">({detailLead.decision_maker_title})</span> : null}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">Produto</span><div>{detailLead?.product_interest || "—"}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("country")}</span><div>{detailLead?.country || "—"}</div></div>
+              <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("deal_value")}</span><div className="text-[#104496] font-mono-alt">{fmtUSD(detailLead?.deal_value)}</div></div>
             </div>
-            {detailLead?.notes && <div className="p-3 bg-[#F9F6F0] rounded-lg text-sm border border-[#0F382C]/10">{detailLead.notes}</div>}
+            {detailLead?.notes && <div className="p-3 bg-[#F7F9FC] rounded-lg text-sm border border-[#104496]/10">{detailLead.notes}</div>}
 
-            <div className="border-t border-[#0F382C]/10 pt-4">
-              <div className="font-display font-semibold text-[#0F382C] mb-3 flex items-center gap-2"><MessageSquarePlus className="w-4 h-4" />{t("log_interaction")}</div>
+            <div className="border-t border-[#104496]/10 pt-4">
+              <div className="font-display font-semibold text-[#104496] mb-3 flex items-center gap-2"><MessageSquarePlus className="w-4 h-4" />{t("log_interaction")}</div>
               <div className="grid grid-cols-3 gap-2 mb-2">
                 <Select value={newInter.type} onValueChange={(v) => setNewInter({ ...newInter, type: v })}>
                   <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
@@ -216,23 +250,23 @@ const Pipeline = () => {
                 <Input placeholder={t("subject")} value={newInter.subject} onChange={(e) => setNewInter({ ...newInter, subject: e.target.value })} className="col-span-2" />
               </div>
               <Textarea placeholder={t("body")} value={newInter.content} onChange={(e) => setNewInter({ ...newInter, content: e.target.value })} rows={2} data-testid="interaction-content-input" />
-              <Button onClick={addInteraction} size="sm" className="mt-2 bg-[#0F382C] hover:bg-[#0A2920] text-white" data-testid="add-interaction-button">{t("log_interaction")}</Button>
+              <Button onClick={addInteraction} size="sm" className="mt-2 bg-[#104496] hover:bg-[#0B3274] text-white" data-testid="add-interaction-button">{t("log_interaction")}</Button>
             </div>
 
             <div>
-              <div className="font-display font-semibold text-[#0F382C] mb-2">{t("interactions")}</div>
+              <div className="font-display font-semibold text-[#104496] mb-2">{t("interactions")}</div>
               {interactions.length === 0 ? (
-                <div className="text-sm text-[#0F382C]/50 italic">{t("no_interactions")}</div>
+                <div className="text-sm text-[#104496]/50 italic">{t("no_interactions")}</div>
               ) : (
                 <div className="space-y-2">
                   {interactions.map(i => (
-                    <div key={i.id} className="p-3 border border-[#0F382C]/10 rounded-lg bg-white text-sm">
+                    <div key={i.id} className="p-3 border border-[#104496]/10 rounded-lg bg-white text-sm">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700">{t(i.type === "sample" ? "sample_int" : i.type)}</span>
-                        <span className="text-xs text-[#0F382C]/50">{new Date(i.created_at).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]">{t(i.type === "sample" ? "sample_int" : i.type)}</span>
+                        <span className="text-xs text-[#104496]/50">{new Date(i.created_at).toLocaleDateString()}</span>
                       </div>
-                      {i.subject && <div className="font-medium text-[#0F382C]">{i.subject}</div>}
-                      <div className="text-[#0F382C]/80 whitespace-pre-wrap">{i.content}</div>
+                      {i.subject && <div className="font-medium text-[#104496]">{i.subject}</div>}
+                      <div className="text-[#104496]/80 whitespace-pre-wrap">{i.content}</div>
                     </div>
                   ))}
                 </div>

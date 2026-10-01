@@ -13,11 +13,13 @@ import Templates from "@/pages/Templates";
 import Tasks from "@/pages/Tasks";
 import Orders from "@/pages/Orders";
 import Inventory from "@/pages/Inventory";
+import ImportCRM from "@/pages/ImportCRM";
 import GestaoHome from "@/pages/gestao/GestaoHome";
 import Procedimentos from "@/pages/gestao/Procedimentos";
 import Financeiro from "@/pages/gestao/Financeiro";
 import FornecedoresHub from "@/pages/gestao/FornecedoresHub";
 import Specs from "@/pages/gestao/Specs";
+import Produtos from "@/pages/gestao/Produtos";
 import Precos from "@/pages/gestao/Precos";
 
 const Protected = ({ children }) => {
@@ -41,6 +43,7 @@ function App() {
                 <Route path="procedimentos" element={<Procedimentos />} />
                 <Route path="financeiro" element={<Financeiro />} />
                 <Route path="fornecedores" element={<FornecedoresHub />} />
+                <Route path="produtos" element={<Produtos />} />
                 <Route path="prospeccao" element={<Specs />} />
                 <Route path="precos" element={<Precos />} />
               </Route>
@@ -53,6 +56,7 @@ function App() {
                 <Route path="tasks" element={<Tasks />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="import" element={<ImportCRM />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

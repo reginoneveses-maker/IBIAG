@@ -17,7 +17,8 @@ def headers():
 
 def ncm_search(search="", page=1, per_page=50):
     params={"language":"pt","perPage":min(max(per_page,1),100),"page":max(page,1)}
-    if search.strip(): params["search"]=search.strip()
+    if search.strip():
+        params["search"]=search.strip()
     r=requests.get(f"{BASE_URL}/tables/ncm",params=params,headers=headers(),timeout=30)
     r.raise_for_status()
     return r.json()

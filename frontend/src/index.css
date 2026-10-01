@@ -4,102 +4,81 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+    --ibiag-blue: #104496;
+    --ibiag-green: #CAD51B;
+    --ibiag-blue-dark: #0B3274;
+    --ibiag-blue-soft: #EEF3FB;
+    --ibiag-green-soft: #F4F7D8;
+}
+
 body {
     margin: 0;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #F9F6F0;
-    color: #111827;
+    background-color: #F7F9FC;
+    color: #172033;
 }
 
-.font-display {
-    font-family: 'Cabinet Grotesk', 'Outfit', sans-serif;
-    letter-spacing: -0.02em;
-}
-
-.font-mono-alt {
-    font-family: 'JetBrains Mono', monospace;
-}
-
-.grain-bg {
-    background-image:
-        radial-gradient(circle at 25% 15%, rgba(217, 119, 6, 0.06), transparent 40%),
-        radial-gradient(circle at 75% 85%, rgba(15, 56, 44, 0.08), transparent 45%);
-}
+.font-display { font-family: 'Cabinet Grotesk', 'Outfit', sans-serif; letter-spacing: -0.02em; }
+.font-mono-alt { font-family: 'JetBrains Mono', monospace; }
+.grain-bg { background-image: radial-gradient(circle at 25% 15%, rgba(202,213,27,.07), transparent 40%), radial-gradient(circle at 75% 85%, rgba(16,68,150,.07), transparent 45%); }
 
 @layer base {
     :root {
-        --background: 40 30% 96%;
-        --foreground: 220 15% 12%;
+        --background: 216 33% 98%;
+        --foreground: 220 29% 15%;
         --card: 0 0% 100%;
-        --card-foreground: 220 15% 12%;
+        --card-foreground: 220 29% 15%;
         --popover: 0 0% 100%;
-        --popover-foreground: 220 15% 12%;
-        --primary: 158 58% 14%;
-        --primary-foreground: 40 30% 96%;
-        --secondary: 40 17% 92%;
-        --secondary-foreground: 158 58% 14%;
-        --muted: 40 17% 92%;
-        --muted-foreground: 220 10% 40%;
-        --accent: 32 95% 44%;
-        --accent-foreground: 40 30% 96%;
+        --popover-foreground: 220 29% 15%;
+        --primary: 218 81% 33%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 66 69% 51%;
+        --secondary-foreground: 220 29% 15%;
+        --muted: 216 25% 94%;
+        --muted-foreground: 220 12% 45%;
+        --accent: 66 69% 51%;
+        --accent-foreground: 220 29% 15%;
         --destructive: 0 84% 60%;
-        --destructive-foreground: 40 30% 96%;
-        --border: 40 15% 85%;
-        --input: 40 15% 85%;
-        --ring: 158 58% 14%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 216 22% 88%;
+        --input: 216 22% 88%;
+        --ring: 218 81% 33%;
         --radius: 0.75rem;
     }
     .dark {
-        --background: 158 30% 6%;
-        --foreground: 40 30% 96%;
-        --card: 158 25% 10%;
-        --card-foreground: 40 30% 96%;
-        --popover: 158 25% 10%;
-        --popover-foreground: 40 30% 96%;
-        --primary: 40 30% 96%;
-        --primary-foreground: 158 58% 14%;
-        --secondary: 158 20% 15%;
-        --secondary-foreground: 40 30% 96%;
-        --muted: 158 20% 15%;
-        --muted-foreground: 40 10% 65%;
-        --accent: 32 95% 55%;
-        --accent-foreground: 158 58% 14%;
+        --background: 218 45% 7%;
+        --foreground: 0 0% 98%;
+        --card: 218 40% 10%;
+        --card-foreground: 0 0% 98%;
+        --popover: 218 40% 10%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 218 81% 55%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 66 69% 51%;
+        --secondary-foreground: 218 45% 7%;
+        --muted: 218 28% 16%;
+        --muted-foreground: 216 12% 68%;
+        --accent: 66 69% 51%;
+        --accent-foreground: 218 45% 7%;
         --destructive: 0 62% 40%;
-        --destructive-foreground: 40 30% 96%;
-        --border: 158 20% 18%;
-        --input: 158 20% 18%;
-        --ring: 40 30% 96%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 218 25% 20%;
+        --input: 218 25% 20%;
+        --ring: 218 81% 55%;
     }
 }
 
 @layer base {
-    * {
-        @apply border-border;
-    }
-    body {
-        @apply bg-background text-foreground;
-    }
+    * { @apply border-border; }
+    body { @apply bg-background text-foreground; }
 }
 
-.scrollbar-thin::-webkit-scrollbar {
-    height: 6px;
-    width: 6px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-    background: rgba(15, 56, 44, 0.25);
-    border-radius: 4px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
-}
+.scrollbar-thin::-webkit-scrollbar { height: 6px; width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(16,68,150,.28); border-radius: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 
-/* Kanban card animation */
-@keyframes card-in {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.animate-card-in {
-    animation: card-in 0.35s ease-out both;
-}
+@keyframes card-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-card-in { animation: card-in .35s ease-out both; }

@@ -6,7 +6,11 @@ load_dotenv(ROOT_DIR / '.env')
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-import os, logging, uuid, bcrypt, jwt, requests
+import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
+import pandas as pd
+from comexstat_client import ncm_search, general as comex_general
+from comexstat_market import normalize_markets
+from buyer_discovery import discover_buyers, discover_decision_maker
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -21,13 +25,38 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 APP_NAME = os.environ.get("APP_NAME", "agrobrasil")
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+STORAGE_PROVIDER = os.environ.get("STORAGE_PROVIDER", "emergent").strip().lower()
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
+S3_REGION = os.environ.get("S3_REGION", "")
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "")
 
 storage_key = None
+s3_client = None
+
+def _s3():
+    global s3_client
+    if s3_client:
+        return s3_client
+    if not S3_BUCKET or not S3_ACCESS_KEY or not S3_SECRET_KEY:
+        return None
+    import boto3
+    s3_client = boto3.client(
+        "s3",
+        region_name=S3_REGION or None,
+        endpoint_url=S3_ENDPOINT or None,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+    )
+    return s3_client
 
 def init_storage(force=False):
     global storage_key
+    if STORAGE_PROVIDER == "s3":
+        return "s3"
     if storage_key and not force:
         return storage_key
     try:
@@ -40,8 +69,15 @@ def init_storage(force=False):
         return None
 
 def put_object(path: str, data: bytes, content_type: str) -> dict:
+    if STORAGE_PROVIDER == "s3":
+        client = _s3()
+        if not client:
+            raise HTTPException(500, "S3 storage is not configured")
+        client.put_object(Bucket=S3_BUCKET, Key=path, Body=data, ContentType=content_type)
+        return {"path": path, "size": len(data), "content_type": content_type}
     key = init_storage()
-    if not key: raise HTTPException(500, "Storage not initialized")
+    if not key:
+        raise HTTPException(500, "Storage not initialized")
     resp = requests.put(f"{STORAGE_URL}/objects/{path}",
                         headers={"X-Storage-Key": key, "Content-Type": content_type},
                         data=data, timeout=120)
@@ -55,7 +91,15 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
     return resp.json()
 
 def get_object(path: str):
+    if STORAGE_PROVIDER == "s3":
+        client = _s3()
+        if not client:
+            raise HTTPException(500, "S3 storage is not configured")
+        obj = client.get_object(Bucket=S3_BUCKET, Key=path)
+        return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
     key = init_storage()
+    if not key:
+        raise HTTPException(500, "Storage not initialized")
     resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
@@ -89,7 +133,21 @@ async def get_current_user(request: Request):
 def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
-app = FastAPI()
+app = FastAPI(title="IBIAG", version="1.0.0")
+
+# Production CORS. Keep this explicit in production; "*" is only a development fallback.
+cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
+if not cors_origins:
+    cors_origins = ["http://localhost:3000", "http://localhost:80"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 api = APIRouter(prefix="/api")
 
 # ----- Models -----
@@ -101,6 +159,12 @@ class RegisterBody(BaseModel):
     email: EmailStr
     password: str
     name: str = ""
+
+class UserCreateBody(BaseModel):
+    email: EmailStr
+    password: str
+    name: str = ""
+    role: str = "user"
 
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -118,6 +182,16 @@ class Product(BaseModel):
     image_url: str = ""
     sku: str = ""
     stock: float = 0
+    origin: str = ""
+    ncm: str = ""
+    technical_name: str = ""
+    available_capacity: str = ""
+    incoterm: str = ""
+    lead_time: str = ""
+    payment_terms: str = ""
+    current_customers: str = ""
+    target_markets: str = ""
+    price_history_notes: str = ""
     unit: str = "kg"
     created_at: str = Field(default_factory=now_iso)
 
@@ -128,11 +202,21 @@ class Lead(BaseModel):
     contact_name: str = ""
     email: str = ""
     phone: str = ""
+    website: str = ""
+    linkedin: str = ""
     country: str = ""
     country_code: str = ""
     industry: str = "beverage"
     stage: str = "new_lead"
     interested_products: List[str] = []
+    product_interest: str = ""
+    decision_maker: str = ""
+    decision_maker_title: str = ""
+    decision_maker_email: str = ""
+    decision_maker_phone: str = ""
+    current_supplier: str = ""
+    priority: str = "normal"
+    source_url: str = ""
     deal_value: float = 0.0
     notes: str = ""
     source: str = "manual"
@@ -319,9 +403,43 @@ class PriceEntry(BaseModel):
     updated_at: str = Field(default_factory=now_iso)
     created_at: str = Field(default_factory=now_iso)
 
+
+class ProductOffer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    product_id: str
+    product_name: str = ""
+    form: str = ""
+    supplier_id: str = ""
+    supplier_name: str = ""
+    supplier_price: float = 0
+    sale_price_brl: float = 0
+    sale_price_usd: float = 0
+    unit: str = "kg"
+    capacity: str = ""
+    moq: str = ""
+    ncm: str = ""
+    hs_code: str = ""
+    active: bool = True
+    spec_document_ids: List[str] = []
+    certificate_document_ids: List[str] = []
+    other_document_ids: List[str] = []
+    spec_ids: List[str] = []
+    certification_ids: List[str] = []
+    notes: str = ""
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
 # ============ AUTH ============
+def require_admin(user):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin permission required")
+    return user
+
 @api.post("/auth/register")
 async def register(body: RegisterBody):
+    if os.environ.get("ALLOW_PUBLIC_REGISTRATION", "false").lower() != "true":
+        raise HTTPException(403, "Public registration is disabled. Ask an administrator to create your user.")
     email = body.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
@@ -333,6 +451,29 @@ async def register(body: RegisterBody):
     })
     token = create_token(uid, email)
     return {"access_token": token, "user": {"id": uid, "email": email, "name": body.name, "role": "user"}}
+
+@api.get("/auth/users")
+async def list_users(user=Depends(get_current_user)):
+    require_admin(user)
+    return await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(500)
+
+@api.post("/auth/users")
+async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
+    require_admin(user)
+    email = body.email.lower().strip()
+    if body.role not in {"admin", "user"}:
+        raise HTTPException(400, "Invalid role")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must have at least 8 characters")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(400, "Email already registered")
+    record = {"id": str(uuid.uuid4()), "email": email,
+              "name": body.name or email.split("@")[0],
+              "password_hash": hash_pw(body.password), "role": body.role,
+              "created_at": now_iso()}
+    await db.users.insert_one(record)
+    record.pop("password_hash", None)
+    return record
 
 @api.post("/auth/login")
 async def login(body: LoginBody):
@@ -696,6 +837,75 @@ async def upd_stock(pid: str, body: StockUpd, user=Depends(get_current_user)):
     if not doc: raise HTTPException(404, "Not found")
     return doc
 
+
+# ============ PRODUCT PORTFOLIO OFFERS ============
+@api.get("/product-offers", response_model=List[ProductOffer])
+async def list_product_offers(product_id: Optional[str] = None, supplier_id: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_current_user)):
+    q = {}
+    if product_id: q["product_id"] = product_id
+    if supplier_id: q["supplier_id"] = supplier_id
+    if active is not None: q["active"] = active
+    return await db.product_offers.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
+
+@api.post("/product-offers", response_model=ProductOffer)
+async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
+    if not await db.products.find_one({"id": o.product_id}):
+        raise HTTPException(404, "Produto não encontrado")
+    if o.supplier_id and not await db.suppliers.find_one({"id": o.supplier_id}):
+        raise HTTPException(404, "Fornecedor não encontrado")
+    if not o.product_name:
+        product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
+        o.product_name = product.get("name", "") if product else ""
+    if o.supplier_id and not o.supplier_name:
+        supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
+        o.supplier_name = supplier.get("name", "") if supplier else ""
+    await db.product_offers.insert_one(o.model_dump())
+    return o
+
+@api.put("/product-offers/{oid}", response_model=ProductOffer)
+async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_current_user)):
+    if not await db.product_offers.find_one({"id": oid}):
+        raise HTTPException(404, "Oferta não encontrada")
+    o.id = oid
+    o.updated_at = now_iso()
+    if not o.product_name:
+        product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
+        o.product_name = product.get("name", "") if product else ""
+    if o.supplier_id:
+        supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
+        if not supplier:
+            raise HTTPException(404, "Fornecedor não encontrado")
+        o.supplier_name = supplier.get("name", "")
+    else:
+        o.supplier_name = ""
+    await db.product_offers.replace_one({"id": oid}, o.model_dump())
+    return o
+
+@api.delete("/product-offers/{oid}")
+async def delete_product_offer(oid: str, user=Depends(get_current_user)):
+    r = await db.product_offers.delete_one({"id": oid})
+    return {"deleted": r.deleted_count}
+
+@api.get("/product-offers/{oid}/documents")
+async def product_offer_documents(oid: str, user=Depends(get_current_user)):
+    offer = await db.product_offers.find_one({"id": oid}, {"_id": 0})
+    if not offer:
+        raise HTTPException(404, "Oferta não encontrada")
+    ids = list(dict.fromkeys(offer.get("spec_document_ids", []) + offer.get("certificate_document_ids", []) + offer.get("other_document_ids", [])))
+    result = []
+    if ids:
+        docs = await db.documents.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**d, "link_type": "document"} for d in docs])
+    spec_ids = offer.get("spec_ids", [])
+    if spec_ids:
+        specs = await db.specs.find({"id": {"$in": spec_ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**x, "link_type": "spec"} for x in specs])
+    cert_ids = offer.get("certification_ids", [])
+    if cert_ids:
+        certs = await db.certifications.find({"id": {"$in": cert_ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**x, "link_type": "certification"} for x in certs])
+    return result
+
 # ============ PRODUCTS (public read + auth write) ============
 @api.get("/products", response_model=List[Product])
 async def list_products(category: Optional[str] = None):
@@ -715,12 +925,175 @@ async def del_product(pid: str, user=Depends(get_current_user)):
     r = await db.products.delete_one({"id": pid}); return {"deleted": r.deleted_count}
 
 # ============ LEADS (CRM) ============
+class LeadImportResult(BaseModel):
+    imported: int
+    updated: int
+    skipped: int
+    errors: List[str] = []
+
+def _norm_text(value: str) -> str:
+    text = "" if value is None else str(value).strip()
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+def _norm_col(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", _norm_text(value).lower()).strip("_")
+
+def _clean_value(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+def _pick(row: dict, aliases: List[str]) -> str:
+    for alias in aliases:
+        key = _norm_col(alias)
+        if key in row and row[key] not in (None, ""):
+            return _clean_value(row[key])
+    return ""
+
+def _parse_number(value) -> float:
+    raw = _clean_value(value).replace("R$", "").replace("$", "").replace(" ", "")
+    if not raw:
+        return 0.0
+    if "," in raw and "." in raw:
+        if raw.rfind(",") > raw.rfind("."):
+            raw = raw.replace(".", "").replace(",", ".")
+        else:
+            raw = raw.replace(",", "")
+    elif "," in raw:
+        raw = raw.replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return 0.0
+
+def _norm_company(value: str) -> str:
+    text = _norm_text(value).lower()
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+@api.post("/leads/import", response_model=LeadImportResult)
+async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
+    name = (file.filename or "").lower()
+    raw = await file.read()
+    try:
+        if name.endswith(".xlsx") or name.endswith(".xls"):
+            df = pd.read_excel(io.BytesIO(raw))
+        elif name.endswith(".csv"):
+            try:
+                df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
+            except Exception:
+                df = pd.read_csv(io.BytesIO(raw), sep=";")
+        else:
+            raise HTTPException(400, "Use CSV or XLSX")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Could not read file: {e}")
+
+    df = df.fillna("")
+    df.columns = [_norm_col(c) for c in df.columns]
+    imported = updated = skipped = 0
+    errors = []
+    # Load existing CRM records once; avoids one database scan per imported row.
+    # No artificial CRM-size cap: load all existing lead keys for conservative deduplication.\n    candidates = await db.leads.find({}, {"_id": 0}).to_list(None)
+
+    aliases = {
+        "company": ["company","empresa","razao_social","razão_social","nome_empresa","cliente"],
+        "contact_name": ["contact_name","contato","nome_contato","contato_nome","comprador"],
+        "email": ["email","e_mail","email_comercial","commercial_email"],
+        "phone": ["phone","telefone","celular","whatsapp"],
+        "website": ["website","site","url"],
+        "linkedin": ["linkedin","linkedin_url"],
+        "country": ["country","pais","país"],
+        "country_code": ["country_code","pais_codigo","iso"],
+        "industry": ["industry","industria","setor"],
+        "stage": ["stage","estagio","etapa"],
+        "product_interest": ["product_interest","produto","produto_interesse","ingrediente"],
+        "decision_maker": ["decision_maker","decisor","decisor_compras","comprador_decisor"],
+        "decision_maker_title": ["decision_maker_title","cargo","cargo_decisor"],
+        "decision_maker_email": ["decision_maker_email","email_decisor"],
+        "decision_maker_phone": ["decision_maker_phone","telefone_decisor","celular_decisor"],
+        "current_supplier": ["current_supplier","fornecedor_atual","fornecedor"],
+        "priority": ["priority","prioridade"],
+        "source_url": ["source_url","fonte","url_fonte"],
+        "deal_value": ["deal_value","valor_negocio","valor"],
+        "notes": ["notes","observacoes","observações","notas"],
+    }
+
+    for idx, raw_row in enumerate(df.to_dict(orient="records"), start=2):
+        row = {_norm_col(k): v for k, v in raw_row.items()}
+        company = _pick(row, aliases["company"])
+        if not company:
+            skipped += 1
+            errors.append(f"Linha {idx}: empresa vazia")
+            continue
+        data = {"company": company}
+        for field, names in aliases.items():
+            if field == "company": continue
+            value = _pick(row, names)
+            if field == "deal_value":
+                try: value = _parse_number(value)
+                except Exception: value = 0.0
+            if value != "":
+                data[field] = value
+
+        # Match legacy CRM records using normalized company/country values.
+        # Keep the match conservative: no fuzzy merge is done.
+        existing = None
+        company_norm = _norm_company(company)
+        country_norm = _norm_company(data.get("country", ""))
+        for candidate in candidates:
+            if _norm_company(candidate.get("company", "")) != company_norm:
+                continue
+            if country_norm and _norm_company(candidate.get("country", "")) != country_norm:
+                continue
+            existing = candidate
+            break
+        if existing:
+            updates = {k:v for k,v in data.items() if v not in ("", None) and not existing.get(k)}
+            if updates:
+                updates["updated_at"] = now_iso()
+                await db.leads.update_one({"id": existing["id"]}, {"$set": updates})
+                updated += 1
+            else:
+                skipped += 1
+        else:
+            lead = Lead(**data)
+            lead_doc = lead.model_dump()
+            await db.leads.insert_one(lead_doc)
+            candidates.append(lead_doc)
+            imported += 1
+
+    return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
+
 @api.get("/leads", response_model=List[Lead])
-async def list_leads(stage: Optional[str] = None, industry: Optional[str] = None):
+async def list_leads(
+    stage: Optional[str] = None,
+    industry: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 250,
+):
+    """List CRM leads with pagination; there is no registration/storage cap."""
     q = {}
-    if stage: q["stage"] = stage
-    if industry: q["industry"] = industry
-    return await db.leads.find(q, {"_id": 0}).to_list(1000)
+    if stage:
+        q["stage"] = stage
+    if industry:
+        q["industry"] = industry
+    skip = max(0, skip)
+    limit = min(max(1, limit), 250)
+    return await db.leads.find(q, {"_id": 0}).sort("updated_at", -1).skip(skip).limit(limit).to_list(limit)
+
+@api.get("/leads/count")
+async def count_leads(stage: Optional[str] = None, industry: Optional[str] = None, user=Depends(get_current_user)):
+    q = {}
+    if stage:
+        q["stage"] = stage
+    if industry:
+        q["industry"] = industry
+    return {"total": await db.leads.count_documents(q)}
 
 @api.post("/leads", response_model=Lead)
 async def create_lead(lead: Lead, user=Depends(get_current_user)):
@@ -792,6 +1165,80 @@ async def list_tpl(language: Optional[str] = None, category: Optional[str] = Non
     if category: q["category"] = category
     return await db.templates.find(q, {"_id": 0}).to_list(200)
 
+# ============ COMEX STAT / MDIC ============
+@api.get("/comexstat/ncm")
+async def comexstat_ncm(search: str = "", page: int = 1, per_page: int = 50, user=Depends(get_current_user)):
+    try:
+        return ncm_search(search=search, page=page, per_page=per_page)
+    except requests.RequestException as e:
+        logging.exception("Comex Stat NCM search failed")
+        raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
+
+@api.post("/comexstat/prospect")
+async def comexstat_prospect(payload: dict, user=Depends(get_current_user)):
+    """Build a prospecting snapshot from official Comex Stat aggregates."""
+    try:
+        flow = payload.get("flow", "export")
+        period = payload.get("period") or {"from": "2026-01", "to": "2026-08"}
+        ncm = str(payload.get("ncm", "")).strip()
+        details = ["country"]
+        filters = []
+        if ncm:
+            details.insert(0, "ncm")
+            filters.append({"filter": "ncm", "values": [int(ncm)]})
+        query = {
+            "flow": flow,
+            "monthDetail": False,
+            "period": period,
+            "filters": filters,
+            "details": details,
+            "metrics": ["metricFOB", "metricKG"],
+        }
+        data = comex_general(query)
+        markets = normalize_markets(data)
+        return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data, "markets": markets}
+    except (requests.RequestException, ValueError) as e:
+        logging.exception("Comex Stat prospect query failed")
+        raise HTTPException(502, f"Não foi possível montar o prospecting snapshot: {str(e)[:180]}")
+
+@api.post("/comexstat/markets")
+async def comexstat_markets(payload: dict, user=Depends(get_current_user)):
+    """Return normalized country-market aggregates for a product/NCM."""
+    try:
+        flow = payload.get("flow", "export")
+        period = payload.get("period") or {"from": "2026-01", "to": "2026-08"}
+        ncm = str(payload.get("ncm", "")).strip()
+        filters = []
+        if ncm:
+            filters.append({"filter": "ncm", "values": [int(ncm)]})
+        query = {
+            "flow": flow,
+            "monthDetail": False,
+            "period": period,
+            "filters": filters,
+            "details": ["country"],
+            "metrics": ["metricFOB", "metricKG"],
+        }
+        data = comex_general(query)
+        return {
+            "flow": flow,
+            "period": period,
+            "ncm": ncm,
+            "source": "Comex Stat / MDIC",
+            "markets": normalize_markets(data),
+        }
+    except (requests.RequestException, ValueError) as e:
+        logging.exception("Comex Stat markets query failed")
+        raise HTTPException(502, f"Não foi possível montar os mercados: {str(e)[:180]}")
+
+@api.post("/comexstat/general")
+async def comexstat_general(payload: dict, user=Depends(get_current_user)):
+    try:
+        return comex_general(payload)
+    except requests.RequestException as e:
+        logging.exception("Comex Stat general query failed")
+        raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
+
 # ============ TRADE (public) ============
 class TradeRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -828,6 +1275,74 @@ async def trade_to_crm(tid: str, user=Depends(get_current_user)):
                 country_code=tr["country_code"], industry=tr["industry_segment"],
                 stage="new_lead", source="trade_data", deal_value=tr["value_usd"],
                 notes=f"From Trade Intel. HS {tr['hs_code']}. {tr['volume_kg']:.0f} kg / USD {tr['value_usd']:.0f}")
+    await db.leads.insert_one(lead.model_dump())
+    return lead
+
+
+# ============ BUYER DISCOVERY ============
+class BuyerDiscoveryRequest(BaseModel):
+    product: str
+    country: str
+    country_code: str = ""
+    limit: int = 8
+
+@api.post("/buyer-discovery/search")
+async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_current_user)):
+    product = body.product.strip()
+    country = body.country.strip()
+    if not product or not country:
+        raise HTTPException(400, "Informe produto e país.")
+    try:
+        buyers = discover_buyers(product, country, max(1, min(body.limit, 20)))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except requests.RequestException as e:
+        logging.exception("Buyer discovery provider error")
+        raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
+    return {"product": product, "country": country, "results": buyers, "source": "web_discovery"}
+
+@api.post("/buyer-discovery/{company}/decision-maker")
+async def buyer_discovery_decision_maker(company: str, product: str = "", country: str = "", user=Depends(get_current_user)):
+    if not company.strip():
+        raise HTTPException(400, "Empresa obrigatória.")
+    try:
+        import asyncio
+        return await asyncio.to_thread(discover_decision_maker, company, country, product)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except requests.RequestException as e:
+        logging.exception("Decision maker discovery provider error")
+        raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
+
+@api.post("/buyer-discovery/to-crm")
+async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
+    company = str(payload.get("company", "")).strip()
+    if not company:
+        raise HTTPException(400, "Empresa obrigatória.")
+    country = str(payload.get("country", ""))
+    data = {
+        "company": company,
+        "country": country,
+        "country_code": str(payload.get("country_code", "")),
+        "website": str(payload.get("website", "")),
+        "linkedin": str(payload.get("linkedin", "")),
+        "product_interest": str(payload.get("product_interest", "")),
+        "source_url": str(payload.get("source_url", "")),
+        "source": "buyer_discovery",
+        "priority": "high" if float(payload.get("priority_score", 0) or 0) >= 70 else "normal",
+        "notes": f"Descoberto via inteligência web. Score: {payload.get('priority_score', 0)}",
+        "updated_at": now_iso(),
+    }
+    existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(country)}$", "$options": "i"}}, {"_id": 0})
+    if existing:
+        merged = dict(existing)
+        for k, v in data.items():
+            if v and not merged.get(k):
+                merged[k] = v
+        merged["updated_at"] = now_iso()
+        await db.leads.replace_one({"id": existing["id"]}, merged)
+        return merged
+    lead = Lead(**data)
     await db.leads.insert_one(lead.model_dump())
     return lead
 
@@ -876,14 +1391,19 @@ async def dashboard():
         "finance_payable": fin_payable, "contracts_expiring": expiring
     }
 
+@api.get("/health")
+async def health():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "database": "ok", "timestamp": now_iso()}
+    except Exception:
+        logging.exception("Health check failed")
+        raise HTTPException(503, "Database unavailable")
+
 @api.get("/")
-async def root(): return {"message": "AgroBrasil ERP API"}
+async def root(): return {"message": "IBIAG API", "status": "ok"}
 
 app.include_router(api)
-
-app.add_middleware(CORSMiddleware, allow_credentials=True,
-                   allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-                   allow_methods=["*"], allow_headers=["*"])
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -891,15 +1411,16 @@ logger = logging.getLogger(__name__)
 # ----- SEED -----
 async def seed_all():
     # Admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-    admin_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
-    existing = await db.users.find_one({"email": admin_email})
-    if not existing:
-        await db.users.insert_one({"id": str(uuid.uuid4()), "email": admin_email,
-                                    "name": "Regino Neves", "password_hash": hash_pw(admin_pw),
-                                    "role": "admin", "created_at": now_iso()})
-    elif not verify_pw(admin_pw, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_pw(admin_pw)}})
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_pw = os.environ.get("ADMIN_PASSWORD", "")
+    if admin_email and admin_pw:
+        existing = await db.users.find_one({"email": admin_email})
+        if not existing:
+            await db.users.insert_one({"id": str(uuid.uuid4()), "email": admin_email,
+                                        "name": "Administrador IBIAG", "password_hash": hash_pw(admin_pw),
+                                        "role": "admin", "created_at": now_iso()})
+        elif not verify_pw(admin_pw, existing["password_hash"]):
+            await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_pw(admin_pw)}})
     await db.users.create_index("email", unique=True)
 
     # Products & templates & trade & leads seed (kept same as before)
