@@ -363,6 +363,8 @@ class ProductOffer(BaseModel):
     spec_document_ids: List[str] = []
     certificate_document_ids: List[str] = []
     other_document_ids: List[str] = []
+    spec_ids: List[str] = []
+    certification_ids: List[str] = []
     notes: str = ""
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
@@ -795,9 +797,19 @@ async def product_offer_documents(oid: str, user=Depends(get_current_user)):
     if not offer:
         raise HTTPException(404, "Oferta não encontrada")
     ids = list(dict.fromkeys(offer.get("spec_document_ids", []) + offer.get("certificate_document_ids", []) + offer.get("other_document_ids", [])))
-    if not ids:
-        return []
-    return await db.documents.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    result = []
+    if ids:
+        docs = await db.documents.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**d, "link_type": "document"} for d in docs])
+    spec_ids = offer.get("spec_ids", [])
+    if spec_ids:
+        specs = await db.specs.find({"id": {"$in": spec_ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**x, "link_type": "spec"} for x in specs])
+    cert_ids = offer.get("certification_ids", [])
+    if cert_ids:
+        certs = await db.certifications.find({"id": {"$in": cert_ids}}, {"_id": 0}).to_list(200)
+        result.extend([{**x, "link_type": "certification"} for x in certs])
+    return result
 
 # ============ PRODUCTS (public read + auth write) ============
 @api.get("/products", response_model=List[Product])
