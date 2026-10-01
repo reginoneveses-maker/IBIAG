@@ -93,7 +93,21 @@ async def get_current_user(request: Request):
 def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
-app = FastAPI()
+app = FastAPI(title="IBIAG", version="1.0.0")
+
+# Production CORS. Keep this explicit in production; "*" is only a development fallback.
+cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
+if not cors_origins:
+    cors_origins = ["http://localhost:3000", "http://localhost:80"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 api = APIRouter(prefix="/api")
 
 # ----- Models -----
