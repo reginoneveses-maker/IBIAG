@@ -1,0 +1,32 @@
+name: IBIAG Database Backup
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backup dependencies
+        run: pip install "pymongo==4.6.3" "boto3>=1.34.129"
+      - name: Create and upload backup
+        env:
+          MONGO_URL: ${{ secrets.IBIAG_MONGO_URL }}
+          DB_NAME: ${{ secrets.IBIAG_DB_NAME }}
+          BACKUP_S3_BUCKET: ${{ secrets.IBIAG_BACKUP_S3_BUCKET }}
+          BACKUP_S3_PREFIX: ${{ vars.IBIAG_BACKUP_S3_PREFIX }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.IBIAG_BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_REGION: ${{ secrets.IBIAG_BACKUP_S3_REGION }}
+          BACKUP_S3_ACCESS_KEY: ${{ secrets.IBIAG_BACKUP_S3_ACCESS_KEY }}
+          BACKUP_S3_SECRET_KEY: ${{ secrets.IBIAG_BACKUP_S3_SECRET_KEY }}
+          BACKUP_RETENTION_DAYS: ${{ vars.IBIAG_BACKUP_RETENTION_DAYS }}
+        run: python backend/backup.py
