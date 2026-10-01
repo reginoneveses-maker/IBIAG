@@ -21,7 +21,8 @@ const groups = (module, t) => module === "gestao"
         { to: "/gestao/fornecedores", icon: Truck, label: "Fornecedores", },
       ]},
       { title: "Produtos", items: [
-        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Specs & documentos" },
+        { to: "/gestao/produtos", icon: Package, label: "Produtos & dossiês" },
+        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Specs técnicas" },
         { to: "/gestao/precos", icon: Calculator, label: "Preços & calculadora" },
       ]},
     ]
