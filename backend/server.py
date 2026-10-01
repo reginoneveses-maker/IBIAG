@@ -1329,10 +1329,6 @@ async def root(): return {"message": "IBIAG API", "status": "ok"}
 
 app.include_router(api)
 
-app.add_middleware(CORSMiddleware, allow_credentials=True,
-                   allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-                   allow_methods=["*"], allow_headers=["*"])
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
