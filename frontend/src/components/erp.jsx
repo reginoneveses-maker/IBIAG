@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trash2, Plus, Upload, Download, FileText, Pencil } from "lucide-react";
+import { Trash2, Plus, Upload, Download, FileText, Pencil, Search, Truck, FileCheck2 } from "lucide-react";
 import { toast } from "sonner";
 import { fmtBRL, fmtUSD } from "@/lib/api";
 
@@ -121,4 +121,4 @@ export const useUpload = () => {
   return { el, doUpload, uploading };
 };
 
-export { Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Trash2, Plus, Upload, Download, FileText, Pencil, toast, fmtBRL, fmtUSD };
+export { Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Trash2, Plus, Upload, Download, FileText, Pencil, Search, Truck, FileCheck2, toast, fmtBRL, fmtUSD };
