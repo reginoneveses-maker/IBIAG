@@ -25,13 +25,38 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 APP_NAME = os.environ.get("APP_NAME", "agrobrasil")
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
+STORAGE_PROVIDER = os.environ.get("STORAGE_PROVIDER", "emergent").strip().lower()
 STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
 STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+S3_BUCKET = os.environ.get("S3_BUCKET", "")
+S3_REGION = os.environ.get("S3_REGION", "")
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
+S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
+S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "")
 
 storage_key = None
+s3_client = None
+
+def _s3():
+    global s3_client
+    if s3_client:
+        return s3_client
+    if not S3_BUCKET or not S3_ACCESS_KEY or not S3_SECRET_KEY:
+        return None
+    import boto3
+    s3_client = boto3.client(
+        "s3",
+        region_name=S3_REGION or None,
+        endpoint_url=S3_ENDPOINT or None,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+    )
+    return s3_client
 
 def init_storage(force=False):
     global storage_key
+    if STORAGE_PROVIDER == "s3":
+        return "s3"
     if storage_key and not force:
         return storage_key
     try:
@@ -44,8 +69,15 @@ def init_storage(force=False):
         return None
 
 def put_object(path: str, data: bytes, content_type: str) -> dict:
+    if STORAGE_PROVIDER == "s3":
+        client = _s3()
+        if not client:
+            raise HTTPException(500, "S3 storage is not configured")
+        client.put_object(Bucket=S3_BUCKET, Key=path, Body=data, ContentType=content_type)
+        return {"path": path, "size": len(data), "content_type": content_type}
     key = init_storage()
-    if not key: raise HTTPException(500, "Storage not initialized")
+    if not key:
+        raise HTTPException(500, "Storage not initialized")
     resp = requests.put(f"{STORAGE_URL}/objects/{path}",
                         headers={"X-Storage-Key": key, "Content-Type": content_type},
                         data=data, timeout=120)
@@ -59,7 +91,15 @@ def put_object(path: str, data: bytes, content_type: str) -> dict:
     return resp.json()
 
 def get_object(path: str):
+    if STORAGE_PROVIDER == "s3":
+        client = _s3()
+        if not client:
+            raise HTTPException(500, "S3 storage is not configured")
+        obj = client.get_object(Bucket=S3_BUCKET, Key=path)
+        return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
     key = init_storage()
+    if not key:
+        raise HTTPException(500, "Storage not initialized")
     resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
     resp.raise_for_status()
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
