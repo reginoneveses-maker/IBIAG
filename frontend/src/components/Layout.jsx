@@ -85,15 +85,7 @@ const Layout = ({ module = "crm" }) => {
 
       <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 bg-[#104496] text-white flex-col">
         <div className="h-20 px-5 flex items-center border-b border-white/10">
-          <Link to="/" className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${brand.bg} border border-white/10 flex items-center justify-center`}>
-              <brand.Icon className={`w-5 h-5 ${brand.fg}`} />
-            </div>
-            <div>
-              <div className="font-display font-extrabold text-lg leading-none">{brand.name}</div>
-              <div className="text-[10px] uppercase tracking-widest text-white/45 mt-1">{brand.sub}</div>
-            </div>
-          </Link>
+          <Link to="/" className="block bg-white rounded-xl px-3 py-2"><IbiagLogo className="w-44 h-auto" /></Link>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
