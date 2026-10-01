@@ -427,6 +427,19 @@ class ProductOffer(BaseModel):
     spec_ids: List[str] = []
     certification_ids: List[str] = []
     notes: str = ""
+    packaging_type: str = ""
+    packaging: str = ""
+    palletization: str = ""
+    export_price_text: str = ""
+    fob_price_text: str = ""
+    organic_version: str = ""
+    commission: float = 0
+    certifications_text: str = ""
+    spec_url: str = ""
+    marketing_claim: str = ""
+    harvest: str = ""
+    checked: str = ""
+    source: str = ""
     created_at: str = Field(default_factory=now_iso)
     updated_at: str = Field(default_factory=now_iso)
 
@@ -923,6 +936,114 @@ async def upd_product(pid: str, p: Product, user=Depends(get_current_user)):
 @api.delete("/products/{pid}")
 async def del_product(pid: str, user=Depends(get_current_user)):
     r = await db.products.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+
+
+class PortfolioImportResult(BaseModel):
+    products: int
+    suppliers: int
+    offers: int
+    source_rows: int
+
+@api.post("/portfolio/import-xlsx", response_model=PortfolioImportResult)
+async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, user=Depends(get_current_user)):
+    """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
+    raw = await file.read()
+    try:
+        df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
+    except Exception as e:
+        raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {e}")
+
+    def clean(v):
+        if v is None: return ""
+        if isinstance(v, float) and v.is_integer(): return str(int(v))
+        return str(v).strip()
+
+    required = {"Produto", "Fornecedor"}
+    if not required.issubset(set(df.columns)):
+        raise HTTPException(400, "Planilha sem as colunas Produto/Fornecedor esperadas")
+
+    rows = []
+    for _, row in df.iterrows():
+        name = clean(row.get("Produto"))
+        if not name:
+            continue
+        rows.append({str(k).strip(): clean(v) for k, v in row.to_dict().items()})
+
+    if replace:
+        await db.products.delete_many({})
+        await db.product_offers.delete_many({})
+
+    supplier_names = sorted({r.get("Fornecedor","") for r in rows if r.get("Fornecedor","")})
+    supplier_map = {}
+    for name in supplier_names:
+        existing = await db.suppliers.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
+        if not existing:
+            s = Supplier(name=name, notes="Importado da Tabela Produtos IBIAG 2026")
+            await db.suppliers.insert_one(s.model_dump())
+            existing = s.model_dump()
+        supplier_map[name] = existing
+
+    product_map = {}
+    for r in rows:
+        name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
+        key = name.casefold()
+        if key in product_map:
+            continue
+        ncm = r.get("NCM/HS","")
+        p = Product(
+            name=name,
+            category=r.get("Linha","") or "portfolio",
+            hs_code=ncm,
+            ncm=ncm,
+            sku=r.get("SKU",""),
+            packaging=" · ".join(x for x in [r.get("Tipo Embalagem",""), r.get("Embalagem","")] if x),
+            available_capacity=r.get("Capacidade de Produção",""),
+            price_range=r.get("Preço Exportação",""),
+            specs=r.get("Spec",""),
+            price_history_notes=r.get("Observações",""),
+            description_pt="Produto do portfólio operacional IBIAG 2026",
+        )
+        await db.products.insert_one(p.model_dump())
+        product_map[key] = p.model_dump()
+
+    offer_count = 0
+    for r in rows:
+        name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
+        p = product_map[name.casefold()]
+        supplier_name = r.get("Fornecedor","")
+        supplier = supplier_map.get(supplier_name, {})
+        commission_raw = r.get("Comissão","")
+        try:
+            commission = float(str(commission_raw).replace(",", ".")) if commission_raw else 0
+        except Exception:
+            commission = 0
+        offer = ProductOffer(
+            product_id=p["id"], product_name=p["name"], form=p["name"],
+            supplier_id=supplier.get("id",""), supplier_name=supplier_name,
+            capacity=r.get("Capacidade de Produção",""), ncm=r.get("NCM/HS",""), hs_code=r.get("NCM/HS",""),
+            packaging_type=r.get("Tipo Embalagem",""), packaging=r.get("Embalagem",""),
+            palletization=r.get("Palletização",""), export_price_text=r.get("Preço Exportação",""),
+            fob_price_text="" if r.get("Preço FOB","") == "#VALUE!" else r.get("Preço FOB",""),
+            organic_version=r.get("Versão Orgânica",""), commission=commission,
+            certifications_text=r.get("Certificações",""), spec_url=r.get("Spec",""),
+            marketing_claim=r.get("Apelo MKT",""), harvest=r.get("Safra",""),
+            checked=r.get("Conferido",""), notes=r.get("Observações",""),
+            source="Tabela Produtos Ibiag 2026 - COMPLETA / aba IBIAG"
+        )
+        await db.product_offers.insert_one(offer.model_dump())
+        offer_count += 1
+
+    # Refresh each supplier's product summary without inventing contact data.
+    for name, supplier in supplier_map.items():
+        supplied = sorted({r.get("Produto","").strip() for r in rows if r.get("Fornecedor","") == name and r.get("Produto","").strip()})
+        await db.suppliers.update_one({"id": supplier["id"]}, {"$set": {"products": ", ".join(supplied)}})
+
+    await db.settings.update_one({"key":"portfolio_source"}, {"$set":{
+        "key":"portfolio_source","value":"Tabela Produtos Ibiag 2026 - COMPLETA (1).xlsx",
+        "source_rows":len(rows),"products":len(product_map),"suppliers":len(supplier_map),
+        "offers":offer_count,"updated_at":now_iso()
+    }}, upsert=True)
+    return PortfolioImportResult(products=len(product_map), suppliers=len(supplier_map), offers=offer_count, source_rows=len(rows))
 
 # ============ LEADS (CRM) ============
 class LeadImportResult(BaseModel):
