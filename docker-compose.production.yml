@@ -25,6 +25,9 @@ services:
       S3_REGION: ${S3_REGION:-}
       S3_ENDPOINT: ${S3_ENDPOINT:-}
       FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      ALLOW_PUBLIC_REGISTRATION: "false"
     ports:
       - "8000:8000"
 
