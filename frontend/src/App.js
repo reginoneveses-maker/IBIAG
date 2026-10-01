@@ -21,6 +21,7 @@ import FornecedoresHub from "@/pages/gestao/FornecedoresHub";
 import Specs from "@/pages/gestao/Specs";
 import Produtos from "@/pages/gestao/Produtos";
 import Precos from "@/pages/gestao/Precos";
+import Documentos from "@/pages/gestao/Documentos";
 
 const Protected = ({ children }) => {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ function App() {
                 <Route path="produtos" element={<Produtos />} />
                 <Route path="prospeccao" element={<Specs />} />
                 <Route path="precos" element={<Precos />} />
+                <Route path="documentos" element={<Documentos />} />
               </Route>
               <Route path="/prospects" element={<Protected><Layout module="crm" /></Protected>}>
                 <Route index element={<Dashboard />} />
