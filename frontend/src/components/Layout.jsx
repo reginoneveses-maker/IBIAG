@@ -52,14 +52,14 @@ const Layout = ({ module = "crm" }) => {
   const navGroups = groups(module, t);
 
   const brand = module === "gestao"
-    ? { name: "IBIAG", sub: "Gestão da empresa", Icon: Building2, bg: "bg-[#0F382C]", fg: "text-amber-400" }
-    : { name: "Tropical Prospects", sub: "Compradores & CRM", Icon: Leaf, bg: "bg-amber-600", fg: "text-white" };
+    ? { name: "IBIAG", sub: "Gestão da empresa", Icon: Building2, bg: "bg-[#104496]", fg: "text-[#CAD51B]" }
+    : { name: "Tropical Prospects", sub: "Compradores & CRM", Icon: Leaf, bg: "bg-[#104496]", fg: "text-white" };
 
   return (
-    <div className="min-h-screen bg-[#F6F7F4]">
+    <div className="min-h-screen bg-[#F7F9FC]">
       <Toaster position="top-right" />
 
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 bg-[#102F27] text-white flex-col">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 bg-[#104496] text-white flex-col">
         <div className="h-20 px-5 flex items-center border-b border-white/10">
           <Link to="/" className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl ${brand.bg} border border-white/10 flex items-center justify-center`}>
@@ -79,7 +79,7 @@ const Layout = ({ module = "crm" }) => {
               <div className="space-y-1">
                 {group.items.map(({ to, icon: Icon, label, end }) => (
                   <NavLink key={to} to={to} end={end}
-                    className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${isActive ? "bg-white text-[#102F27] shadow-sm" : "text-white/65 hover:bg-white/8 hover:text-white"}`}>
+                    className={({ isActive }) => `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${isActive ? "bg-white text-[#104496] shadow-sm" : "text-white/65 hover:bg-white/8 hover:text-white"}`}>
                     <Icon className="w-4 h-4 shrink-0" />
                     <span className="flex-1">{label}</span>
                     <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50" />
@@ -101,26 +101,26 @@ const Layout = ({ module = "crm" }) => {
       </aside>
 
       <div className="lg:pl-64 min-h-screen">
-        <header className="sticky top-0 z-30 h-16 bg-[#F6F7F4]/90 backdrop-blur-xl border-b border-[#102F27]/10">
+        <header className="sticky top-0 z-30 h-16 bg-[#F7F9FC]/90 backdrop-blur-xl border-b border-[#104496]/10">
           <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             <div className="flex items-center gap-2 lg:hidden">
-              <Link to="/" className="p-2 rounded-lg hover:bg-white text-[#102F27]"><LayoutGrid className="w-5 h-5" /></Link>
-              <div className="font-display font-extrabold text-[#102F27]">{brand.name}</div>
+              <Link to="/" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
+              <div className="font-display font-extrabold text-[#104496]">{brand.name}</div>
             </div>
-            <div className="hidden lg:flex items-center gap-2 text-xs text-[#102F27]/45">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-[#104496]/45">
               <Home className="w-3.5 h-3.5" />
               <span>{module === "gestao" ? "Gestão" : "Prospecção & CRM"}</span>
             </div>
             <div className="ml-auto flex items-center gap-3">
-              <div className="flex items-center gap-1 p-1 rounded-full border border-[#102F27]/10 bg-white">
-                <button onClick={() => setLang("pt")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-full ${lang === "pt" ? "bg-[#102F27] text-white" : "text-[#102F27]/55"}`}>PT</button>
-                <button onClick={() => setLang("en")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-full ${lang === "en" ? "bg-[#102F27] text-white" : "text-[#102F27]/55"}`}>EN</button>
+              <div className="flex items-center gap-1 p-1 rounded-full border border-[#104496]/10 bg-white">
+                <button onClick={() => setLang("pt")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-full ${lang === "pt" ? "bg-[#104496] text-white" : "text-[#104496]/55"}`}>PT</button>
+                <button onClick={() => setLang("en")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-full ${lang === "en" ? "bg-[#104496] text-white" : "text-[#104496]/55"}`}>EN</button>
               </div>
               <div className="hidden sm:flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[#102F27] text-white flex items-center justify-center text-xs font-bold">{(user?.name || user?.email || "U").slice(0,1).toUpperCase()}</div>
-                <span className="text-xs font-medium text-[#102F27]/70 max-w-32 truncate">{user?.name || user?.email}</span>
+                <div className="w-8 h-8 rounded-full bg-[#104496] text-white flex items-center justify-center text-xs font-bold">{(user?.name || user?.email || "U").slice(0,1).toUpperCase()}</div>
+                <span className="text-xs font-medium text-[#104496]/70 max-w-32 truncate">{user?.name || user?.email}</span>
               </div>
-              <button onClick={logout} className="lg:hidden p-2 rounded-lg hover:bg-white text-[#102F27]"><LogOut className="w-4 h-4" /></button>
+              <button onClick={logout} className="lg:hidden p-2 rounded-lg hover:bg-white text-[#104496]"><LogOut className="w-4 h-4" /></button>
             </div>
           </div>
         </header>
