@@ -48,7 +48,7 @@ def init_storage(force=False):
 
 async def put_object(path: str, data: bytes, content_type: str) -> dict:
     if STORAGE_PROVIDER == "gridfs":
-        old = await db.ibiag_files_files.find_one({"filename": path})
+        old = await db["ibiag_files.files"].find_one({"filename": path})
         if old: await gridfs.delete(old["_id"])
         await gridfs.upload_from_stream(path, data, metadata={"content_type": content_type})
         return {"path": path, "size": len(data), "content_type": content_type}
