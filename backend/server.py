@@ -908,7 +908,7 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
     imported = updated = skipped = 0
     errors = []
     # Load existing CRM records once; avoids one database scan per imported row.
-    candidates = await db.leads.find({}, {"_id": 0}).to_list(5000)
+    # No artificial CRM-size cap: load all existing lead keys for conservative deduplication.\n    candidates = await db.leads.find({}, {"_id": 0}).to_list(None)
 
     aliases = {
         "company": ["company","empresa","razao_social","razão_social","nome_empresa","cliente"],
