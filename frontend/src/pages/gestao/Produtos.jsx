@@ -134,6 +134,32 @@ export default function Produtos() {
         {!filtered.length && <Card className="col-span-full bg-white"><CardContent className="py-12 text-center text-sm text-[#0F382C]/50">Nenhum produto cadastrado.</CardContent></Card>}
       </div>
 
+      <Dialog open={offerDialog} onOpenChange={setOfferDialog}>
+        <DialogContent className="bg-[#F9F6F0] max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">Forma, fornecedor e documentação</DialogTitle></DialogHeader>
+          <div className="space-y-5">
+            <div className="rounded-xl bg-white border border-[#0F382C]/10 p-4"><div className="text-xs text-[#0F382C]/50">Produto</div><div className="font-display text-xl font-bold text-[#0F382C]">{offerProduct?.name}</div></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {field("Forma / apresentação","form",offerForm,setOfferForm,{className:"sm:col-span-2"})}
+              <div><label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/55 mb-1">Fornecedor</label><select value={offerForm.supplier_id} onChange={e=>setOfferForm({...offerForm,supplier_id:e.target.value})} className="w-full h-10 rounded-md border bg-white px-3 text-sm"><option value="">Selecionar fornecedor</option>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
+              {field("Unidade","unit",offerForm,setOfferForm)}
+              {field("Custo fornecedor","supplier_price",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
+              {field("Preço venda BRL","sale_price_brl",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
+              {field("Preço venda USD","sale_price_usd",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
+              {field("Capacidade","capacity",offerForm,setOfferForm)}
+              {field("MOQ","moq",offerForm,setOfferForm)}
+              {field("NCM","ncm",offerForm,setOfferForm)}
+              {field("HS Code","hs_code",offerForm,setOfferForm)}
+            </div>
+            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Especificações vinculadas</div>{specs.length?<div className="space-y-2 max-h-36 overflow-y-auto">{specs.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.spec_ids.includes(x.id)} onChange={()=>toggleId("spec_ids",x.id)}/><span>{x.product_name} · {x.supplier_name||"Fornecedor"} · v{x.version}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhuma spec cadastrada.</div>}</section>
+            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Certificações vinculadas</div>{certifications.length?<div className="space-y-2 max-h-36 overflow-y-auto">{certifications.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.certification_ids.includes(x.id)} onChange={()=>toggleId("certification_ids",x.id)}/><span>{x.name} · {x.supplier_name||"Fornecedor"}{x.expiry_date?" · vence "+x.expiry_date:""}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum certificado cadastrado.</div>}</section>
+            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Documentos / arquivos vinculados</div>{documents.length?<div className="space-y-2 max-h-36 overflow-y-auto">{documents.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.other_document_ids.includes(x.id)} onChange={()=>toggleId("other_document_ids",x.id)}/><span className="flex-1">{x.title||x.file_name}</span>{x.file_path&&<button type="button" className="text-amber-700" onClick={()=>openLinkedFile(x.file_path,x.file_name)}>Abrir</button>}</label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum documento cadastrado.</div>}</section>
+            <Textarea placeholder="Observações desta forma/fornecedor" value={offerForm.notes||""} onChange={e=>setOfferForm({...offerForm,notes:e.target.value})} className="bg-white" rows={3}/>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#0F382C] text-white">Salvar vínculo</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+    
       <Dialog open={dialog} onOpenChange={setDialog}>
         <DialogContent className="bg-[#F9F6F0] max-w-4xl max-h-[92vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-display text-[#0F382C]">{form.id ? "Dossiê do produto" : "Novo produto"}</DialogTitle></DialogHeader>
@@ -178,32 +204,7 @@ export default function Produtos() {
               </div>
             </section>
           </div>
-      <Dialog open={offerDialog} onOpenChange={setOfferDialog}>
-        <DialogContent className="bg-[#F9F6F0] max-w-3xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">Forma, fornecedor e documentação</DialogTitle></DialogHeader>
-          <div className="space-y-5">
-            <div className="rounded-xl bg-white border border-[#0F382C]/10 p-4"><div className="text-xs text-[#0F382C]/50">Produto</div><div className="font-display text-xl font-bold text-[#0F382C]">{offerProduct?.name}</div></div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {field("Forma / apresentação","form",offerForm,setOfferForm,{className:"sm:col-span-2"})}
-              <div><label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/55 mb-1">Fornecedor</label><select value={offerForm.supplier_id} onChange={e=>setOfferForm({...offerForm,supplier_id:e.target.value})} className="w-full h-10 rounded-md border bg-white px-3 text-sm"><option value="">Selecionar fornecedor</option>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
-              {field("Unidade","unit",offerForm,setOfferForm)}
-              {field("Custo fornecedor","supplier_price",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
-              {field("Preço venda BRL","sale_price_brl",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
-              {field("Preço venda USD","sale_price_usd",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
-              {field("Capacidade","capacity",offerForm,setOfferForm)}
-              {field("MOQ","moq",offerForm,setOfferForm)}
-              {field("NCM","ncm",offerForm,setOfferForm)}
-              {field("HS Code","hs_code",offerForm,setOfferForm)}
-            </div>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Especificações vinculadas</div>{specs.length?<div className="space-y-2 max-h-36 overflow-y-auto">{specs.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.spec_ids.includes(x.id)} onChange={()=>toggleId("spec_ids",x.id)}/><span>{x.product_name} · {x.supplier_name||"Fornecedor"} · v{x.version}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhuma spec cadastrada.</div>}</section>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Certificações vinculadas</div>{certifications.length?<div className="space-y-2 max-h-36 overflow-y-auto">{certifications.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.certification_ids.includes(x.id)} onChange={()=>toggleId("certification_ids",x.id)}/><span>{x.name} · {x.supplier_name||"Fornecedor"}{x.expiry_date?" · vence "+x.expiry_date:""}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum certificado cadastrado.</div>}</section>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Documentos / arquivos vinculados</div>{documents.length?<div className="space-y-2 max-h-36 overflow-y-auto">{documents.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.other_document_ids.includes(x.id)} onChange={()=>toggleId("other_document_ids",x.id)}/><span className="flex-1">{x.title||x.file_name}</span>{x.file_path&&<button type="button" className="text-amber-700" onClick={()=>openLinkedFile(x.file_path,x.file_name)}>Abrir</button>}</label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum documento cadastrado.</div>}</section>
-            <Textarea placeholder="Observações desta forma/fornecedor" value={offerForm.notes||""} onChange={e=>setOfferForm({...offerForm,notes:e.target.value})} className="bg-white" rows={3}/>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#0F382C] text-white">Salvar vínculo</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-          <DialogFooter>
+      <DialogFooter>
             {form.id && <Button variant="ghost" className="mr-auto text-rose-600" onClick={() => { remove(form.id); setDialog(false); }}>Excluir</Button>}
             <Button variant="outline" onClick={() => setDialog(false)}>Cancelar</Button>
             <Button onClick={save} className="bg-[#0F382C] text-white">Salvar dossiê</Button>
