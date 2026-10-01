@@ -5,6 +5,11 @@ import {
   Building2, Upload, ChevronRight, Home, FolderArchive, BriefcaseBusiness, Settings,
   Warehouse, FileText
 } from "lucide-react";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { useAuth } from "@/AuthContext";
+import { useLang } from "@/i18n";
+import { Toaster } from "@/components/ui/sonner";
+import { IbiagLogo } from "@/components/IbiagLogo";
 
 const groups = (module, t) => module === "gestao"
   ? [
