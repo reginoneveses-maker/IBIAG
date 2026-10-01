@@ -5,7 +5,7 @@ load_dotenv(ROOT_DIR / '.env')
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
@@ -20,89 +20,59 @@ import xml.etree.ElementTree as ET
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+gridfs = AsyncIOMotorGridFSBucket(db, bucket_name="ibiag_files")
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 APP_NAME = os.environ.get("APP_NAME", "agrobrasil")
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
-STORAGE_PROVIDER = os.environ.get("STORAGE_PROVIDER", "emergent").strip().lower()
-STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+STORAGE_PROVIDER = os.environ.get("STORAGE_PROVIDER", "gridfs").strip().lower()
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
 S3_REGION = os.environ.get("S3_REGION", "")
 S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "")
 S3_ACCESS_KEY = os.environ.get("S3_ACCESS_KEY", "")
 S3_SECRET_KEY = os.environ.get("S3_SECRET_KEY", "")
-
-storage_key = None
 s3_client = None
 
 def _s3():
     global s3_client
-    if s3_client:
-        return s3_client
-    if not S3_BUCKET or not S3_ACCESS_KEY or not S3_SECRET_KEY:
-        return None
+    if s3_client: return s3_client
+    if not S3_BUCKET or not S3_ACCESS_KEY or not S3_SECRET_KEY: return None
     import boto3
-    s3_client = boto3.client(
-        "s3",
-        region_name=S3_REGION or None,
-        endpoint_url=S3_ENDPOINT or None,
-        aws_access_key_id=S3_ACCESS_KEY,
-        aws_secret_access_key=S3_SECRET_KEY,
-    )
+    s3_client = boto3.client("s3", region_name=S3_REGION or None, endpoint_url=S3_ENDPOINT or None,
+        aws_access_key_id=S3_ACCESS_KEY, aws_secret_access_key=S3_SECRET_KEY)
     return s3_client
 
 def init_storage(force=False):
-    global storage_key
-    if STORAGE_PROVIDER == "s3":
-        return "s3"
-    if storage_key and not force:
-        return storage_key
-    try:
-        resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
-        resp.raise_for_status()
-        storage_key = resp.json()["storage_key"]
-        return storage_key
-    except Exception as e:
-        logging.error(f"Storage init failed: {e}")
-        return None
+    return STORAGE_PROVIDER
 
-def put_object(path: str, data: bytes, content_type: str) -> dict:
-    if STORAGE_PROVIDER == "s3":
-        client = _s3()
-        if not client:
-            raise HTTPException(500, "S3 storage is not configured")
-        client.put_object(Bucket=S3_BUCKET, Key=path, Body=data, ContentType=content_type)
+async def put_object(path: str, data: bytes, content_type: str) -> dict:
+    if STORAGE_PROVIDER == "gridfs":
+        old = await db.ibiag_files_files.find_one({"filename": path})
+        if old: await gridfs.delete(old["_id"])
+        await gridfs.upload_from_stream(path, data, metadata={"content_type": content_type})
         return {"path": path, "size": len(data), "content_type": content_type}
-    key = init_storage()
-    if not key:
-        raise HTTPException(500, "Storage not initialized")
-    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                        headers={"X-Storage-Key": key, "Content-Type": content_type},
-                        data=data, timeout=120)
-    if resp.status_code == 404:
-        init_storage(force=True)
-        key = storage_key
-        resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                            headers={"X-Storage-Key": key, "Content-Type": content_type},
-                            data=data, timeout=120)
-    resp.raise_for_status()
-    return resp.json()
-
-def get_object(path: str):
     if STORAGE_PROVIDER == "s3":
-        client = _s3()
-        if not client:
-            raise HTTPException(500, "S3 storage is not configured")
-        obj = client.get_object(Bucket=S3_BUCKET, Key=path)
+        c = _s3()
+        if not c: raise HTTPException(500, "S3 storage is not configured")
+        c.put_object(Bucket=S3_BUCKET, Key=path, Body=data, ContentType=content_type)
+        return {"path": path, "size": len(data), "content_type": content_type}
+    raise HTTPException(500, "Storage provider is not configured")
+
+async def get_object(path: str):
+    if STORAGE_PROVIDER == "gridfs":
+        try:
+            stream = await gridfs.open_download_stream_by_name(path)
+            data = await stream.read()
+            return data, (stream.metadata or {}).get("content_type", "application/octet-stream")
+        except Exception:
+            raise HTTPException(404, "Arquivo não encontrado")
+    if STORAGE_PROVIDER == "s3":
+        c = _s3()
+        if not c: raise HTTPException(500, "S3 storage is not configured")
+        obj = c.get_object(Bucket=S3_BUCKET, Key=path)
         return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
-    key = init_storage()
-    if not key:
-        raise HTTPException(500, "Storage not initialized")
-    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+    raise HTTPException(500, "Storage provider is not configured")
 
 # ----- Auth helpers -----
 def hash_pw(pw): return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
@@ -511,12 +481,12 @@ async def upload_file(file: UploadFile = File(...), user=Depends(get_current_use
     path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ext}"
     data = await file.read()
     ct = file.content_type or "application/octet-stream"
-    result = put_object(path, data, ct)
+    result = await put_object(path, data, ct)
     return {"path": result["path"], "name": file.filename, "size": result.get("size", len(data)), "content_type": ct}
 
 @api.get("/files/{full_path:path}")
 async def download_file(full_path: str, user=Depends(get_current_user)):
-    data, ct = get_object(full_path)
+    data, ct = await get_object(full_path)
     return Response(content=data, media_type=ct)
 
 # ============ DOCUMENTS ============
@@ -947,6 +917,7 @@ class PortfolioImportResult(BaseModel):
 @api.post("/portfolio/import-xlsx", response_model=PortfolioImportResult)
 async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, user=Depends(get_current_user)):
     """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
+    require_admin(user)
     raw = await file.read()
     try:
         df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
@@ -1551,64 +1522,64 @@ async def seed_all():
         # The previous installation contained demonstration products. Replace them once with the official portfolio.
         await db.products.delete_many({})
         prods = [
-            Product(name="Açaí Extract Powder", category="superfruits", moq="100 KG", specs="Powder extract; organic available", sku="IB-001", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Freeze Dried", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-002", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Pulp (8%, 12%, 14% solids)", category="superfruits", moq="Please request", specs="Single strength / puree; organic available", sku="IB-003", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Soft Mix", category="superfruits", moq="Please request", specs="UHT", sku="IB-004", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Sorbet", category="superfruits", moq="Please request", specs="Organic available", sku="IB-005", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Dry Extract Powder (17%, 21%, 25% Native Vit C)", category="superfruits", moq="20 KG", specs="Powder extract; organic available", sku="IB-006", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Freeze Dried (17%, 30%, 40% Native Vit C)", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-007", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Juice", category="superfruits", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-008", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Apple Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-009", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Artichoke Extract Powder", category="herbs_roots", moq="100 KG", specs="Extract powder", sku="IB-010", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Babassu Flour", category="specialties", moq="25 KG", specs="Flour", sku="IB-011", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cajá / Cajá Umbu", category="superfruits", moq="Please request", specs="Juice / puree", sku="IB-012", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Camu Camu Extract Powder", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-013", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Camu Camu Freeze Dried Powder", category="superfruits", moq="10 KG", specs="Freeze dried powder; organic available", sku="IB-014", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cashew Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-015", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cashew Nuts", category="nuts_seeds", moq="7,938 KG", specs="Nuts; organic available", sku="IB-016", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Catuaba", category="herbs_roots", moq="100 KG", specs="Powder / extract / cut", sku="IB-017", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Flour (Degreased Desiccated)", category="specialties", moq="25 KG", specs="Flour", sku="IB-018", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Milk Concentrated", category="specialties", moq="20 KG", specs="Concentrated coconut milk", sku="IB-019", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Pulp Green Integral", category="specialties", moq="20 KG", specs="Integral green coconut pulp; organic available", sku="IB-020", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Water", category="juices", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-021", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Grape Seed Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-022", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Grape Skin Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-023", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Graviola (Soursop)", category="herbs_roots", moq="Please request", specs="Juice / powder / cut", sku="IB-024", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Complex Powder", category="superfruits", moq="5 KG", specs="Powder", sku="IB-025", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Dry Extract 10% Caffeine", category="superfruits", moq="100 KG", specs="Dry extract", sku="IB-026", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Oil", category="specialties", moq="5 KG", specs="Vegetal oil", sku="IB-027", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Extract Powder (10%, 22% Caffeine)", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-028", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Fluid Extract (1.2%, 4-6% Caffeine)", category="superfruits", moq="100 KG", specs="Fluid extract; organic available", sku="IB-029", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Powder", category="superfruits", moq="100 KG", specs="Powder; organic available", sku="IB-030", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Seed", category="nuts_seeds", moq="100 KG", specs="Grains; organic available", sku="IB-031", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guava", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-032", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Hibiscus Soluble Tea", category="herbs_roots", moq="100 KG", specs="Soluble tea", sku="IB-033", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Jambu (Paracress)", category="herbs_roots", moq="10 KG", specs="Powder / cut", sku="IB-034", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Lime", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-035", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Lithothamnion Algae Powder", category="specialties", moq="25 KG", specs="Mineral algae powder", sku="IB-036", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Mandarin Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-037", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Melon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-038", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Moringa Powder", category="herbs_roots", moq="20 KG", specs="Powder; organic available", sku="IB-039", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Muirapuama", category="herbs_roots", moq="100 KG", specs="Extract / powder / cut", sku="IB-040", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Ora Pro Nobis (Lemon Vine)", category="herbs_roots", moq="10 KG", specs="Powder / freeze dried; organic available", sku="IB-041", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Orange", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-042", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Papaya Pulp", category="juices", moq="Please request", specs="Pulp; organic available", sku="IB-043", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Passion Fruit Pulp", category="juices", moq="Please request", specs="Pulp", sku="IB-044", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pau D'Arco", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-045", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pfaffia Paniculata (Brazilian Ginseng) Powder", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-046", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pineapple Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-047", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pitaya (Dragon Fruit)", category="superfruits", moq="Please request", specs="Juice / powder", sku="IB-048", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Quercetin", category="specialties", moq="100 KG", specs="Powder", sku="IB-049", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Rutin 70%", category="specialties", moq="100 KG", specs="Powder", sku="IB-050", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Strawberry Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-051", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Tamarind Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-052", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Tangerine Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-053", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Watermelon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-054", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate 5/10 Green / Roasted", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-055", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Dry Extract 8-10%", category="herbs_roots", moq="100 KG", specs="Dry extract", sku="IB-056", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Leaves and Stems", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-057", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Soluble Tea Green / Roasted", category="herbs_roots", moq="100 KG", specs="Soluble tea; organic available", sku="IB-058", certifications=["FSSC 22000", "Fair Trade", "Orgânico", "USDA Organic", "EU Organic", "Kosher", "Halal"], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026")
+            Product(name="Açaí Extract Powder", category="superfruits", moq="100 KG", specs="Powder extract; organic available", sku="IB-001", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Açaí Freeze Dried", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-002", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Açaí Pulp (8%, 12%, 14% solids)", category="superfruits", moq="Please request", specs="Single strength / puree; organic available", sku="IB-003", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Açaí Soft Mix", category="superfruits", moq="Please request", specs="UHT", sku="IB-004", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Açaí Sorbet", category="superfruits", moq="Please request", specs="Organic available", sku="IB-005", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Acerola Dry Extract Powder (17%, 21%, 25% Native Vit C)", category="superfruits", moq="20 KG", specs="Powder extract; organic available", sku="IB-006", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Acerola Freeze Dried (17%, 30%, 40% Native Vit C)", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-007", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Acerola Juice", category="superfruits", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-008", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Apple Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-009", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Artichoke Extract Powder", category="herbs_roots", moq="100 KG", specs="Extract powder", sku="IB-010", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Babassu Flour", category="specialties", moq="25 KG", specs="Flour", sku="IB-011", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Cajá / Cajá Umbu", category="superfruits", moq="Please request", specs="Juice / puree", sku="IB-012", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Camu Camu Extract Powder", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-013", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Camu Camu Freeze Dried Powder", category="superfruits", moq="10 KG", specs="Freeze dried powder; organic available", sku="IB-014", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Cashew Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-015", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Cashew Nuts", category="nuts_seeds", moq="7,938 KG", specs="Nuts; organic available", sku="IB-016", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Catuaba", category="herbs_roots", moq="100 KG", specs="Powder / extract / cut", sku="IB-017", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Coconut Flour (Degreased Desiccated)", category="specialties", moq="25 KG", specs="Flour", sku="IB-018", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Coconut Milk Concentrated", category="specialties", moq="20 KG", specs="Concentrated coconut milk", sku="IB-019", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Coconut Pulp Green Integral", category="specialties", moq="20 KG", specs="Integral green coconut pulp; organic available", sku="IB-020", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Coconut Water", category="juices", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-021", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Grape Seed Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-022", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Grape Skin Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-023", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Graviola (Soursop)", category="herbs_roots", moq="Please request", specs="Juice / powder / cut", sku="IB-024", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Green Coffee Complex Powder", category="superfruits", moq="5 KG", specs="Powder", sku="IB-025", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Green Coffee Dry Extract 10% Caffeine", category="superfruits", moq="100 KG", specs="Dry extract", sku="IB-026", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Green Coffee Oil", category="specialties", moq="5 KG", specs="Vegetal oil", sku="IB-027", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Guaraná Extract Powder (10%, 22% Caffeine)", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-028", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Guaraná Fluid Extract (1.2%, 4-6% Caffeine)", category="superfruits", moq="100 KG", specs="Fluid extract; organic available", sku="IB-029", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Guaraná Powder", category="superfruits", moq="100 KG", specs="Powder; organic available", sku="IB-030", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Guaraná Seed", category="nuts_seeds", moq="100 KG", specs="Grains; organic available", sku="IB-031", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Guava", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-032", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Hibiscus Soluble Tea", category="herbs_roots", moq="100 KG", specs="Soluble tea", sku="IB-033", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Jambu (Paracress)", category="herbs_roots", moq="10 KG", specs="Powder / cut", sku="IB-034", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Lime", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-035", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Lithothamnion Algae Powder", category="specialties", moq="25 KG", specs="Mineral algae powder", sku="IB-036", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Mandarin Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-037", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Melon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-038", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Moringa Powder", category="herbs_roots", moq="20 KG", specs="Powder; organic available", sku="IB-039", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Muirapuama", category="herbs_roots", moq="100 KG", specs="Extract / powder / cut", sku="IB-040", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Ora Pro Nobis (Lemon Vine)", category="herbs_roots", moq="10 KG", specs="Powder / freeze dried; organic available", sku="IB-041", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Orange", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-042", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Papaya Pulp", category="juices", moq="Please request", specs="Pulp; organic available", sku="IB-043", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Passion Fruit Pulp", category="juices", moq="Please request", specs="Pulp", sku="IB-044", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Pau D'Arco", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-045", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Pfaffia Paniculata (Brazilian Ginseng) Powder", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-046", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Pineapple Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-047", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Pitaya (Dragon Fruit)", category="superfruits", moq="Please request", specs="Juice / powder", sku="IB-048", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Quercetin", category="specialties", moq="100 KG", specs="Powder", sku="IB-049", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Rutin 70%", category="specialties", moq="100 KG", specs="Powder", sku="IB-050", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Strawberry Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-051", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Tamarind Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-052", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Tangerine Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-053", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Watermelon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-054", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Yerba Mate 5/10 Green / Roasted", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-055", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Yerba Mate Dry Extract 8-10%", category="herbs_roots", moq="100 KG", specs="Dry extract", sku="IB-056", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Yerba Mate Leaves and Stems", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-057", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
+            Product(name="Yerba Mate Soluble Tea Green / Roasted", category="herbs_roots", moq="100 KG", specs="Soluble tea; organic available", sku="IB-058", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026")
         ]
         await db.products.insert_many([p.model_dump() for p in prods])
         await db.settings.update_one({"key": "portfolio_version"}, {"$set": {"key": "portfolio_version", "value": portfolio_version, "updated_at": now_iso()}}, upsert=True)
@@ -1648,7 +1619,6 @@ async def seed_all():
 
 @app.on_event("startup")
 async def startup():
-    init_storage()
     await seed_all()
 
 @app.on_event("shutdown")
