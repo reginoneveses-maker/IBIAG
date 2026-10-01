@@ -51,7 +51,7 @@ export default function Produtos() {
 
   return (
     <div data-testid="produtos-page" className="space-y-5">
-      <PageHeader number="02 · Produtos" title="Produtos & Dossiês" subtitle="Um lugar único para especificações, capacidade, certificações, condições comerciais e histórico de cada produto"
+      <PageHeader number="02 · Produtos" title="Portfólio de Produtos" subtitle="Tudo o que a IBIAG vende: formas, fornecedores, custos, preços e acesso rápido à documentação"
         action={<Button onClick={openNew} className="bg-[#0F382C] text-white"><Plus className="w-4 h-4 mr-1" />Novo produto</Button>} />
 
       <div className="flex items-center gap-3">
@@ -77,8 +77,8 @@ export default function Produtos() {
                 <div className="flex items-center gap-2 text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-2"><Truck className="w-3.5 h-3.5" /> Fornecedores e preços</div>
                 {prices.filter(x => (x.product_name || "").trim().toLowerCase() === (p.name || "").trim().toLowerCase()).map(o => (
                   <div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#0F382C]/8 text-xs">
-                    <div><div className="font-semibold">${o.supplier_name || "Fornecedor não informado"}</div><div className="text-[#0F382C]/45">${o.unit || p.unit} · custo fornecedor</div></div>
-                    <div className="text-right"><div className="font-mono-alt font-semibold">${Number(o.supplier_price || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sell_price_usd || 0).toFixed(2)}</div></div>
+                    <div><div className="font-semibold">{o.supplier_name || "Fornecedor não informado"}</div><div className="text-[#0F382C]/45">{o.unit || p.unit} · custo fornecedor</div></div>
+                    <div className="text-right"><div className="font-mono-alt font-semibold">{Number(o.supplier_price || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sell_price_usd || 0).toFixed(2)}</div></div>
                   </div>
                 ))}
                 {!prices.some(x => (x.product_name || "").trim().toLowerCase() === (p.name || "").trim().toLowerCase()) && <div className="text-xs text-[#0F382C]/45">Nenhum fornecedor/preço vinculado. Cadastre em Preços & calculadora.</div>}
