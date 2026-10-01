@@ -780,9 +780,13 @@ async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_curre
     if not o.product_name:
         product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
         o.product_name = product.get("name", "") if product else ""
-    if o.supplier_id and not o.supplier_name:
+    if o.supplier_id:
         supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
-        o.supplier_name = supplier.get("name", "") if supplier else ""
+        if not supplier:
+            raise HTTPException(404, "Fornecedor não encontrado")
+        o.supplier_name = supplier.get("name", "")
+    else:
+        o.supplier_name = ""
     await db.product_offers.replace_one({"id": oid}, o.model_dump())
     return o
 
