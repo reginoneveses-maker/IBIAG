@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/AuthContext";
-import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, toast, Plus, Pencil, Search, Truck, FileCheck2 } from "@/components/erp";
+import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, toast, Plus, Pencil, Trash2, Search, Truck, FileCheck2 } from "@/components/erp";
 import { Link } from "react-router-dom";
 
 const empty = {
@@ -56,16 +56,30 @@ export default function Produtos() {
     if (!window.confirm("Excluir este produto?")) return;
     await api.delete(`/products/${id}`); load(); toast.success("Produto excluído");
   };
+  const blankOffer = p => ({form:"",supplier_id:"",supplier_name:"",supplier_price:0,sale_price_brl:0,sale_price_usd:0,unit:p?.unit||"kg",capacity:p?.available_capacity||"",moq:p?.moq||"",ncm:p?.ncm||"",hs_code:p?.hs_code||"",active:true,spec_ids:[],certification_ids:[],spec_document_ids:[],certificate_document_ids:[],other_document_ids:[],notes:""});
   const openOffer = p => {
     setOfferProduct(p);
-    setOfferForm({form:"",supplier_id:"",supplier_name:"",supplier_price:0,sale_price_brl:0,sale_price_usd:0,unit:p.unit||"kg",capacity:p.available_capacity||"",moq:p.moq||"",ncm:p.ncm||"",hs_code:p.hs_code||"",active:true,spec_ids:[],certification_ids:[],spec_document_ids:[],certificate_document_ids:[],other_document_ids:[],notes:""});
+    setOfferForm(blankOffer(p));
     setOfferDialog(true);
+  };
+  const editOffer = (p,o) => {
+    setOfferProduct(p);
+    setOfferForm({...blankOffer(p), ...o});
+    setOfferDialog(true);
+  };
+  const deleteOffer = async id => {
+    if (!window.confirm("Excluir esta forma/fornecedor do portfólio?")) return;
+    await api.delete("/product-offers/"+id);
+    toast.success("Vínculo excluído");
+    load();
   };
   const saveOffer = async () => {
     if (!offerProduct || !offerForm.form.trim()) return toast.error("Informe a forma do produto");
     const supplier=suppliers.find(x=>x.id===offerForm.supplier_id);
-    await api.post("/product-offers",{...offerForm,product_id:offerProduct.id,product_name:offerProduct.name,supplier_name:supplier?.name||offerForm.supplier_name||""});
-    setOfferDialog(false); toast.success("Forma e fornecedor vinculados"); load();
+    const body={...offerForm,product_id:offerProduct.id,product_name:offerProduct.name,supplier_name:supplier?.name||offerForm.supplier_name||""};
+    if (offerForm.id) await api.put("/product-offers/"+offerForm.id,body);
+    else await api.post("/product-offers",body);
+    setOfferDialog(false); toast.success(offerForm.id ? "Vínculo atualizado" : "Forma e fornecedor vinculados"); load();
   };
   const openLinkedFile = async (path,name) => {
     if(!path)return;
@@ -101,6 +115,7 @@ export default function Produtos() {
                 <div className="flex items-center justify-between gap-2 mb-2"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700"><Truck className="inline w-3.5 h-3.5 mr-1" /> Formas, fornecedores e preços</div><Button size="sm" variant="outline" onClick={() => openOffer(p)}><Plus className="w-3 h-3 mr-1" />Adicionar</Button></div>
                 {offers.filter(x=>x.product_id===p.id).map(o=><div key={o.id} className="border-t border-[#0F382C]/8 py-3 first:border-t-0">
                   <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#0F382C]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sale_price_usd||0).toFixed(2)}</div></div></div>
+                  <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
                   <div className="flex flex-wrap gap-1 mt-2">{o.spec_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Spec vinculada</span>}{o.certification_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Certificado vinculado</span>}{o.other_document_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Arquivo</span>}</div>
                   {o.notes&&<div className="text-[11px] text-[#0F382C]/55 mt-2">{o.notes}</div>}
                 </div>)}
@@ -136,7 +151,7 @@ export default function Produtos() {
 
       <Dialog open={offerDialog} onOpenChange={setOfferDialog}>
         <DialogContent className="bg-[#F9F6F0] max-w-3xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">Forma, fornecedor e documentação</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">{offerForm.id ? "Editar forma, fornecedor e documentação" : "Forma, fornecedor e documentação"}</DialogTitle></DialogHeader>
           <div className="space-y-5">
             <div className="rounded-xl bg-white border border-[#0F382C]/10 p-4"><div className="text-xs text-[#0F382C]/50">Produto</div><div className="font-display text-xl font-bold text-[#0F382C]">{offerProduct?.name}</div></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -156,7 +171,7 @@ export default function Produtos() {
             <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Documentos / arquivos vinculados</div>{documents.length?<div className="space-y-2 max-h-36 overflow-y-auto">{documents.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.other_document_ids.includes(x.id)} onChange={()=>toggleId("other_document_ids",x.id)}/><span className="flex-1">{x.title||x.file_name}</span>{x.file_path&&<button type="button" className="text-amber-700" onClick={()=>openLinkedFile(x.file_path,x.file_name)}>Abrir</button>}</label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum documento cadastrado.</div>}</section>
             <Textarea placeholder="Observações desta forma/fornecedor" value={offerForm.notes||""} onChange={e=>setOfferForm({...offerForm,notes:e.target.value})} className="bg-white" rows={3}/>
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#0F382C] text-white">Salvar vínculo</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#0F382C] text-white">{offerForm.id ? "Atualizar vínculo" : "Salvar vínculo"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     
