@@ -1,11 +1,8 @@
-import { NavLink, Outlet, Link } from "react-router-dom";
-import { useLang } from "@/i18n";
-import { useAuth } from "@/AuthContext";
-import { Toaster } from "@/components/ui/sonner";
 import {
   LayoutDashboard, Package, Kanban, Globe2, Mail, CheckSquare, Leaf, ShoppingCart,
   Boxes, LogOut, ClipboardList, Wallet, Truck, FlaskConical, Calculator, LayoutGrid,
-  Building2, Upload, ChevronRight, Home, Users, FileCheck2
+  Building2, Upload, ChevronRight, Home, FolderArchive, BriefcaseBusiness, Settings,
+  Warehouse, FileText
 } from "lucide-react";
 
 const groups = (module, t) => module === "gestao"
@@ -13,36 +10,63 @@ const groups = (module, t) => module === "gestao"
       { title: "Visão geral", items: [
         { to: "/gestao", icon: LayoutDashboard, label: "Painel", end: true },
       ]},
-      { title: "Operação", items: [
-        { to: "/gestao/procedimentos", icon: ClipboardList, label: "Procedimentos" },
-        { to: "/gestao/financeiro", icon: Wallet, label: "Financeiro & NF" },
+      { title: "Comercial & CRM", items: [
+        { to: "/prospects/pipeline", icon: Kanban, label: "Compradores & Pipeline" },
+        { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas & follow-ups" },
+        { to: "/prospects/templates", icon: Mail, label: "Comunicações" },
       ]},
-      { title: "Fornecedores", items: [
-        { to: "/gestao/fornecedores", icon: Truck, label: "Fornecedores", },
+      { title: "Prospecção & Inteligência", items: [
+        { to: "/prospects/trade", icon: Globe2, label: "Trade Intelligence" },
+        { to: "/prospects/import", icon: Upload, label: "Importar dados" },
       ]},
       { title: "Produtos", items: [
-        { to: "/gestao/produtos", icon: Package, label: "Produtos & dossiês" },
-        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Specs técnicas" },
+        { to: "/gestao/produtos", icon: Package, label: "Portfólio & dossiês" },
+        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Especificações técnicas" },
         { to: "/gestao/precos", icon: Calculator, label: "Preços & calculadora" },
+      ]},
+      { title: "Fornecedores", items: [
+        { to: "/gestao/fornecedores", icon: Truck, label: "Fornecedores" },
+      ]},
+      { title: "Vendas & Pedidos", items: [
+        { to: "/prospects/orders", icon: ShoppingCart, label: "Pedidos" },
+      ]},
+      { title: "Financeiro", items: [
+        { to: "/gestao/financeiro", icon: Wallet, label: "Financeiro & Fiscal" },
+      ]},
+      { title: "Documentos", items: [
+        { to: "/gestao/documentos", icon: FolderArchive, label: "Central de Documentos" },
+        { to: "/gestao/procedimentos", icon: ClipboardList, label: "Procedimentos" },
+      ]},
+      { title: "Estoque & Logística", items: [
+        { to: "/prospects/inventory", icon: Warehouse, label: "Estoque" },
       ]},
     ]
   : [
       { title: "Visão geral", items: [
         { to: "/prospects", icon: LayoutDashboard, label: "Painel", end: true },
       ]},
+      { title: "Comercial & CRM", items: [
+        { to: "/prospects/pipeline", icon: Kanban, label: "Compradores & Pipeline" },
+        { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas & follow-ups" },
+        { to: "/prospects/templates", icon: Mail, label: "Comunicações" },
+      ]},
+      { title: "Prospecção & Inteligência", items: [
+        { to: "/prospects/trade", icon: Globe2, label: "Trade Intelligence" },
+        { to: "/prospects/import", icon: Upload, label: "Importar dados" },
+      ]},
       { title: "Produtos", items: [
         { to: "/prospects/catalog", icon: Package, label: "Catálogo" },
+      ]},
+      { title: "Vendas & Pedidos", items: [
+        { to: "/prospects/orders", icon: ShoppingCart, label: "Pedidos" },
+      ]},
+      { title: "Estoque & Logística", items: [
         { to: "/prospects/inventory", icon: Boxes, label: "Estoque" },
       ]},
-      { title: "Prospecção", items: [
-        { to: "/prospects/trade", icon: Globe2, label: "Trade Intelligence" },
-        { to: "/prospects/import", icon: Upload, label: "Importar CRM" },
-      ]},
-      { title: "Vendas & CRM", items: [
-        { to: "/prospects/pipeline", icon: Kanban, label: "Pipeline" },
-        { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas" },
-        { to: "/prospects/templates", icon: Mail, label: "Templates" },
-        { to: "/prospects/orders", icon: ShoppingCart, label: "Pedidos" },
+      { title: "Gestão", items: [
+        { to: "/gestao", icon: Building2, label: "Gestão da empresa" },
+        { to: "/gestao/documentos", icon: FolderArchive, label: "Documentos" },
+        { to: "/gestao/financeiro", icon: Wallet, label: "Financeiro" },
       ]},
     ];
 
