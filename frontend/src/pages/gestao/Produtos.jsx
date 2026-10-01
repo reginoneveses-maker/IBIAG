@@ -13,7 +13,7 @@ const empty = {
 
 const field = (label, key, form, setForm, props = {}) => (
   <div className={props.className || ""}>
-    <label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/55 mb-1">{label}</label>
+    <label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]/55 mb-1">{label}</label>
     <Input value={form[key] ?? ""} onChange={e => setForm({ ...form, [key]: e.target.value })} className="bg-white" {...props.inputProps} />
   </div>
 );
@@ -90,54 +90,54 @@ export default function Produtos() {
   return (
     <div data-testid="produtos-page" className="space-y-5">
       <PageHeader number="02 · Produtos" title="Portfólio de Produtos" subtitle="Tudo o que a IBIAG vende: formas, fornecedores, custos, preços e acesso rápido à documentação"
-        action={<Button onClick={openNew} className="bg-[#0F382C] text-white"><Plus className="w-4 h-4 mr-1" />Novo produto</Button>} />
+        action={<Button onClick={openNew} className="bg-[#104496] text-white"><Plus className="w-4 h-4 mr-1" />Novo produto</Button>} />
 
       <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xl"><Search className="absolute left-3 top-2.5 w-4 h-4 text-[#0F382C]/40" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar produto, NCM, HS, origem..." className="pl-9 bg-white" /></div>
-        <span className="text-xs font-mono-alt uppercase tracking-widest text-[#0F382C]/45">{filtered.length} produtos</span>
+        <div className="relative flex-1 max-w-xl"><Search className="absolute left-3 top-2.5 w-4 h-4 text-[#104496]/40" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar produto, NCM, HS, origem..." className="pl-9 bg-white" /></div>
+        <span className="text-xs font-mono-alt uppercase tracking-widest text-[#104496]/45">{filtered.length} produtos</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(p => (
-          <Card key={p.id} className="bg-white border-[#0F382C]/10 hover:border-[#0F382C]/25 transition-colors">
+          <Card key={p.id} className="bg-white border-[#104496]/10 hover:border-[#104496]/25 transition-colors">
             <CardContent className="p-5">
               <div className="flex justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700">{p.category} · {p.unit}</div>
-                  <h3 className="font-display text-xl font-bold text-[#0F382C] mt-1">{p.name}</h3>
-                  <p className="text-xs text-[#0F382C]/55 mt-1">{p.technical_name || "Nome técnico não informado"}</p>
+                  <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]">{p.category} · {p.unit}</div>
+                  <h3 className="font-display text-xl font-bold text-[#104496] mt-1">{p.name}</h3>
+                  <p className="text-xs text-[#104496]/55 mt-1">{p.technical_name || "Nome técnico não informado"}</p>
                 </div>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => { edit(p); setDialog(true); }}><Pencil className="w-3 h-3" /></Button>
                 </div>
               </div>
-              <div className="mt-5 rounded-xl border border-[#0F382C]/8 bg-[#F9F6F0]/50 p-3">
-                <div className="flex items-center justify-between gap-2 mb-2"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700"><Truck className="inline w-3.5 h-3.5 mr-1" /> Formas, fornecedores e preços</div><Button size="sm" variant="outline" onClick={() => openOffer(p)}><Plus className="w-3 h-3 mr-1" />Adicionar</Button></div>
-                {offers.filter(x=>x.product_id===p.id).map(o=><div key={o.id} className="border-t border-[#0F382C]/8 py-3 first:border-t-0">
-                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#0F382C]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sale_price_usd||0).toFixed(2)}</div></div></div>
+              <div className="mt-5 rounded-xl border border-[#104496]/8 bg-[#EEF3FB]/50 p-3">
+                <div className="flex items-center justify-between gap-2 mb-2"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]"><Truck className="inline w-3.5 h-3.5 mr-1" /> Formas, fornecedores e preços</div><Button size="sm" variant="outline" onClick={() => openOffer(p)}><Plus className="w-3 h-3 mr-1" />Adicionar</Button></div>
+                {offers.filter(x=>x.product_id===p.id).map(o=><div key={o.id} className="border-t border-[#104496]/8 py-3 first:border-t-0">
+                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-[#104496]">${Number(o.sale_price_usd||0).toFixed(2)}</div></div></div>
                   <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
                   <div className="flex flex-wrap gap-1 mt-2">{o.spec_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Spec vinculada</span>}{o.certification_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Certificado vinculado</span>}{o.other_document_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Arquivo</span>}</div>
-                  {o.notes&&<div className="text-[11px] text-[#0F382C]/55 mt-2">{o.notes}</div>}
+                  {o.notes&&<div className="text-[11px] text-[#104496]/55 mt-2">{o.notes}</div>}
                 </div>)}
-                {!offers.some(x=>x.product_id===p.id)&&<div className="text-xs text-[#0F382C]/45">Nenhuma forma/fornecedor cadastrada ainda.</div>}
+                {!offers.some(x=>x.product_id===p.id)&&<div className="text-xs text-[#104496]/45">Nenhuma forma/fornecedor cadastrada ainda.</div>}
               </div>
 
-              <div className="mt-5 rounded-xl border border-[#0F382C]/8 bg-[#F9F6F0]/50 p-3">
-                <div className="flex items-center gap-2 text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-2"><Truck className="w-3.5 h-3.5" /> Preços legados</div>
-                {prices.filter(x=>(x.product_name||"").trim().toLowerCase()===(p.name||"").trim().toLowerCase()).map(o=><div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#0F382C]/8 text-xs"><div><div className="font-semibold">{o.supplier_name||"Fornecedor não informado"}</div><div className="text-[#0F382C]/45">{o.unit||p.unit} · custo fornecedor</div></div><div className="text-right"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sell_price_usd||0).toFixed(2)}</div></div></div>)}
+              <div className="mt-5 rounded-xl border border-[#104496]/8 bg-[#EEF3FB]/50 p-3">
+                <div className="flex items-center gap-2 text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-2"><Truck className="w-3.5 h-3.5" /> Preços legados</div>
+                {prices.filter(x=>(x.product_name||"").trim().toLowerCase()===(p.name||"").trim().toLowerCase()).map(o=><div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#104496]/8 text-xs"><div><div className="font-semibold">{o.supplier_name||"Fornecedor não informado"}</div><div className="text-[#104496]/45">{o.unit||p.unit} · custo fornecedor</div></div><div className="text-right"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-[#104496]">${Number(o.sell_price_usd||0).toFixed(2)}</div></div></div>)}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
                 <Link to="/gestao/prospeccao"><Button size="sm" variant="outline"><FileCheck2 className="w-3.5 h-3.5 mr-1" />Specs & documentos</Button></Link>
                 <Link to="/gestao/precos"><Button size="sm" variant="outline">Preços</Button></Link>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
-                <div><span className="text-[#0F382C]/45">NCM / HS</span><div className="font-semibold">{p.ncm || "—"} {p.hs_code ? `/ ${p.hs_code}` : ""}</div></div>
-                <div><span className="text-[#0F382C]/45">Origem</span><div className="font-semibold">{p.origin || "—"}</div></div>
-                <div><span className="text-[#0F382C]/45">MOQ</span><div className="font-semibold">{p.moq || "—"}</div></div>
-                <div><span className="text-[#0F382C]/45">Capacidade</span><div className="font-semibold">{p.available_capacity || "—"}</div></div>
+                <div><span className="text-[#104496]/45">NCM / HS</span><div className="font-semibold">{p.ncm || "—"} {p.hs_code ? `/ ${p.hs_code}` : ""}</div></div>
+                <div><span className="text-[#104496]/45">Origem</span><div className="font-semibold">{p.origin || "—"}</div></div>
+                <div><span className="text-[#104496]/45">MOQ</span><div className="font-semibold">{p.moq || "—"}</div></div>
+                <div><span className="text-[#104496]/45">Capacidade</span><div className="font-semibold">{p.available_capacity || "—"}</div></div>
               </div>
               <div className="flex flex-wrap gap-1 mt-4">
-                {(p.certifications || []).slice(0, 5).map(c => <span key={c} className="px-2 py-1 rounded-full bg-[#F9F6F0] border border-[#0F382C]/10 text-[10px]">{c}</span>)}
+                {(p.certifications || []).slice(0, 5).map(c => <span key={c} className="px-2 py-1 rounded-full bg-[#EEF3FB] border border-[#104496]/10 text-[10px]">{c}</span>)}
               </div>
               <div className="flex gap-2 mt-5">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => { edit(p); setDialog(true); }}>Abrir dossiê</Button>
@@ -146,17 +146,17 @@ export default function Produtos() {
             </CardContent>
           </Card>
         ))}
-        {!filtered.length && <Card className="col-span-full bg-white"><CardContent className="py-12 text-center text-sm text-[#0F382C]/50">Nenhum produto cadastrado.</CardContent></Card>}
+        {!filtered.length && <Card className="col-span-full bg-white"><CardContent className="py-12 text-center text-sm text-[#104496]/50">Nenhum produto cadastrado.</CardContent></Card>}
       </div>
 
       <Dialog open={offerDialog} onOpenChange={setOfferDialog}>
-        <DialogContent className="bg-[#F9F6F0] max-w-3xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">{offerForm.id ? "Editar forma, fornecedor e documentação" : "Forma, fornecedor e documentação"}</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#EEF3FB] max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display text-[#104496]">{offerForm.id ? "Editar forma, fornecedor e documentação" : "Forma, fornecedor e documentação"}</DialogTitle></DialogHeader>
           <div className="space-y-5">
-            <div className="rounded-xl bg-white border border-[#0F382C]/10 p-4"><div className="text-xs text-[#0F382C]/50">Produto</div><div className="font-display text-xl font-bold text-[#0F382C]">{offerProduct?.name}</div></div>
+            <div className="rounded-xl bg-white border border-[#104496]/10 p-4"><div className="text-xs text-[#104496]/50">Produto</div><div className="font-display text-xl font-bold text-[#104496]">{offerProduct?.name}</div></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {field("Forma / apresentação","form",offerForm,setOfferForm,{className:"sm:col-span-2"})}
-              <div><label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#0F382C]/55 mb-1">Fornecedor</label><select value={offerForm.supplier_id} onChange={e=>setOfferForm({...offerForm,supplier_id:e.target.value})} className="w-full h-10 rounded-md border bg-white px-3 text-sm"><option value="">Selecionar fornecedor</option>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
+              <div><label className="block text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]/55 mb-1">Fornecedor</label><select value={offerForm.supplier_id} onChange={e=>setOfferForm({...offerForm,supplier_id:e.target.value})} className="w-full h-10 rounded-md border bg-white px-3 text-sm"><option value="">Selecionar fornecedor</option>{suppliers.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></div>
               {field("Unidade","unit",offerForm,setOfferForm)}
               {field("Custo fornecedor","supplier_price",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
               {field("Preço venda BRL","sale_price_brl",offerForm,setOfferForm,{inputProps:{type:"number",step:"0.0001"}})}
@@ -166,21 +166,21 @@ export default function Produtos() {
               {field("NCM","ncm",offerForm,setOfferForm)}
               {field("HS Code","hs_code",offerForm,setOfferForm)}
             </div>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Especificações vinculadas</div>{specs.length?<div className="space-y-2 max-h-36 overflow-y-auto">{specs.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.spec_ids.includes(x.id)} onChange={()=>toggleId("spec_ids",x.id)}/><span>{x.product_name} · {x.supplier_name||"Fornecedor"} · v{x.version}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhuma spec cadastrada.</div>}</section>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Certificações vinculadas</div>{certifications.length?<div className="space-y-2 max-h-36 overflow-y-auto">{certifications.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.certification_ids.includes(x.id)} onChange={()=>toggleId("certification_ids",x.id)}/><span>{x.name} · {x.supplier_name||"Fornecedor"}{x.expiry_date?" · vence "+x.expiry_date:""}</span></label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum certificado cadastrado.</div>}</section>
-            <section className="rounded-xl border border-[#0F382C]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Documentos / arquivos vinculados</div>{documents.length?<div className="space-y-2 max-h-36 overflow-y-auto">{documents.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.other_document_ids.includes(x.id)} onChange={()=>toggleId("other_document_ids",x.id)}/><span className="flex-1">{x.title||x.file_name}</span>{x.file_path&&<button type="button" className="text-amber-700" onClick={()=>openLinkedFile(x.file_path,x.file_name)}>Abrir</button>}</label>)}</div>:<div className="text-xs text-[#0F382C]/45">Nenhum documento cadastrado.</div>}</section>
+            <section className="rounded-xl border border-[#104496]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Especificações vinculadas</div>{specs.length?<div className="space-y-2 max-h-36 overflow-y-auto">{specs.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.spec_ids.includes(x.id)} onChange={()=>toggleId("spec_ids",x.id)}/><span>{x.product_name} · {x.supplier_name||"Fornecedor"} · v{x.version}</span></label>)}</div>:<div className="text-xs text-[#104496]/45">Nenhuma spec cadastrada.</div>}</section>
+            <section className="rounded-xl border border-[#104496]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Certificações vinculadas</div>{certifications.length?<div className="space-y-2 max-h-36 overflow-y-auto">{certifications.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.certification_ids.includes(x.id)} onChange={()=>toggleId("certification_ids",x.id)}/><span>{x.name} · {x.supplier_name||"Fornecedor"}{x.expiry_date?" · vence "+x.expiry_date:""}</span></label>)}</div>:<div className="text-xs text-[#104496]/45">Nenhum certificado cadastrado.</div>}</section>
+            <section className="rounded-xl border border-[#104496]/10 bg-white p-4"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Documentos / arquivos vinculados</div>{documents.length?<div className="space-y-2 max-h-36 overflow-y-auto">{documents.map(x=><label key={x.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={offerForm.other_document_ids.includes(x.id)} onChange={()=>toggleId("other_document_ids",x.id)}/><span className="flex-1">{x.title||x.file_name}</span>{x.file_path&&<button type="button" className="text-[#104496]" onClick={()=>openLinkedFile(x.file_path,x.file_name)}>Abrir</button>}</label>)}</div>:<div className="text-xs text-[#104496]/45">Nenhum documento cadastrado.</div>}</section>
             <Textarea placeholder="Observações desta forma/fornecedor" value={offerForm.notes||""} onChange={e=>setOfferForm({...offerForm,notes:e.target.value})} className="bg-white" rows={3}/>
           </div>
-          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#0F382C] text-white">{offerForm.id ? "Atualizar vínculo" : "Salvar vínculo"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={()=>setOfferDialog(false)}>Cancelar</Button><Button onClick={saveOffer} className="bg-[#104496] text-white">{offerForm.id ? "Atualizar vínculo" : "Salvar vínculo"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     
       <Dialog open={dialog} onOpenChange={setDialog}>
-        <DialogContent className="bg-[#F9F6F0] max-w-4xl max-h-[92vh] overflow-y-auto">
-          <DialogHeader><DialogTitle className="font-display text-[#0F382C]">{form.id ? "Dossiê do produto" : "Novo produto"}</DialogTitle></DialogHeader>
+        <DialogContent className="bg-[#EEF3FB] max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="font-display text-[#104496]">{form.id ? "Dossiê do produto" : "Novo produto"}</DialogTitle></DialogHeader>
           <div className="space-y-6">
             <section>
-              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Identidade e classificação</div>
+              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Identidade e classificação</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field("Nome comercial", "name", form, setForm, { className: "sm:col-span-2" })}
                 {field("Nome técnico", "technical_name", form, setForm)}
@@ -194,7 +194,7 @@ export default function Produtos() {
             </section>
 
             <section>
-              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Oferta e operação</div>
+              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Oferta e operação</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field("MOQ", "moq", form, setForm)}
                 {field("Embalagem", "packaging", form, setForm)}
@@ -208,7 +208,7 @@ export default function Produtos() {
             </section>
 
             <section>
-              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-3">Mercado e documentação</div>
+              <div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-3">Mercado e documentação</div>
               <div className="grid gap-3">
                 {field("Certificações (separe por vírgula)", "certifications", { ...form, certifications: (form.certifications || []).join(", ") }, f => setForm({ ...form, certifications: f.certifications.split(",").map(x => x.trim()).filter(Boolean) }))}
                 <Textarea placeholder="Especificações / parâmetros principais" value={form.specs || ""} onChange={e => setForm({ ...form, specs: e.target.value })} className="bg-white" rows={3} />
@@ -222,7 +222,7 @@ export default function Produtos() {
       <DialogFooter>
             {form.id && <Button variant="ghost" className="mr-auto text-rose-600" onClick={() => { remove(form.id); setDialog(false); }}>Excluir</Button>}
             <Button variant="outline" onClick={() => setDialog(false)}>Cancelar</Button>
-            <Button onClick={save} className="bg-[#0F382C] text-white">Salvar dossiê</Button>
+            <Button onClick={save} className="bg-[#104496] text-white">Salvar dossiê</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
