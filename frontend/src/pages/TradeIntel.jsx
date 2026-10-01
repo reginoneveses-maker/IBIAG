@@ -158,20 +158,20 @@ const TradeIntel = () => {
   return (
     <div className="space-y-6" data-testid="trade-page">
       <div>
-        <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#0F382C]/60 mb-2 flex items-center gap-1">
+        <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60 mb-2 flex items-center gap-1">
           <Globe2 className="w-3 h-3" /> 04 · Trade Intelligence
         </div>
-        <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#0F382C]">{t("trade_title")}</h1>
-        <p className="text-base text-[#0F382C]/70 mt-1">{t("trade_subtitle")}</p>
+        <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#104496]">{t("trade_title")}</h1>
+        <p className="text-base text-[#104496]/70 mt-1">{t("trade_subtitle")}</p>
       </div>
 
 
 
-      <div className="rounded-xl border border-[#0F382C]/10 bg-white/95 p-5 space-y-4" data-testid="comexstat-panel">
+      <div className="rounded-xl border border-[#104496]/10 bg-white/95 p-5 space-y-4" data-testid="comexstat-panel">
         <div>
-          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#0F382C]/60">COMEX STAT · MDIC</div>
-          <h2 className="font-display text-xl font-bold text-[#0F382C]">Inteligência oficial de comércio exterior</h2>
-          <p className="text-sm text-[#0F382C]/60 mt-1">Consulte NCM, destino/mercado e valores oficiais. O Comex Stat não divulga o nome das empresas importadoras.</p>
+          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60">COMEX STAT · MDIC</div>
+          <h2 className="font-display text-xl font-bold text-[#104496]">Inteligência oficial de comércio exterior</h2>
+          <p className="text-sm text-[#104496]/60 mt-1">Consulte NCM, destino/mercado e valores oficiais. O Comex Stat não divulga o nome das empresas importadoras.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -199,28 +199,28 @@ const TradeIntel = () => {
           </Select>
           <Input type="month" value={comexFrom} onChange={e => setComexFrom(e.target.value)} className="bg-white" />
           <Input type="month" value={comexTo} onChange={e => setComexTo(e.target.value)} className="bg-white" />
-          <Button onClick={queryComex} disabled={comexLoading} className="bg-[#0F382C] hover:bg-[#0A2920] text-white">
+          <Button onClick={queryComex} disabled={comexLoading} className="bg-[#104496] hover:bg-[#0B3274] text-white">
             {comexLoading ? "Consultando..." : "Consultar Comex Stat"}
           </Button>
         </div>
 
         {prospectSummary && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
-              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">NCM</div>
-              <div className="font-semibold text-[#0F382C]">{prospectSummary.ncm || "Todos"}</div>
+            <div className="rounded-lg border p-3 bg-[#EEF3FB]">
+              <div className="text-[10px] uppercase tracking-widest text-[#104496]/50">NCM</div>
+              <div className="font-semibold text-[#104496]">{prospectSummary.ncm || "Todos"}</div>
             </div>
-            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
-              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Período</div>
-              <div className="font-semibold text-[#0F382C]">{prospectSummary.period?.from} → {prospectSummary.period?.to}</div>
+            <div className="rounded-lg border p-3 bg-[#EEF3FB]">
+              <div className="text-[10px] uppercase tracking-widest text-[#104496]/50">Período</div>
+              <div className="font-semibold text-[#104496]">{prospectSummary.period?.from} → {prospectSummary.period?.to}</div>
             </div>
-            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
-              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Fluxo</div>
-              <div className="font-semibold text-[#0F382C]">{prospectSummary.flow === "import" ? "Importação" : "Exportação"}</div>
+            <div className="rounded-lg border p-3 bg-[#EEF3FB]">
+              <div className="text-[10px] uppercase tracking-widest text-[#104496]/50">Fluxo</div>
+              <div className="font-semibold text-[#104496]">{prospectSummary.flow === "import" ? "Importação" : "Exportação"}</div>
             </div>
-            <div className="rounded-lg border p-3 bg-[#F9F6F0]">
-              <div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Fonte</div>
-              <div className="font-semibold text-[#0F382C]">Comex Stat / MDIC</div>
+            <div className="rounded-lg border p-3 bg-[#EEF3FB]">
+              <div className="text-[10px] uppercase tracking-widest text-[#104496]/50">Fonte</div>
+              <div className="font-semibold text-[#104496]">Comex Stat / MDIC</div>
             </div>
           </div>
         )}
@@ -228,12 +228,12 @@ const TradeIntel = () => {
         {marketRows.length > 0 && (
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Mercados</div><div className="font-semibold text-[#0F382C]">{marketRows.length}</div></div>
-              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">Volume</div><div className="font-semibold text-[#0F382C]">{marketTotals.volume_kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg</div></div>
-              <div className="rounded-lg border p-3 bg-[#F9F6F0]"><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">FOB</div><div className="font-semibold text-[#0F382C]">USD {marketTotals.fob_usd.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div></div>
+              <div className="rounded-lg border p-3 bg-[#EEF3FB]"><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">Mercados</div><div className="font-semibold text-[#104496]">{marketRows.length}</div></div>
+              <div className="rounded-lg border p-3 bg-[#EEF3FB]"><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">Volume</div><div className="font-semibold text-[#104496]">{marketTotals.volume_kg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} kg</div></div>
+              <div className="rounded-lg border p-3 bg-[#EEF3FB]"><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">FOB</div><div className="font-semibold text-[#104496]">USD {marketTotals.fob_usd.toLocaleString("en-US", { maximumFractionDigits: 0 })}</div></div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-[#0F382C]/10">
-              <Table><TableHeader><TableRow className="bg-[#0F382C] hover:bg-[#0F382C]">
+            <div className="overflow-x-auto rounded-lg border border-[#104496]/10">
+              <Table><TableHeader><TableRow className="bg-[#104496] hover:bg-[#104496]">
                 <TableHead className="text-amber-300 text-[10px] uppercase">Mercado / País</TableHead>
                 <TableHead className="text-amber-300 text-[10px] uppercase text-right">Volume kg</TableHead>
                 <TableHead className="text-amber-300 text-[10px] uppercase text-right">FOB USD</TableHead>
@@ -243,7 +243,7 @@ const TradeIntel = () => {
               </TableRow></TableHeader>
               <TableBody>{marketRows.slice(0, 50).map((m, i) => (
                 <TableRow key={i}>
-                  <TableCell className="font-semibold text-[#0F382C]">{m.country}</TableCell>
+                  <TableCell className="font-semibold text-[#104496]">{m.country}</TableCell>
                   <TableCell className="text-right font-mono-alt text-xs">{Number(m.volume_kg || 0).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}</TableCell>
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.fob_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</TableCell>
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.avg_usd_kg || 0).toFixed(2)}</TableCell>
@@ -256,36 +256,36 @@ const TradeIntel = () => {
         )}
 
         {buyerResults.length > 0 && (
-          <div className="rounded-lg border border-[#0F382C]/10 bg-[#F9F6F0] p-4 space-y-3">
+          <div className="rounded-lg border border-[#104496]/10 bg-[#EEF3FB] p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <div><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">BUSCA WEB · COMPRADORES</div><div className="font-display text-lg font-bold text-[#0F382C]">{buyerCountry}</div><div className="text-xs text-[#0F382C]/60">{buyerProduct}</div></div>
+              <div><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">BUSCA WEB · COMPRADORES</div><div className="font-display text-lg font-bold text-[#104496]">{buyerCountry}</div><div className="text-xs text-[#104496]/60">{buyerProduct}</div></div>
               <Badge variant="outline">{buyerResults.length} empresas</Badge>
             </div>
             <div className="space-y-2">{buyerResults.map((b) => (
               <div key={b.domain || b.company} className="rounded-lg border bg-white p-3">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-semibold text-[#0F382C]">{b.company}</div>
-                    <div className="text-xs text-[#0F382C]/60">{b.domain || b.website} · Score {b.priority_score}</div>
+                    <div className="font-semibold text-[#104496]">{b.company}</div>
+                    <div className="text-xs text-[#104496]/60">{b.domain || b.website} · Score {b.priority_score}</div>
                     {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}
-                    {b.linkedin && <a className="text-xs underline text-[#0F382C]" href={b.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
+                    {b.linkedin && <a className="text-xs underline text-[#104496]" href={b.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[b.company]}>{decisionLoading[b.company] ? "Pesquisando..." : "Buscar decisor"}</Button>
-                    <Button size="sm" onClick={() => addBuyerToCrm(b)} className="bg-[#0F382C] hover:bg-[#0A2920] text-white">Adicionar ao CRM</Button>
+                    <Button size="sm" onClick={() => addBuyerToCrm(b)} className="bg-[#104496] hover:bg-[#0B3274] text-white">Adicionar ao CRM</Button>
                   </div>
                 </div>
-                {b.source_url && <div className="text-[10px] mt-2 text-[#0F382C]/50 truncate">Fonte: {b.source_url}</div>}
+                {b.source_url && <div className="text-[10px] mt-2 text-[#104496]/50 truncate">Fonte: {b.source_url}</div>}
               </div>
             ))}</div>
           </div>
         )}
 
         {comexRows.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-[#0F382C]/10">
+          <div className="overflow-x-auto rounded-lg border border-[#104496]/10">
             <Table>
               <TableHeader>
-                <TableRow className="bg-[#0F382C] hover:bg-[#0F382C]">
+                <TableRow className="bg-[#104496] hover:bg-[#104496]">
                   {Object.keys(comexRows[0]).slice(0, 8).map(k => <TableHead key={k} className="text-amber-300 text-[10px] uppercase">{k}</TableHead>)}
                 </TableRow>
               </TableHeader>
@@ -303,7 +303,7 @@ const TradeIntel = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="relative col-span-2">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#0F382C]/40" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#104496]/40" />
           <Input
             placeholder={t("search_placeholder")}
             value={search}
@@ -332,15 +332,15 @@ const TradeIntel = () => {
         </Select>
       </div>
 
-      <div className="text-xs font-mono-alt uppercase tracking-widest text-[#0F382C]/50">
+      <div className="text-xs font-mono-alt uppercase tracking-widest text-[#104496]/50">
         {records.length} {t("records_short")}
       </div>
 
-      <div className="rounded-xl overflow-hidden border border-[#0F382C]/10 bg-white/95" data-testid="trade-table-wrap">
+      <div className="rounded-xl overflow-hidden border border-[#104496]/10 bg-white/95" data-testid="trade-table-wrap">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-[#0F382C] hover:bg-[#0F382C]">
+              <TableRow className="bg-[#104496] hover:bg-[#104496]">
                 <TableHead className="text-amber-300 font-mono-alt text-[11px] uppercase tracking-widest">{t("company")}</TableHead>
                 <TableHead className="text-amber-300 font-mono-alt text-[11px] uppercase tracking-widest">{t("country")}</TableHead>
                 <TableHead className="text-amber-300 font-mono-alt text-[11px] uppercase tracking-widest">HS / {t("product")}</TableHead>
@@ -352,28 +352,28 @@ const TradeIntel = () => {
             </TableHeader>
             <TableBody>
               {records.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="text-center py-10 text-[#0F382C]/50 italic">{t("no_results")}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-10 text-[#104496]/50 italic">{t("no_results")}</TableCell></TableRow>
               )}
               {records.map(r => (
-                <TableRow key={r.id} data-testid={`trade-row-${r.id}`} className="hover:bg-[#F9F6F0]">
+                <TableRow key={r.id} data-testid={`trade-row-${r.id}`} className="hover:bg-[#EEF3FB]">
                   <TableCell>
-                    <div className="font-semibold text-[#0F382C]">{r.importer_company}</div>
-                    <div className="text-[10px] text-[#0F382C]/50 font-mono-alt">{r.contact_hint}</div>
+                    <div className="font-semibold text-[#104496]">{r.importer_company}</div>
+                    <div className="text-[10px] text-[#104496]/50 font-mono-alt">{r.contact_hint}</div>
                   </TableCell>
                   <TableCell className="text-sm"><span className="mr-1">{flag(r.country_code)}</span>{r.importer_country}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="text-[10px] mr-2 border-amber-600/40 text-amber-800 bg-amber-50">{r.hs_code}</Badge>
-                    <span className="text-sm text-[#0F382C]/80">{r.product_description}</span>
+                    <Badge variant="outline" className="text-[10px] mr-2 border-amber-600/40 text-[#104496] bg-[#F4F7D8]">{r.hs_code}</Badge>
+                    <span className="text-sm text-[#104496]/80">{r.product_description}</span>
                   </TableCell>
                   <TableCell className="text-right font-mono-alt text-sm">{r.volume_kg.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-mono-alt text-sm text-amber-700 font-semibold">{fmtUSD(r.value_usd)}</TableCell>
-                  <TableCell className="text-sm text-[#0F382C]/70">{r.last_shipment_date}</TableCell>
+                  <TableCell className="text-right font-mono-alt text-sm text-[#104496] font-semibold">{fmtUSD(r.value_usd)}</TableCell>
+                  <TableCell className="text-sm text-[#104496]/70">{r.last_shipment_date}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       size="sm"
                       onClick={() => addToCrm(r.id)}
                       data-testid={`add-crm-${r.id}`}
-                      className="bg-[#0F382C] hover:bg-[#0A2920] text-white text-xs"
+                      className="bg-[#104496] hover:bg-[#0B3274] text-white text-xs"
                     ><Plus className="w-3 h-3 mr-1" />{t("add_to_crm")}</Button>
                   </TableCell>
                 </TableRow>
