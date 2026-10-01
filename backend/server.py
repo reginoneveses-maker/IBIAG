@@ -160,6 +160,12 @@ class RegisterBody(BaseModel):
     password: str
     name: str = ""
 
+class UserCreateBody(BaseModel):
+    email: EmailStr
+    password: str
+    name: str = ""
+    role: str = "user"
+
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -425,8 +431,15 @@ class ProductOffer(BaseModel):
     updated_at: str = Field(default_factory=now_iso)
 
 # ============ AUTH ============
+def require_admin(user):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin permission required")
+    return user
+
 @api.post("/auth/register")
 async def register(body: RegisterBody):
+    if os.environ.get("ALLOW_PUBLIC_REGISTRATION", "false").lower() != "true":
+        raise HTTPException(403, "Public registration is disabled. Ask an administrator to create your user.")
     email = body.email.lower().strip()
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
@@ -438,6 +451,29 @@ async def register(body: RegisterBody):
     })
     token = create_token(uid, email)
     return {"access_token": token, "user": {"id": uid, "email": email, "name": body.name, "role": "user"}}
+
+@api.get("/auth/users")
+async def list_users(user=Depends(get_current_user)):
+    require_admin(user)
+    return await db.users.find({}, {"_id": 0, "password_hash": 0}).sort("created_at", 1).to_list(500)
+
+@api.post("/auth/users")
+async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
+    require_admin(user)
+    email = body.email.lower().strip()
+    if body.role not in {"admin", "user"}:
+        raise HTTPException(400, "Invalid role")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must have at least 8 characters")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(400, "Email already registered")
+    record = {"id": str(uuid.uuid4()), "email": email,
+              "name": body.name or email.split("@")[0],
+              "password_hash": hash_pw(body.password), "role": body.role,
+              "created_at": now_iso()}
+    await db.users.insert_one(record)
+    record.pop("password_hash", None)
+    return record
 
 @api.post("/auth/login")
 async def login(body: LoginBody):
@@ -1375,15 +1411,16 @@ logger = logging.getLogger(__name__)
 # ----- SEED -----
 async def seed_all():
     # Admin
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com")
-    admin_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
-    existing = await db.users.find_one({"email": admin_email})
-    if not existing:
-        await db.users.insert_one({"id": str(uuid.uuid4()), "email": admin_email,
-                                    "name": "Regino Neves", "password_hash": hash_pw(admin_pw),
-                                    "role": "admin", "created_at": now_iso()})
-    elif not verify_pw(admin_pw, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_pw(admin_pw)}})
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+    admin_pw = os.environ.get("ADMIN_PASSWORD", "")
+    if admin_email and admin_pw:
+        existing = await db.users.find_one({"email": admin_email})
+        if not existing:
+            await db.users.insert_one({"id": str(uuid.uuid4()), "email": admin_email,
+                                        "name": "Administrador IBIAG", "password_hash": hash_pw(admin_pw),
+                                        "role": "admin", "created_at": now_iso()})
+        elif not verify_pw(admin_pw, existing["password_hash"]):
+            await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_pw(admin_pw)}})
     await db.users.create_index("email", unique=True)
 
     # Products & templates & trade & leads seed (kept same as before)
