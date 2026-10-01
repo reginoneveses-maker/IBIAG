@@ -5,7 +5,7 @@
 - Web frontend served over HTTPS at the IBIAG domain.
 - FastAPI backend behind HTTPS.
 - One central MongoDB database.
-- One central object-storage bucket for documents.
+- One central S3-compatible object-storage bucket for documents (AWS S3, Cloudflare R2, MinIO or equivalent).
 - Secrets configured only in the hosting provider / CI, never in Git.
 - Daily database backup to separate storage.
 - Restore test before production launch.
@@ -18,7 +18,13 @@ Backend:
 - JWT_SECRET
 - CORS_ORIGINS
 - APP_NAME
-- EMERGENT_LLM_KEY (if storage integration is retained)
+- STORAGE_PROVIDER=s3
+- S3_BUCKET
+- S3_ACCESS_KEY
+- S3_SECRET_KEY
+- S3_REGION (optional)
+- S3_ENDPOINT (optional for S3-compatible providers)
+- EMERGENT_LLM_KEY (only if using the legacy Emergent storage provider)
 - FIRECRAWL_API_KEY (for live buyer discovery)
 
 Seed/admin:
@@ -40,7 +46,7 @@ Frontend build:
 ## Deployment order
 
 1. Create managed MongoDB.
-2. Create S3-compatible object storage.
+2. Create S3-compatible object storage and set `STORAGE_PROVIDER=s3`.
 3. Deploy backend container and configure secrets.
 4. Verify `/api/health`.
 5. Deploy frontend with `REACT_APP_BACKEND_URL` pointing to the backend HTTPS URL.
