@@ -30,6 +30,7 @@ Backend:
 Seed/admin:
 - ADMIN_EMAIL
 - ADMIN_PASSWORD
+- ALLOW_PUBLIC_REGISTRATION=false (recommended; admins create additional users)
 
 Backup:
 - IBIAG_MONGO_URL
@@ -47,7 +48,7 @@ Frontend build:
 
 1. Create managed MongoDB.
 2. Create S3-compatible object storage and set `STORAGE_PROVIDER=s3`.
-3. Deploy backend container and configure secrets.
+3. Deploy backend container and configure secrets. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the first administrator.
 4. Verify `/api/health`.
 5. Deploy frontend with `REACT_APP_BACKEND_URL` pointing to the backend HTTPS URL.
 6. Configure DNS and TLS.
