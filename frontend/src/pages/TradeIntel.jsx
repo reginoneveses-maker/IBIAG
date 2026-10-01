@@ -27,6 +27,11 @@ const TradeIntel = () => {
   const [comexLoading, setComexLoading] = useState(false);
   const [marketRows, setMarketRows] = useState([]);
   const [marketTotals, setMarketTotals] = useState({ volume_kg: 0, fob_usd: 0 });
+  const [buyerResults, setBuyerResults] = useState([]);
+  const [buyerCountry, setBuyerCountry] = useState("");
+  const [buyerProduct, setBuyerProduct] = useState("");
+  const [buyerLoading, setBuyerLoading] = useState(false);
+  const [decisionLoading, setDecisionLoading] = useState({});
 
   const load = () => {
     const params = {};
@@ -111,6 +116,38 @@ const TradeIntel = () => {
     } finally {
       setComexLoading(false);
     }
+  };
+
+  const discoverBuyers = async (market) => {
+    const opt = ncmOptions.find(x => String(x.coNcm ?? x.co_ncm ?? x.code ?? x.codigo ?? "") === String(selectedNcm));
+    const product = selectedNcm ? (opt?.noNcm || opt?.no_ncm || opt?.description || selectedNcm) : (comexSearch || "Brazilian tropical ingredients");
+    const countryName = market.country || "";
+    setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
+    try {
+      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 });
+      setBuyerResults(r.data?.results || []);
+      if (!(r.data?.results || []).length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
+      setBuyerResults([]);
+    } finally { setBuyerLoading(false); }
+  };
+
+  const findDecisionMaker = async (buyer) => {
+    setDecisionLoading(prev => ({...prev, [buyer.company]: true}));
+    try {
+      const r = await api.post("/buyer-discovery/" + encodeURIComponent(buyer.company) + "/decision-maker", null, { params: { product: buyerProduct, country: buyerCountry } });
+      setBuyerResults(prev => prev.map(x => x.company === buyer.company ? {...x, ...r.data} : x));
+      toast.success("Pesquisa de decisor concluída.");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível pesquisar o decisor."); }
+    finally { setDecisionLoading(prev => ({...prev, [buyer.company]: false})); }
+  };
+
+  const addBuyerToCrm = async (buyer) => {
+    try {
+      await api.post("/buyer-discovery/to-crm", {...buyer, country: buyerCountry, product_interest: buyerProduct});
+      toast.success(buyer.company + " enviado para o CRM.");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível enviar para o CRM."); }
   };
 
   const addToCrm = async (id) => {
@@ -211,10 +248,36 @@ const TradeIntel = () => {
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.fob_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</TableCell>
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.avg_usd_kg || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right text-xs">{Number(m.share_pct || 0).toFixed(2)}%</TableCell>
-                  <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => toast.info("Mercado selecionado. A próxima etapa é buscar empresas compradoras reais neste mercado.")}><Users className="w-3 h-3 mr-1" />Buscar compradores</Button></TableCell>
+                  <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => discoverBuyers(m)}><Users className="w-3 h-3 mr-1" />{buyerLoading ? "Pesquisando..." : "Buscar compradores"}</Button></TableCell>
                 </TableRow>
               ))}</TableBody></Table>
             </div>
+          </div>
+        )}
+
+        {buyerResults.length > 0 && (
+          <div className="rounded-lg border border-[#0F382C]/10 bg-[#F9F6F0] p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div><div className="text-[10px] uppercase tracking-widest text-[#0F382C]/50">BUSCA WEB · COMPRADORES</div><div className="font-display text-lg font-bold text-[#0F382C]">{buyerCountry}</div><div className="text-xs text-[#0F382C]/60">{buyerProduct}</div></div>
+              <Badge variant="outline">{buyerResults.length} empresas</Badge>
+            </div>
+            <div className="space-y-2">{buyerResults.map((b) => (
+              <div key={b.domain || b.company} className="rounded-lg border bg-white p-3">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[#0F382C]">{b.company}</div>
+                    <div className="text-xs text-[#0F382C]/60">{b.domain || b.website} · Score {b.priority_score}</div>
+                    {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}
+                    {b.linkedin && <a className="text-xs underline text-[#0F382C]" href={b.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[b.company]}>{decisionLoading[b.company] ? "Pesquisando..." : "Buscar decisor"}</Button>
+                    <Button size="sm" onClick={() => addBuyerToCrm(b)} className="bg-[#0F382C] hover:bg-[#0A2920] text-white">Adicionar ao CRM</Button>
+                  </div>
+                </div>
+                {b.source_url && <div className="text-[10px] mt-2 text-[#0F382C]/50 truncate">Fonte: {b.source_url}</div>}
+              </div>
+            ))}</div>
           </div>
         )}
 
