@@ -19,6 +19,7 @@ import Procedimentos from "@/pages/gestao/Procedimentos";
 import Financeiro from "@/pages/gestao/Financeiro";
 import FornecedoresHub from "@/pages/gestao/FornecedoresHub";
 import Specs from "@/pages/gestao/Specs";
+import Produtos from "@/pages/gestao/Produtos";
 import Precos from "@/pages/gestao/Precos";
 
 const Protected = ({ children }) => {
@@ -42,6 +43,7 @@ function App() {
                 <Route path="procedimentos" element={<Procedimentos />} />
                 <Route path="financeiro" element={<Financeiro />} />
                 <Route path="fornecedores" element={<FornecedoresHub />} />
+                <Route path="produtos" element={<Produtos />} />
                 <Route path="prospeccao" element={<Specs />} />
                 <Route path="precos" element={<Precos />} />
               </Route>
