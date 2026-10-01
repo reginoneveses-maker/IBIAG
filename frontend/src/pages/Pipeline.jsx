@@ -24,7 +24,22 @@ const Pipeline = () => {
   const [interactions, setInteractions] = useState([]);
   const [newInter, setNewInter] = useState({ type: "email", subject: "", content: "" });
 
-  const load = () => api.get("/leads").then(r => setLeads(r.data)).catch(() => {});
+  const load = async () => {
+    try {
+      const pageSize = 250;
+      let skip = 0;
+      const all = [];
+      while (true) {
+        const r = await api.get("/leads", { params: { skip, limit: pageSize } });
+        all.push(...r.data);
+        if (r.data.length < pageSize) break;
+        skip += pageSize;
+      }
+      setLeads(all);
+    } catch {
+      // Keep the current board visible if a reload fails.
+    }
+  };
   useEffect(() => { load(); }, []);
 
   const filtered = leads.filter(l => {
