@@ -10,6 +10,7 @@ import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
+from buyer_discovery import discover_buyers, discover_decision_maker
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -1165,6 +1166,74 @@ async def trade_to_crm(tid: str, user=Depends(get_current_user)):
                 country_code=tr["country_code"], industry=tr["industry_segment"],
                 stage="new_lead", source="trade_data", deal_value=tr["value_usd"],
                 notes=f"From Trade Intel. HS {tr['hs_code']}. {tr['volume_kg']:.0f} kg / USD {tr['value_usd']:.0f}")
+    await db.leads.insert_one(lead.model_dump())
+    return lead
+
+
+# ============ BUYER DISCOVERY ============
+class BuyerDiscoveryRequest(BaseModel):
+    product: str
+    country: str
+    country_code: str = ""
+    limit: int = 8
+
+@api.post("/buyer-discovery/search")
+async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_current_user)):
+    product = body.product.strip()
+    country = body.country.strip()
+    if not product or not country:
+        raise HTTPException(400, "Informe produto e país.")
+    try:
+        buyers = discover_buyers(product, country, max(1, min(body.limit, 20)))
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except requests.RequestException as e:
+        logging.exception("Buyer discovery provider error")
+        raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
+    return {"product": product, "country": country, "results": buyers, "source": "web_discovery"}
+
+@api.post("/buyer-discovery/{company}/decision-maker")
+async def buyer_discovery_decision_maker(company: str, product: str = "", country: str = "", user=Depends(get_current_user)):
+    if not company.strip():
+        raise HTTPException(400, "Empresa obrigatória.")
+    try:
+        import asyncio
+        return await asyncio.to_thread(discover_decision_maker, company, country, product)
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+    except requests.RequestException as e:
+        logging.exception("Decision maker discovery provider error")
+        raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
+
+@api.post("/buyer-discovery/to-crm")
+async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
+    company = str(payload.get("company", "")).strip()
+    if not company:
+        raise HTTPException(400, "Empresa obrigatória.")
+    country = str(payload.get("country", ""))
+    data = {
+        "company": company,
+        "country": country,
+        "country_code": str(payload.get("country_code", "")),
+        "website": str(payload.get("website", "")),
+        "linkedin": str(payload.get("linkedin", "")),
+        "product_interest": str(payload.get("product_interest", "")),
+        "source_url": str(payload.get("source_url", "")),
+        "source": "buyer_discovery",
+        "priority": "high" if float(payload.get("priority_score", 0) or 0) >= 70 else "normal",
+        "notes": f"Descoberto via inteligência web. Score: {payload.get('priority_score', 0)}",
+        "updated_at": now_iso(),
+    }
+    existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(country)}$", "$options": "i"}}, {"_id": 0})
+    if existing:
+        merged = dict(existing)
+        for k, v in data.items():
+            if v and not merged.get(k):
+                merged[k] = v
+        merged["updated_at"] = now_iso()
+        await db.leads.replace_one({"id": existing["id"]}, merged)
+        return merged
+    lead = Lead(**data)
     await db.leads.insert_one(lead.model_dump())
     return lead
 
