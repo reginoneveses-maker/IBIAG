@@ -1509,28 +1509,21 @@ async def seed_all():
         ]
         await db.templates.insert_many([t.model_dump() for t in tps])
 
-    if await db.trade_data.count_documents({}) == 0:
-        recs = [
-            {"id": str(uuid.uuid4()), "importer_company": "Green Nordic Beverages AB", "importer_country": "Sweden", "country_code": "SE", "hs_code": "2008.99.90", "product_description": "Açaí Puree Aseptic", "volume_kg": 48000, "value_usd": 192000, "exporter_country": "Brazil", "industry_segment": "beverage", "last_shipment_date": "2025-11-14", "contact_hint": "procurement@greenordic.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Pura Vida Organics LLC", "importer_country": "United States", "country_code": "US", "hs_code": "2008.99.90", "product_description": "Freeze-dried Açaí Powder", "volume_kg": 12000, "value_usd": 384000, "exporter_country": "Brazil", "industry_segment": "food_service", "last_shipment_date": "2025-12-02", "contact_hint": "sourcing@puravida.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Bio Cosmétique Paris SAS", "importer_country": "France", "country_code": "FR", "hs_code": "2106.90.90", "product_description": "Acerola Powder 17% Vit C", "volume_kg": 6000, "value_usd": 156000, "exporter_country": "Brazil", "industry_segment": "cosmetics", "last_shipment_date": "2026-01-08", "contact_hint": "achats@biocosmetique.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Sakura Wellness Co Ltd", "importer_country": "Japan", "country_code": "JP", "hs_code": "2009.89.90", "product_description": "Passion Fruit Puree", "volume_kg": 22000, "value_usd": 110000, "exporter_country": "Brazil", "industry_segment": "beverage", "last_shipment_date": "2025-11-28", "contact_hint": "import@sakurawellness.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Emirates Tropical Trading LLC", "importer_country": "UAE", "country_code": "AE", "hs_code": "2009.89.90", "product_description": "Coconut Water NFC", "volume_kg": 180000, "value_usd": 162000, "exporter_country": "Brazil", "industry_segment": "distributor", "last_shipment_date": "2025-12-10", "contact_hint": "trade@emiratestropical.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Nordic Nut House A/S", "importer_country": "Denmark", "country_code": "DK", "hs_code": "0801.22.00", "product_description": "Brazil Nuts Whole", "volume_kg": 25000, "value_usd": 275000, "exporter_country": "Brazil", "industry_segment": "food_service", "last_shipment_date": "2026-01-15", "contact_hint": "import@nordicnut.example"},
-            {"id": str(uuid.uuid4()), "importer_company": "Umi Foods UK Ltd", "importer_country": "United Kingdom", "country_code": "GB", "hs_code": "0801.32.00", "product_description": "Cashew Nuts W240", "volume_kg": 40000, "value_usd": 320000, "exporter_country": "Brazil", "industry_segment": "distributor", "last_shipment_date": "2025-12-18", "contact_hint": "buying@umifoods.example"},
-        ]
-        await db.trade_data.insert_many(recs)
-
-    if await db.leads.count_documents({}) == 0:
-        leads = [
-            Lead(company="Green Nordic Beverages AB", contact_name="Erik Lindqvist", email="erik@greenordic.example",
-                 country="Sweden", country_code="SE", industry="beverage", stage="negotiation", deal_value=45000,
-                 notes="Interested in Açaí Puree aseptic 200L drums."),
-            Lead(company="Bio Cosmétique Paris SAS", contact_name="Sophie Martin", email="sophie@biocosmetique.example",
-                 country="France", country_code="FR", industry="cosmetics", stage="sample_sent", deal_value=28000,
-                 notes="Sample of Acerola powder sent 15-Jan."),
-        ]
-        await db.leads.insert_many([l.model_dump() for l in leads])
+    # Production safety: purge the legacy demonstration prospecting dataset once.
+    demo_cleanup_version = "prospecting-demo-cleanup-v1"
+    if await db.settings.find_one({"key": demo_cleanup_version}) is None:
+        await db.trade_data.delete_many({})
+        await db.leads.delete_many({"$or": [
+            {"email": {"$regex": "@.*\\.example$", "$options": "i"}},
+            {"source": "trade_data", "company": {"$in": [
+                "Green Nordic Beverages AB", "Bio Cosmétique Paris SAS"
+            ]}}
+        ]})
+        await db.settings.update_one(
+            {"key": demo_cleanup_version},
+            {"$set": {"key": demo_cleanup_version, "value": "done", "updated_at": now_iso()}},
+            upsert=True
+        )
 
 @app.on_event("startup")
 async def startup():
