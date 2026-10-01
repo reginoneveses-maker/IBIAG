@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/AuthContext";
-import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, toast, Plus, Pencil, Search } from "@/components/erp";
+import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, toast, Plus, Pencil, Search, Truck, FileCheck2 } from "@/components/erp";
+import { Link } from "react-router-dom";
 
 const empty = {
   name: "", category: "acai", hs_code: "", ncm: "", technical_name: "", origin: "",
@@ -22,8 +23,9 @@ export default function Produtos() {
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState(false);
   const [form, setForm] = useState(empty);
+  const [prices, setPrices] = useState([]);
 
-  const load = () => api.get("/products").then(r => setItems(r.data)).catch(() => {});
+  const load = () => Promise.all([api.get("/products"), api.get("/prices")]).then(([p, pr]) => { setItems(p.data || []); setPrices(pr.data || []); }).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const filtered = items.filter(p => {
@@ -70,6 +72,20 @@ export default function Produtos() {
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => { edit(p); setDialog(true); }}><Pencil className="w-3 h-3" /></Button>
                 </div>
+              </div>
+              <div className="mt-5 rounded-xl border border-[#0F382C]/8 bg-[#F9F6F0]/50 p-3">
+                <div className="flex items-center gap-2 text-[10px] font-mono-alt uppercase tracking-widest text-amber-700 mb-2"><Truck className="w-3.5 h-3.5" /> Fornecedores e preços</div>
+                {prices.filter(x => (x.product_name || "").trim().toLowerCase() === (p.name || "").trim().toLowerCase()).map(o => (
+                  <div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#0F382C]/8 text-xs">
+                    <div><div className="font-semibold">${o.supplier_name || "Fornecedor não informado"}</div><div className="text-[#0F382C]/45">${o.unit || p.unit} · custo fornecedor</div></div>
+                    <div className="text-right"><div className="font-mono-alt font-semibold">${Number(o.supplier_price || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-amber-700">${Number(o.sell_price_usd || 0).toFixed(2)}</div></div>
+                  </div>
+                ))}
+                {!prices.some(x => (x.product_name || "").trim().toLowerCase() === (p.name || "").trim().toLowerCase()) && <div className="text-xs text-[#0F382C]/45">Nenhum fornecedor/preço vinculado. Cadastre em Preços & calculadora.</div>}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <Link to="/gestao/prospeccao"><Button size="sm" variant="outline"><FileCheck2 className="w-3.5 h-3.5 mr-1" />Specs & documentos</Button></Link>
+                <Link to="/gestao/precos"><Button size="sm" variant="outline">Preços</Button></Link>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-5 text-xs">
                 <div><span className="text-[#0F382C]/45">NCM / HS</span><div className="font-semibold">{p.ncm || "—"} {p.hs_code ? `/ ${p.hs_code}` : ""}</div></div>
