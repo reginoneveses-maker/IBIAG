@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, flag, fmtUSD, INDUSTRIES } from "@/lib/api";
 import { useLang } from "@/i18n";
 import { Input } from "@/components/ui/input";
@@ -33,7 +33,7 @@ const TradeIntel = () => {
   const [buyerLoading, setBuyerLoading] = useState(false);
   const [decisionLoading, setDecisionLoading] = useState({});
 
-  const load = () => {
+  const load = useCallback(() => {
     const params = {};
     if (search) params.search = search;
     if (country !== "all") params.country = country;
