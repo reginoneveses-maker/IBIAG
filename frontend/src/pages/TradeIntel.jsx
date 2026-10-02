@@ -32,6 +32,8 @@ const TradeIntel = () => {
   const [buyerResults, setBuyerResults] = useState([]);
   const [buyerCountry, setBuyerCountry] = useState("");
   const [buyerProduct, setBuyerProduct] = useState("");
+  const [directCountry, setDirectCountry] = useState("");
+  const [directProduct, setDirectProduct] = useState("");
   const [buyerLoading, setBuyerLoading] = useState(false);
   const [decisionLoading, setDecisionLoading] = useState({});
 
@@ -120,6 +122,21 @@ const TradeIntel = () => {
     }
   };
 
+  const directDiscoverBuyers = async () => {
+    const product = directProduct.trim();
+    const countryName = directCountry.trim();
+    if (!product || !countryName) return toast.error("Informe o produto e o país.");
+    setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
+    try {
+      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 });
+      setBuyerResults(r.data?.results || []);
+      if (!(r.data?.results || []).length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
+      setBuyerResults([]);
+    } finally { setBuyerLoading(false); }
+  };
+
   const discoverBuyers = async (market) => {
     const opt = ncmOptions.find(x => String(x.coNcm ?? x.co_ncm ?? x.code ?? x.codigo ?? "") === String(selectedNcm));
     const product = selectedNcm ? (opt?.noNcm || opt?.no_ncm || opt?.description || selectedNcm) : (comexSearch || "Brazilian tropical ingredients");
@@ -168,6 +185,21 @@ const TradeIntel = () => {
       </div>
 
 
+
+      <div className="rounded-xl border border-[#104496]/10 bg-white/95 p-5 space-y-4" data-testid="direct-buyer-search">
+        <div>
+          <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60">PROSPECÇÃO WEB</div>
+          <h2 className="font-display text-xl font-bold text-[#104496]">Buscar compradores por produto e país</h2>
+          <p className="text-sm text-[#104496]/60 mt-1">Pesquisa direta em fontes web atuais. Não exige NCM nem consulta prévia ao Comex Stat.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <Input value={directProduct} onChange={e => setDirectProduct(e.target.value)} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Produto, ex.: Acerola Powder" className="bg-white md:col-span-2" />
+          <Input value={directCountry} onChange={e => setDirectCountry(e.target.value)} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="País, ex.: Estados Unidos" className="bg-white md:col-span-2" />
+          <Button onClick={directDiscoverBuyers} disabled={buyerLoading || !directProduct.trim() || !directCountry.trim()} className="bg-[#104496] hover:bg-[#0B3274] text-white">
+            <Search className="w-4 h-4 mr-1" />{buyerLoading ? "Pesquisando..." : "Buscar compradores"}
+          </Button>
+        </div>
+      </div>
 
       <div className="rounded-xl border border-[#104496]/10 bg-white/95 p-5 space-y-4" data-testid="comexstat-panel">
         <div>
