@@ -4,18 +4,18 @@ import { FolderArchive, FileText, Search, Upload, Trash2, Download, X } from "lu
 
 const cats=["Financeiro & Fiscal","Produtos","Fornecedores","Clientes & Comercial","Societário","Qualidade & Compliance","Exportação & Logística"];
 export default function Documentos(){
- const [docs,setDocs]=useState([]),[q,setQ]=useState(""),[open,setOpen]=useState(false),[busy,setBusy]=useState(false);
- const [form,setForm]=useState({title:"",category:cats[0],tags:"",notes:"",file:null});
+ const [docs,setDocs]=useState([]),[products,setProducts]=useState([]),[suppliers,setSuppliers]=useState([]),[q,setQ]=useState(""),[open,setOpen]=useState(false),[busy,setBusy]=useState(false);
+ const emptyForm={title:"",category:cats[0],tags:"",notes:"",product_id:"",supplier_id:"",file:null};\n const [form,setForm]=useState(emptyForm);
  const load=()=>api.get("/documents").then(r=>setDocs(r.data)).catch(()=>setDocs([]));
- useEffect(load,[]);
+ useEffect(()=>{load(); api.get("/products").then(r=>setProducts(r.data)).catch(()=>setProducts([])); api.get("/suppliers").then(r=>setSuppliers(r.data)).catch(()=>setSuppliers([]));},[]);
  const filtered=useMemo(()=>docs.filter(d=>[d.title,d.category,d.file_name,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q]);
  async function submit(e){e.preventDefault(); if(!form.file)return; setBusy(true); try{
    const fd=new FormData(); fd.append("file",form.file); const up=(await api.post("/upload",fd,{headers:{"Content-Type":"multipart/form-data"}})).data;
-   await api.post("/documents",{title:form.title||up.name,category:form.category,file_path:up.path,file_name:up.name,content_type:up.content_type,size:up.size,tags:form.tags.split(",").map(x=>x.trim()).filter(Boolean),notes:form.notes});
-   setOpen(false); setForm({title:"",category:cats[0],tags:"",notes:"",file:null}); await load();
+   const product=products.find(x=>x.id===form.product_id), supplier=suppliers.find(x=>x.id===form.supplier_id);\n   await api.post("/documents",{title:form.title||up.name,category:form.category,file_path:up.path,file_name:up.name,content_type:up.content_type,size:up.size,tags:form.tags.split(",").map(x=>x.trim()).filter(Boolean),notes:form.notes,product_id:form.product_id||"",product_name:product?.name||"",supplier_id:form.supplier_id||"",supplier_name:supplier?.name||""});
+   setOpen(false); setForm(emptyForm); await load();
  }finally{setBusy(false)}}
  async function download(d){const r=await api.get("/files/"+d.file_path,{responseType:"blob"}); const u=URL.createObjectURL(r.data); const a=document.createElement("a");a.href=u;a.download=d.file_name;a.click();URL.revokeObjectURL(u)}
- async function remove(id){if(!window.confirm("Excluir este documento do cadastro?"))return;await api.delete("/documents/"+id);load()}
+ async function remove(id){if(!window.confirm("Excluir este documento e também o arquivo armazenado?"))return;await api.delete("/documents/"+id);load()}
  return <div className="space-y-6">
   <div className="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#104496]/45">Gestão documental</p><h1 className="text-3xl font-bold text-[#104496] mt-1">Central de Documentos</h1><p className="text-sm text-slate-500 mt-2">{docs.length} documentos cadastrados.</p></div><button onClick={()=>setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#104496] text-white text-sm font-semibold"><Upload className="w-4 h-4"/> Novo documento</button></div>
   <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input value={q} onChange={e=>setQ(e.target.value)} className="w-full bg-white border rounded-xl pl-10 pr-4 py-2.5 text-sm" placeholder="Buscar documentos..."/></div>
