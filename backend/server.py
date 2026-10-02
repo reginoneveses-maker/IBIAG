@@ -1195,6 +1195,7 @@ async def list_leads(
     industry: Optional[str] = None,
     skip: int = 0,
     limit: int = 250,
+    user=Depends(get_current_user),
 ):
     """List CRM leads with pagination; there is no registration/storage cap."""
     q = {}
