@@ -6,7 +6,8 @@ export const CATEGORIES = ["acai", "acerola", "juices", "coconut", "nuts"];
 
 export const stageColor = (s) => ({
   new_lead: "bg-blue-100 text-blue-800 border-blue-200",
-  qualified: "bg-cyan-100 text-cyan-800 border-cyan-200",\n  initial_contact: "bg-purple-100 text-purple-800 border-purple-200",
+  qualified: "bg-cyan-100 text-cyan-800 border-cyan-200",
+  initial_contact: "bg-purple-100 text-purple-800 border-purple-200",
   sample_quote: "bg-amber-100 text-amber-800 border-amber-200",
   negotiation: "bg-emerald-100 text-emerald-800 border-emerald-200",
   closed_won: "bg-green-200 text-green-900 border-green-300",
