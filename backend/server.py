@@ -656,9 +656,16 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
             continue
         path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.pdf"
         await put_object(path, data, "application/pdf")
+        folder_path = "/".join(p.strip() for p in str(item.get("folder_path") or "").replace("\\", "/").split("/") if p.strip())
+        if ".." in folder_path.split("/"):
+            raise HTTPException(400, "Lote inválido: caminho de pasta inválido")
         document = Document(title=str(item.get("title") or name), category=category,
                             file_path=path, file_name=name, content_type="application/pdf", size=len(data),
-                            tags=["importado", "arquivo original"], notes=str(item.get("notes") or ""))
+                            tags=["importado", "arquivo original"], notes=str(item.get("notes") or ""),
+                            supplier_id=str(item.get("supplier_id") or ""), supplier_name=str(item.get("supplier_name") or ""),
+                            product_id=str(item.get("product_id") or ""), product_name=str(item.get("product_name") or ""),
+                            document_type=str(item.get("document_type") or ""), certificate_type=str(item.get("certificate_type") or ""),
+                            folder_path=folder_path[:500])
         record = document.model_dump()
         record.update(source_sha256=digest, owner_id=user["id"])
         await db.documents.insert_one(record)
