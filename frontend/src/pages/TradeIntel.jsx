@@ -190,7 +190,7 @@ const TradeIntel = () => {
         <div>
           <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60">PROSPECÇÃO WEB</div>
           <h2 className="font-display text-xl font-bold text-[#104496]">Buscar compradores por produto e país</h2>
-          <p className="text-sm text-[#104496]/60 mt-1">Pesquisa direta em fontes web atuais. Não exige NCM nem consulta prévia ao Comex Stat.</p>
+          <p className="text-sm text-[#104496]/60 mt-1">Pesquisa direta em fontes web atuais. Não exige NCM nem consulta prévia ao Comex Stat. Digite o produto e o país para iniciar.</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <Input value={directProduct} onChange={e => setDirectProduct(e.target.value)} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Produto, ex.: Acerola Powder" className="bg-white md:col-span-2" />
