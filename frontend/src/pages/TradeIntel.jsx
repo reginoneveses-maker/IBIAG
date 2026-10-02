@@ -304,11 +304,14 @@ const TradeIntel = () => {
                     {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}
                     {b.linkedin && <a className="text-xs underline text-[#104496]" href={b.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    {(b.website || b.source_url) && <Button size="sm" variant="outline" asChild><a href={b.website || b.source_url} target="_blank" rel="noreferrer">Ver empresa</a></Button>}
+                    {b.source_url && b.source_url !== b.website && <Button size="sm" variant="outline" asChild><a href={b.source_url} target="_blank" rel="noreferrer">Ver fonte</a></Button>}
                     <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[b.company]}>{decisionLoading[b.company] ? "Pesquisando..." : "Buscar decisor"}</Button>
                     <Button size="sm" onClick={() => addBuyerToCrm(b)} className="bg-[#104496] hover:bg-[#0B3274] text-white">Adicionar ao CRM</Button>
                   </div>
                 </div>
+                {b.source_description && <div className="text-xs mt-2 text-[#104496]/70">{b.source_description}</div>}
                 {b.source_url && <div className="text-[10px] mt-2 text-[#104496]/50 truncate">Fonte: {b.source_url}</div>}
               </div>
             ))}</div>
