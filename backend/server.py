@@ -1,4 +1,5 @@
 import math
+import zipfile, json, hashlib, mimetypes
 from dotenv import load_dotenv
 from pathlib import Path
 ROOT_DIR = Path(__file__).parent
@@ -514,6 +515,58 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
     return Response(content=data, media_type=ct)
 
 # ============ DOCUMENTS ============
+@api.post("/documents/import-batch")
+async def import_document_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
+    require_admin(user)
+    raw = await file.read(40 * 1024 * 1024 + 1)
+    if len(raw) > 40 * 1024 * 1024:
+        raise HTTPException(413, "Lote excede 40 MB")
+    categories = {"Produtos", "Fornecedores", "Qualidade & Compliance", "Clientes & Comercial"}
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(raw))
+        entries = archive.infolist()
+        if len(entries) > 101 or len({x.filename for x in entries}) != len(entries):
+            raise ValueError("Lote inválido ou com entradas duplicadas")
+        if any(x.file_size > 30 * 1024 * 1024 for x in entries) or sum(x.file_size for x in entries) > 80 * 1024 * 1024:
+            raise ValueError("Arquivos excedem o limite")
+        manifest = json.loads(archive.read("manifest.json"))
+        if not isinstance(manifest, list) or not 1 <= len(manifest) <= 100:
+            raise ValueError("Manifesto deve conter de 1 a 100 documentos")
+        plan = []
+        seen = set()
+        for item in manifest:
+            path = item["path"]
+            if not re.fullmatch(r"files/[0-9]+\.pdf", path) or path in seen:
+                raise ValueError("Caminho inválido ou repetido")
+            seen.add(path)
+            data = archive.read(path)
+            if not data.startswith(b"%PDF-"):
+                raise ValueError("Somente PDFs válidos são aceitos")
+            name = str(item["file_name"]).replace("\\", "/").split("/")[-1]
+            category = item["category"]
+            if category not in categories or not name.lower().endswith(".pdf"):
+                raise ValueError("Nome ou categoria inválidos")
+            plan.append((item, name, category, data, hashlib.sha256(data).hexdigest()))
+    except (ValueError, KeyError, TypeError, zipfile.BadZipFile, RuntimeError) as exc:
+        raise HTTPException(400, f"Lote inválido: {exc}")
+    # Validate the entire archive before storing anything. Exact hashes allow safe retries.
+    imported = skipped = 0
+    for item, name, category, data, digest in plan:
+        existing = await db.documents.find_one({"source_sha256": digest})
+        if existing:
+            skipped += 1
+            continue
+        path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.pdf"
+        await put_object(path, data, "application/pdf")
+        document = Document(title=str(item.get("title") or name), category=category,
+                            file_path=path, file_name=name, content_type="application/pdf", size=len(data),
+                            tags=["importado", "arquivo original"], notes=str(item.get("notes") or ""))
+        record = document.model_dump()
+        record.update(source_sha256=digest, owner_id=user["id"])
+        await db.documents.insert_one(record)
+        imported += 1
+    return {"imported": imported, "skipped": skipped, "total": len(plan)}
+
 @api.get("/documents", response_model=List[Document])
 async def list_docs(category: Optional[str] = None, user=Depends(get_current_user)):
     q = {"category": category} if category else {}
