@@ -571,7 +571,7 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
     raw = await file.read(40 * 1024 * 1024 + 1)
     if len(raw) > 40 * 1024 * 1024:
         raise HTTPException(413, "Lote excede 40 MB")
-    categories = {"Produtos", "Fornecedores", "Qualidade & Compliance", "Clientes & Comercial"}
+    categories = {"Produtos", "Fornecedores", "Qualidade & Compliance", "Clientes & Comercial", "Financeiro & Fiscal", "Societário", "Exportação & Logística"}
     try:
         archive = zipfile.ZipFile(io.BytesIO(raw))
         entries = archive.infolist()
