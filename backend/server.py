@@ -741,7 +741,24 @@ async def upd_sup(sid: str, s: Supplier, user=Depends(get_current_user)):
 
 @api.delete("/suppliers/{sid}")
 async def del_sup(sid: str, user=Depends(get_current_user)):
-    r = await db.suppliers.delete_one({"id": sid}); return {"deleted": r.deleted_count}
+    require_admin(user)
+    supplier = await db.suppliers.find_one({"id": sid}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(404, "Fornecedor não encontrado")
+    checks = [
+        (db.product_offers, {"supplier_id": sid}),
+        (db.purchases, {"supplier_id": sid}),
+        (db.orders, {"items.supplier_id": sid}),
+        (db.contracts, {"supplier_id": sid}),
+        (db.certifications, {"supplier_id": sid}),
+        (db.documents, {"supplier_id": sid}),
+        (db.specs, {"supplier_id": sid}),
+    ]
+    for collection, query in checks:
+        if await collection.find_one(query, {"_id": 1}):
+            raise HTTPException(409, "Fornecedor vinculado ao histórico comercial não pode ser excluído.")
+    r = await db.suppliers.delete_one({"id": sid})
+    return {"deleted": r.deleted_count}
 
 # ============ INVOICES ============
 @api.get("/invoices", response_model=List[Invoice])
