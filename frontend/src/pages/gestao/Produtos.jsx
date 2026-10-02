@@ -27,6 +27,8 @@ export default function Produtos() {
   const [offers, setOffers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [linkedPreview,setLinkedPreview]=useState(null);
+  const closeLinkedPreview=()=>{if(linkedPreview)URL.revokeObjectURL(linkedPreview.url);setLinkedPreview(null);};
   const [specs, setSpecs] = useState([]);
   const [certifications, setCertifications] = useState([]);
   const [offerDialog, setOfferDialog] = useState(false);
@@ -83,7 +85,7 @@ export default function Produtos() {
   };
   const openLinkedFile = async (path,name) => {
     if(!path)return;
-    try { const r=await api.get("/files/"+path,{responseType:"blob"}); const url=URL.createObjectURL(r.data); const a=document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noreferrer"; a.download=name||"documento"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); } catch { toast.error("Não foi possível abrir o arquivo"); }
+    try { const r=await api.get("/files/"+path,{responseType:"blob"}); setLinkedPreview({title:name||"Documento",url:URL.createObjectURL(r.data)}); } catch { toast.error("Não foi possível abrir o arquivo"); }
   };
   const toggleId = (key,id) => setOfferForm(f => ({...f,[key]:f[key].includes(id)?f[key].filter(x=>x!==id):[...f[key],id]}));
 
@@ -116,6 +118,7 @@ export default function Produtos() {
                 {offers.filter(x=>x.product_id===p.id).map(o=><div key={o.id} className="border-t border-[#104496]/8 py-3 first:border-t-0">
                   <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{o.export_price_text || (Number(o.supplier_price) ? Number(o.supplier_price).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "Sob consulta")}</div><div className="text-[#104496]">{Number(o.sale_price_usd) ? `$${Number(o.sale_price_usd).toFixed(2)}` : ""}</div></div></div>
                   <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
+                  <div className="flex flex-wrap gap-2 mt-2">{[...new Set([...(o.spec_document_ids||[]),...(o.certificate_document_ids||[]),...(o.other_document_ids||[])])].map(id=>documents.find(d=>d.id===id)).filter(Boolean).map(d=><button key={d.id} type="button" className="text-xs text-[#104496] underline text-left" onClick={()=>openLinkedFile(d.file_path,d.file_name)}>Abrir ficha: {d.title||d.file_name}</button>)}</div>
                   <div className="flex flex-wrap gap-1 mt-2">{o.spec_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Spec vinculada</span>}{o.certification_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Certificado vinculado</span>}{o.other_document_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Arquivo</span>}</div>
                   {Boolean(o.commission_text || Number(o.commission)) && <div className="text-[11px] text-[#104496]/55 mt-2">Comissão: {o.commission_text && !/^\d+(?:[.,]\d+)?$/.test(o.commission_text.trim()) ? o.commission_text : `${(Number(o.commission || o.commission_text) * 100).toLocaleString("pt-BR")}%`}</div>}
                   {o.notes&&<div className="text-[11px] text-[#104496]/55 mt-2">{o.notes}</div>}
@@ -150,6 +153,7 @@ export default function Produtos() {
         {!filtered.length && <Card className="col-span-full bg-white"><CardContent className="py-12 text-center text-sm text-[#104496]/50">Nenhum produto cadastrado.</CardContent></Card>}
       </div>
 
+      {linkedPreview&&<div className="fixed inset-0 z-[100] bg-black/50 p-4 flex flex-col"><div className="bg-white rounded-t-xl p-3 flex justify-between items-center"><span className="font-semibold text-[#104496]">{linkedPreview.title}</span><button type="button" aria-label="Fechar ficha" onClick={closeLinkedPreview}>Fechar</button></div><iframe title={linkedPreview.title} src={linkedPreview.url} className="w-full flex-1 bg-white rounded-b-xl"/></div>}
       <Dialog open={offerDialog} onOpenChange={setOfferDialog}>
         <DialogContent className="bg-[#EEF3FB] max-w-3xl max-h-[92vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-display text-[#104496]">{offerForm.id ? "Editar forma, fornecedor e documentação" : "Forma, fornecedor e documentação"}</DialogTitle></DialogHeader>
