@@ -4,10 +4,10 @@ import { DocumentsPanel } from "@/components/DocumentsPanel";
 export default function Procedimentos() {
   return (
     <div data-testid="procedimentos-page">
-      <PageHeader number="01 · Procedimentos" title="Procedimentos" subtitle="Procedimentos Operacionais Padrão da IBIAG" />
+      <PageHeader number="01 · Procedimentos" title="Procedimentos" subtitle="Procedimentos da IBIAG e dos fornecedores presentes no acervo" />
       <SubTabs tabs={[
-        { key: "pops", label: "POPs", content: <DocumentsPanel category="pop" title="POPs" subtitle="Versões editáveis / vigentes dos procedimentos" /> },
-        { key: "pops_assinados", label: "POPs Assinados", content: <DocumentsPanel category="pop_signed" title="POPs Assinados" subtitle="Cópias assinadas e datadas (PDF)" /> },
+        { key: "pops", label: "POPs", content: <DocumentsPanel category="pop" title="POPs" subtitle="Procedimentos cadastrados. A vigência deve ser conferida no documento." /> },
+        { key: "pops_assinados", label: "POPs Assinados", content: <DocumentsPanel category="pop_signed" title="POPs Assinados" subtitle="Documentos classificados como assinados após conferência" /> },
       ]} />
     </div>
   );
