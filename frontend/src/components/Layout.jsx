@@ -5,7 +5,7 @@ import {
   Building2, Upload, ChevronRight, Home, FolderArchive, BriefcaseBusiness, Settings,
   Warehouse, FileText
 } from "lucide-react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";\nimport { useState } from "react";
 import { useAuth } from "@/AuthContext";
 import { useLang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
