@@ -126,7 +126,7 @@ const Layout = ({ module = "crm" }) => {
         <header className="sticky top-0 z-30 h-16 bg-[#F7F9FC]/90 backdrop-blur-xl border-b border-[#104496]/10">
           <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             <div className="flex items-center gap-2 lg:hidden">
-              <Link to="/" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
+              <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-white text-[#104496]"><Menu className="w-5 h-5" /></button>\n              <Link to="/" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
               <div className="font-display font-extrabold text-[#104496]">{brand.name}</div>
             </div>
             <div className="hidden lg:flex items-center gap-2 text-xs text-[#104496]/45">
@@ -147,7 +147,7 @@ const Layout = ({ module = "crm" }) => {
           </div>
         </header>
 
-        <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {mobileOpen && <nav className="lg:hidden bg-[#104496] text-white px-3 py-4 max-h-[70vh] overflow-y-auto">{navGroups.map(group => <div key={group.title} className="mb-4"><div className="px-3 mb-1 text-[10px] uppercase tracking-widest text-white/40">{group.title}</div>{group.items.map(({to,icon:Icon,label,end}) => <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-3 rounded-xl text-sm ${isActive ? "bg-white text-[#104496]" : "text-white/75"}`}><Icon className="w-4 h-4"/>{label}</NavLink>)}</div>)}</nav>}\n\n        <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Outlet />
         </main>
       </div>
