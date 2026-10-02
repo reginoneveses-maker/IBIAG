@@ -1239,7 +1239,7 @@ async def del_lead(lid: str, user=Depends(get_current_user)):
     return {"deleted": r.deleted_count}
 
 @api.get("/interactions", response_model=List[Interaction])
-async def list_int(lead_id: Optional[str] = None):
+async def list_int(lead_id: Optional[str] = None, user=Depends(get_current_user)):
     q = {"lead_id": lead_id} if lead_id else {}
     return await db.interactions.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
 
@@ -1280,7 +1280,7 @@ class MessageTemplate(BaseModel):
     body: str
 
 @api.get("/templates", response_model=List[MessageTemplate])
-async def list_tpl(language: Optional[str] = None, category: Optional[str] = None):
+async def list_tpl(language: Optional[str] = None, category: Optional[str] = None, user=Depends(get_current_user)):
     q = {}
     if language: q["language"] = language
     if category: q["category"] = category
@@ -1377,7 +1377,7 @@ class TradeRecord(BaseModel):
     contact_hint: str = ""
 
 @api.get("/trade-data", response_model=List[TradeRecord])
-async def list_trade(country: Optional[str] = None, industry: Optional[str] = None, search: Optional[str] = None):
+async def list_trade(country: Optional[str] = None, industry: Optional[str] = None, search: Optional[str] = None, user=Depends(get_current_user)):
     q = {}
     if country: q["country_code"] = country
     if industry: q["industry_segment"] = industry
@@ -1469,7 +1469,7 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
 
 # ============ DASHBOARD ============
 @api.get("/dashboard/stats")
-async def dashboard():
+async def dashboard(user=Depends(get_current_user)):
     total_leads = await db.leads.count_documents({})
     active = await db.leads.count_documents({"stage": {"$nin": ["closed_won", "closed_lost"]}})
     won = await db.leads.count_documents({"stage": "closed_won"})
