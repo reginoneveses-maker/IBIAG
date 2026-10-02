@@ -1,6 +1,6 @@
 import unittest
 from document_categories import normalize_document, matches_document, validate_classification
-from finance_reporting import cashflow_rows, pending_totals
+from finance_reporting import month_keys, cashflow_rows, pending_totals
 
 class DocumentTests(unittest.TestCase):
     def test_legacy_sections_and_central_area_agree(self):
@@ -56,3 +56,17 @@ class FinanceTests(unittest.TestCase):
         self.assertEqual(pending_totals(entries),[])
 
 if __name__ == "__main__":unittest.main()
+
+
+class CashflowPeriodTests(unittest.TestCase):
+    def test_future_months_cross_year(self):
+        from datetime import date
+        self.assertEqual(month_keys(date(2026, 12, 2), 3, "forecast"), ["2026-12", "2027-01", "2027-02"])
+
+    def test_history_crosses_year(self):
+        from datetime import date
+        self.assertEqual(month_keys(date(2026, 1, 2), 3), ["2025-11", "2025-12", "2026-01"])
+
+    def test_invalid_period(self):
+        from datetime import date
+        with self.assertRaises(ValueError): month_keys(date(2026, 1, 2), 12, "invalid")

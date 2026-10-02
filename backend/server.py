@@ -14,7 +14,7 @@ from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker
 from document_categories import normalize_document, matches_document, validate_classification
-from finance_reporting import cashflow_rows, pending_totals, currency_code
+from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
@@ -1132,22 +1132,17 @@ async def del_price(pid: str, user=Depends(get_current_user)):
 
 # ============ CASHFLOW ============
 @api.get("/finance/cashflow")
-async def cashflow(months: int = 12, currency: str = "BRL", user=Depends(get_current_user)):
+async def cashflow(months: int = 12, currency: str = "BRL", period: str = "history", user=Depends(get_current_user)):
     if months < 1 or months > 60:
         raise HTTPException(400, "Informe de 1 a 60 meses")
     currency = currency_code(currency)
     if currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
         raise HTTPException(400, "Moeda não suportada")
     today = datetime.now(timezone.utc)
-    keys = []
-    y, m = today.year, today.month
-    for _ in range(months):
-        keys.append(f"{y:04d}-{m:02d}")
-        m -= 1
-        if m == 0:
-            m = 12
-            y -= 1
-    keys.reverse()
+    try:
+        keys = month_keys(datetime.now(timezone.utc).date(), months, period)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     entries = await all_finance_entries()
     invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
     return cashflow_rows(entries, invoices, keys, currency)

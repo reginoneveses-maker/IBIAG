@@ -1,6 +1,14 @@
 """Currency-separated financial reporting without assumed exchange rates."""
 from datetime import datetime
 
+def month_keys(today, months=12, period="history"):
+    if period not in {"history", "forecast"} or not 1 <= months <= 60:
+        raise ValueError("Período do fluxo de caixa inválido")
+    first = today.year * 12 + today.month - 1
+    if period == "history":
+        first -= months - 1
+    return [f"{(first+i)//12:04d}-{(first+i)%12+1:02d}" for i in range(months)]
+
 def currency_code(value):
     return str(value or "BRL").upper().strip()
 
@@ -30,6 +38,7 @@ def cashflow_rows(entries, invoices, keys, currency="BRL"):
         if key in data:
             data[key]["nf_saida" if invoice.get("kind") == "saida" else "nf_entrada"] += float(invoice.get("total") or 0)
     running = 0.0
+    cash_running = 0.0
     for key in keys:
         row = data[key]
         for field in fields:
@@ -38,6 +47,8 @@ def cashflow_rows(entries, invoices, keys, currency="BRL"):
         row["cash_balance"] = round(row["received"] - row["paid"], 2)
         running += row["balance"]
         row["cumulative"] = round(running, 2)
+        cash_running += row["cash_balance"]
+        row["cash_cumulative"] = round(cash_running, 2)
     return list(data.values())
 
 def pending_totals(entries):
