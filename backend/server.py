@@ -515,6 +515,56 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
     return Response(content=data, media_type=ct)
 
 # ============ DOCUMENTS ============
+@api.post("/documents/link-batch")
+async def link_document_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
+    require_admin(user)
+    raw = await file.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise HTTPException(413, "Plano de vínculos excede 1 MB")
+    try:
+        items = json.loads(raw)
+        if not isinstance(items, list) or not 1 <= len(items) <= 500:
+            raise ValueError("Plano deve conter de 1 a 500 vínculos")
+        plan = []
+        for item in items:
+            digest = item["sha256"]
+            if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("Hash inválido")
+            doc = await db.documents.find_one({"source_sha256": digest})
+            supplier_name = str(item["supplier_name"]).strip()
+            supplier = await db.suppliers.find_one({"name": {"$regex": f"^{re.escape(supplier_name)}$", "$options": "i"}})
+            if not doc or not supplier:
+                raise ValueError(f"Documento ou fornecedor não encontrado: {supplier_name}")
+            if doc.get("supplier_id") and doc["supplier_id"] != supplier["id"]:
+                raise ValueError("Documento já vinculado a outro fornecedor")
+            product_name = str(item.get("product_name") or "").strip()
+            product = None
+            offers = []
+            if product_name:
+                product = await db.products.find_one({"name": {"$regex": f"^{re.escape(product_name)}$", "$options": "i"}})
+                if not product or (doc.get("product_id") and doc["product_id"] != product["id"]):
+                    raise ValueError(f"Produto não encontrado ou vínculo conflitante: {product_name}")
+                offers = await db.product_offers.find({"product_id": product["id"], "supplier_id": supplier["id"]}).to_list(100)
+                if not offers:
+                    raise ValueError(f"Oferta produto/fornecedor não encontrada: {product_name} / {supplier_name}")
+            kind = item.get("kind", "spec")
+            if kind not in {"spec", "other"}:
+                raise ValueError("Tipo de vínculo inválido")
+            plan.append((doc, supplier, product, offers, kind))
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(409, f"Plano não aplicado: {exc}")
+    linked_offers = set()
+    for doc, supplier, product, offers, kind in plan:
+        fields = {"supplier_id": supplier["id"], "supplier_name": supplier["name"]}
+        if product:
+            fields.update(product_id=product["id"], product_name=product["name"])
+        await db.documents.update_one({"id": doc["id"]}, {"$set": fields})
+        for offer in offers:
+            key = "spec_document_ids" if kind == "spec" else "other_document_ids"
+            await db.product_offers.update_one({"id": offer["id"]}, {"$addToSet": {key: doc["id"]}})
+            linked_offers.add(offer["id"])
+    return {"documents": len(plan), "offers": len(linked_offers)}
+
 @api.post("/documents/import-batch")
 async def import_document_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
     require_admin(user)
