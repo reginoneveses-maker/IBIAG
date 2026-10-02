@@ -74,7 +74,21 @@ async def get_object(path: str):
         return obj["Body"].read(), obj.get("ContentType", "application/octet-stream")
     raise HTTPException(500, "Storage provider is not configured")
 
-async def delete_object(path: str):\n    if not path: return\n    if STORAGE_PROVIDER == "gridfs":\n        old = await db["ibiag_files.files"].find_one({"filename": path})\n        if old: await gridfs.delete(old["_id"])\n        return\n    if STORAGE_PROVIDER == "s3":\n        c = _s3()\n        if c: c.delete_object(Bucket=S3_BUCKET, Key=path)\n        return\n\n# ----- Auth helpers -----
+async def delete_object(path: str):
+    if not path:
+        return
+    if STORAGE_PROVIDER == "gridfs":
+        old = await db["ibiag_files.files"].find_one({"filename": path})
+        if old:
+            await gridfs.delete(old["_id"])
+        return
+    if STORAGE_PROVIDER == "s3":
+        client = _s3()
+        if client:
+            client.delete_object(Bucket=S3_BUCKET, Key=path)
+        return
+
+# ----- Auth helpers -----
 def hash_pw(pw): return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 def verify_pw(pw, h): 
     try: return bcrypt.checkpw(pw.encode(), h.encode())
