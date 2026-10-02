@@ -206,6 +206,7 @@ const Pipeline = () => {
               </Select>
             </div>
             <Input type="number" placeholder={t("deal_value")} value={editing.deal_value} onChange={(e) => setEditing({ ...editing, deal_value: Number(e.target.value) })} />
+            <label className="text-sm">Conferência do cadastro<select aria-label="Conferência do cadastro" className="block w-full border rounded p-2 bg-white" value={editing.validation_status||"needs_validation"} onChange={e=>setEditing({...editing,validation_status:e.target.value})}><option value="needs_validation">A validar</option><option value="verified">Cadastro conferido</option><option value="not_found">Contato não encontrado</option></select></label>
             <Textarea placeholder={t("notes")} value={editing.notes} onChange={(e) => setEditing({ ...editing, notes: e.target.value })} rows={3} />
           </div>
           <DialogFooter>
@@ -232,6 +233,8 @@ const Pipeline = () => {
               <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("country")}</span><div>{detailLead?.country || "—"}</div></div>
               <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("deal_value")}</span><div className="text-[#104496] font-mono-alt">{fmtUSD(detailLead?.deal_value)}</div></div>
             </div>
+            {detailLead?.validation_status!=="verified"&&<div className="p-3 rounded-lg bg-amber-50 text-sm text-amber-900">Empresa e contatos a validar. Um cadastro ou resultado de pesquisa não confirma atividade de compra.</div>}
+            {detailLead?.evidence_urls?.length>0&&<div className="text-xs">Fontes de pesquisa: {detailLead.evidence_urls.map(url=><a key={url} className="block underline" href={url.startsWith("https://")||url.startsWith("http://")?url:undefined} target="_blank" rel="noreferrer">{url}</a>)}</div>}
             {detailLead?.notes && <div className="p-3 bg-[#F7F9FC] rounded-lg text-sm border border-[#104496]/10">{detailLead.notes}</div>}
 
             <div className="border-t border-[#104496]/10 pt-4">

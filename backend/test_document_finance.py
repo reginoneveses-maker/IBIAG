@@ -47,6 +47,8 @@ class FinanceTests(unittest.TestCase):
         self.assertEqual(september["receivable"],100)
         self.assertEqual(september["received"],0)
         self.assertEqual(october["received"],100)
+        self.assertEqual(september["pending_receivable"],0)
+        self.assertEqual(october["pending_cumulative"],0)
 
     def test_cancelled_entries_ignored_and_nfe_is_brl(self):
         entries=[{"kind":"receivable","amount":1000,"currency":"USD","due_date":"2026-10-01","cancelled":True}]

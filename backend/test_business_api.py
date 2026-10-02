@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict
+from pymongo.errors import DuplicateKeyError
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
 
 
@@ -85,7 +86,7 @@ def load_api(db):
             # Depends is irrelevant to direct calls; explicit user is supplied.
             node.args.defaults = [ast.Constant(None) if isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == "Depends" else d for d in node.args.defaults]
     env = dict(db=db, BaseModel=BaseModel, Field=Field, ConfigDict=ConfigDict, List=List, Optional=Optional,
-               now_iso=lambda: datetime.now(timezone.utc).isoformat(), uuid=uuid, HTTPException=HTTPException,
+               now_iso=lambda: datetime.now(timezone.utc).isoformat(), uuid=uuid, HTTPException=HTTPException, DuplicateKeyError=DuplicateKeyError,
                asynccontextmanager=asynccontextmanager, datetime=datetime, timezone=timezone, timedelta=timedelta,
                ReturnDocument=SimpleNamespace(AFTER=True), normalize_order=normalize_order, normalize_purchase=normalize_purchase,
                inventory_balances=inventory_balances, validate_balances=validate_balances, linked_finance=linked_finance)

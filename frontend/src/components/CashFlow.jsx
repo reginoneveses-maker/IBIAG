@@ -18,13 +18,13 @@ export const CashFlow = () => {
     load();window.addEventListener("finance-updated",load);
     return ()=>{active=false;window.removeEventListener("finance-updated",load);};
   }, [currency,period]);
-  const inKey=mode==="planned"?"receivable":"received", outKey=mode==="planned"?"payable":"paid";
+  const inKey=mode==="planned"?"pending_receivable":"received", outKey=mode==="planned"?"pending_payable":"paid";
   const totIn = data.reduce((a, b) => a + b[inKey], 0);
   const totOut = data.reduce((a, b) => a + b[outKey], 0);
   const now=new Date();
   const currentKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
   const cur = data.find(row=>row.month===currentKey);
-  const currentBalance=mode==="planned"?cur?.balance:cur?.cash_balance;
+  const currentBalance=mode==="planned"?cur?.pending_balance:cur?.cash_balance;
 
   return (
     <div data-testid="cashflow-panel">
@@ -51,7 +51,7 @@ export const CashFlow = () => {
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey={inKey} name={mode==="planned"?"A receber":"Recebido"} fill="#0F382C" radius={[4, 4, 0, 0]} />
               <Bar dataKey={outKey} name={mode==="planned"?"A pagar":"Pago"} fill="#D97706" radius={[4, 4, 0, 0]} />
-              <Line type="monotone" dataKey={mode==="planned"?"cumulative":"cash_cumulative"} name="Acumulado" stroke="#9F1239" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey={mode==="planned"?"pending_cumulative":"cash_cumulative"} name="Acumulado" stroke="#9F1239" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>

@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useState } from "react";
-import { useAuth } from "@/AuthContext";
+import { toast } from "sonner";
+import { api, useAuth } from "@/AuthContext";
 import { useLang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
 import { IbiagLogo } from "@/components/IbiagLogo";
@@ -81,6 +82,18 @@ const Layout = ({ module = "crm" }) => {
   const { lang, setLang, t } = useLang();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [backupBusy,setBackupBusy] = useState(false);
+  const backup = async () => {
+    setBackupBusy(true);
+    try {
+      const r=await api.get("/admin/backup",{responseType:"blob",timeout:300000});
+      const url=URL.createObjectURL(r.data);
+      const a=document.createElement("a");a.href=url;a.download=`IBIAG_backup_${new Date().toISOString().slice(0,10)}.jsonl.gz`;
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      toast.success("Backup verificado e pronto para baixar.");
+    } catch(e) {toast.error("Não foi possível gerar o backup. Nenhum dado foi alterado.");}
+    finally {setBackupBusy(false);}
+  };
   const navGroups = groups(module, t);
 
   const brand = module === "gestao"
@@ -118,6 +131,7 @@ const Layout = ({ module = "crm" }) => {
           <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/8">
             <LayoutGrid className="w-4 h-4" /> Trocar módulo
           </Link>
+          {user?.role==="admin"&&<button disabled={backupBusy} onClick={backup} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/8"><FolderArchive className="w-4 h-4"/>{backupBusy?"Preparando backup…":"Baixar backup completo"}</button>}
           <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/8">
             <LogOut className="w-4 h-4" /> Sair
           </button>

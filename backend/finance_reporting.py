@@ -14,7 +14,7 @@ def currency_code(value):
 
 def cashflow_rows(entries, invoices, keys, currency="BRL"):
     currency = currency_code(currency)
-    fields = ("receivable", "payable", "received", "paid", "nf_saida", "nf_entrada")
+    fields = ("receivable", "payable", "pending_receivable", "pending_payable", "received", "paid", "nf_saida", "nf_entrada")
     data = {key: {"month": key, "currency": currency, **{f: 0.0 for f in fields}} for key in keys}
     for entry in entries:
         if entry.get("cancelled") or currency_code(entry.get("currency")) != currency:
@@ -26,6 +26,8 @@ def cashflow_rows(entries, invoices, keys, currency="BRL"):
             continue
         if due_key in data:
             data[due_key][kind] += amount
+            if not entry.get("paid"):
+                data[due_key]["pending_" + kind] += amount
         if entry.get("paid"):
             paid_key = (entry.get("paid_date") or entry.get("due_date") or "")[:7]
             if paid_key in data:
@@ -39,6 +41,7 @@ def cashflow_rows(entries, invoices, keys, currency="BRL"):
             data[key]["nf_saida" if invoice.get("kind") == "saida" else "nf_entrada"] += float(invoice.get("total") or 0)
     running = 0.0
     cash_running = 0.0
+    pending_running = 0.0
     for key in keys:
         row = data[key]
         for field in fields:
@@ -49,6 +52,9 @@ def cashflow_rows(entries, invoices, keys, currency="BRL"):
         row["cumulative"] = round(running, 2)
         cash_running += row["cash_balance"]
         row["cash_cumulative"] = round(cash_running, 2)
+        row["pending_balance"] = round(row["pending_receivable"] - row["pending_payable"], 2)
+        pending_running += row["pending_balance"]
+        row["pending_cumulative"] = round(pending_running, 2)
     return list(data.values())
 
 def pending_totals(entries):

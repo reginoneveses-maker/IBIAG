@@ -33,3 +33,7 @@ Pedidos em rascunho ou cancelados e compras canceladas podem ser arquivados e re
 ## Validação automatizada
 
 `test_business_workflow.py` verifica as transições e regras financeiras/estoque. `test_business_api.py` executa as funções reais da API com banco simulado, incluindo concorrência de trava, conflito de versão, repetição, insuficiência e falha antes da gravação. Isso não substitui validação do fluxo pela interface e pelo banco real após deploy.
+
+## Previsão e realizado
+
+O fluxo tem períodos histórico e futuro. A visão prevista usa apenas contas pendentes por vencimento; a visão realizada usa a data registrada do pagamento ou recebimento. Contas quitadas não continuam na previsão. Registros importados sem data real de pagamento usam a data de vencimento como fallback histórico; devem ser conferidos antes de auditoria financeira.
