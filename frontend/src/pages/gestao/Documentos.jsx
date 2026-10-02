@@ -1,32 +1,25 @@
-import { useEffect, useState } from "react";
-import { FolderArchive, FileText, Search, Upload, ShieldCheck, Package, Truck, Wallet, Users, Building2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/AuthContext";
+import { FolderArchive, FileText, Search, Upload, Trash2, Download, X } from "lucide-react";
 
-const categories = [
-  ["Financeiro & Fiscal", Wallet, "NF-e, boletos, comprovantes, contas e documentos fiscais"],
-  ["Produtos", Package, "Fichas técnicas, laudos, certificados e especificações"],
-  ["Fornecedores", Truck, "Contratos, cadastros, certificados e documentos de fornecedores"],
-  ["Clientes & Comercial", Users, "Propostas, contratos, pedidos e documentos de clientes"],
-  ["Societário", Building2, "Documentos da empresa, registros e documentos administrativos"],
-  ["Qualidade & Compliance", ShieldCheck, "Certificações, auditorias, licenças e controles"],
-];
-
-export default function Documentos() {
-  return <div className="space-y-6">
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#104496]/45">Gestão documental</p><h1 className="text-3xl font-bold text-[#104496] mt-1">Central de Documentos</h1><p className="text-sm text-slate-500 mt-2">Arquivos organizados por área e vinculados aos registros da empresa.</p></div>
-      <button className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#104496] text-white text-sm font-semibold"><Upload className="w-4 h-4"/> Novo documento</button>
-    </div>
-    <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input className="w-full bg-white border rounded-xl pl-10 pr-4 py-2.5 text-sm" placeholder="Buscar por nome, categoria, empresa, produto ou fornecedor..." /></div>
-    <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-      {categories.map(([name,Icon,desc]) => <div key={name} className="bg-white border border-slate-200 rounded-2xl p-5 hover:shadow-sm transition-shadow">
-        <div className="w-10 h-10 rounded-xl bg-[#104496]/8 flex items-center justify-center mb-4"><Icon className="w-5 h-5 text-[#104496]"/></div>
-        <h2 className="font-bold text-[#104496]">{name}</h2><p className="text-sm text-slate-500 mt-1 leading-relaxed">{desc}</p>
-        <div className="mt-4 pt-4 border-t text-xs text-slate-400 flex items-center gap-2"><FolderArchive className="w-3.5 h-3.5"/> Pasta documental</div>
-      </div>)}
-    </div>
-    <div className="bg-white border border-slate-200 rounded-2xl p-5">
-      <div className="flex items-center gap-2"><FileText className="w-5 h-5 text-[#104496]"/><h2 className="font-bold text-[#104496]">Documentos recentes</h2></div>
-      <p className="text-sm text-slate-500 mt-3">Os arquivos enviados aparecerão aqui com categoria, vínculo, responsável, data e histórico.</p>
-    </div>
-  </div>;
+const cats=["Financeiro & Fiscal","Produtos","Fornecedores","Clientes & Comercial","Societário","Qualidade & Compliance","Exportação & Logística"];
+export default function Documentos(){
+ const [docs,setDocs]=useState([]),[q,setQ]=useState(""),[open,setOpen]=useState(false),[busy,setBusy]=useState(false);
+ const [form,setForm]=useState({title:"",category:cats[0],tags:"",notes:"",file:null});
+ const load=()=>api.get("/documents").then(r=>setDocs(r.data)).catch(()=>setDocs([]));
+ useEffect(load,[]);
+ const filtered=useMemo(()=>docs.filter(d=>[d.title,d.category,d.file_name,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q]);
+ async function submit(e){e.preventDefault(); if(!form.file)return; setBusy(true); try{
+   const fd=new FormData(); fd.append("file",form.file); const up=(await api.post("/upload",fd,{headers:{"Content-Type":"multipart/form-data"}})).data;
+   await api.post("/documents",{title:form.title||up.name,category:form.category,file_path:up.path,file_name:up.name,content_type:up.content_type,size:up.size,tags:form.tags.split(",").map(x=>x.trim()).filter(Boolean),notes:form.notes});
+   setOpen(false); setForm({title:"",category:cats[0],tags:"",notes:"",file:null}); await load();
+ }finally{setBusy(false)}}
+ async function download(d){const r=await api.get("/files/"+d.file_path,{responseType:"blob"}); const u=URL.createObjectURL(r.data); const a=document.createElement("a");a.href=u;a.download=d.file_name;a.click();URL.revokeObjectURL(u)}
+ async function remove(id){if(!window.confirm("Excluir este documento do cadastro?"))return;await api.delete("/documents/"+id);load()}
+ return <div className="space-y-6">
+  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#104496]/45">Gestão documental</p><h1 className="text-3xl font-bold text-[#104496] mt-1">Central de Documentos</h1><p className="text-sm text-slate-500 mt-2">{docs.length} documentos cadastrados.</p></div><button onClick={()=>setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#104496] text-white text-sm font-semibold"><Upload className="w-4 h-4"/> Novo documento</button></div>
+  <div className="relative"><Search className="absolute left-3 top-3 w-4 h-4 text-slate-400"/><input value={q} onChange={e=>setQ(e.target.value)} className="w-full bg-white border rounded-xl pl-10 pr-4 py-2.5 text-sm" placeholder="Buscar documentos..."/></div>
+  <div className="bg-white border rounded-2xl overflow-hidden">{filtered.length===0?<div className="p-8 text-center text-sm text-slate-500"><FolderArchive className="w-8 h-8 mx-auto mb-2"/>Nenhum documento encontrado.</div>:filtered.map(d=><div key={d.id} className="p-4 border-b last:border-0 flex items-center gap-3"><FileText className="w-5 h-5 text-[#104496]"/><div className="min-w-0 flex-1"><div className="font-semibold text-sm text-[#104496] truncate">{d.title}</div><div className="text-xs text-slate-500 truncate">{d.category} · {d.file_name}</div></div><button onClick={()=>download(d)} className="p-2"><Download className="w-4 h-4"/></button><button onClick={()=>remove(d.id)} className="p-2 text-red-600"><Trash2 className="w-4 h-4"/></button></div>)}</div>
+  {open&&<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"><form onSubmit={submit} className="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4"><div className="flex justify-between"><h2 className="font-bold text-xl text-[#104496]">Novo documento</h2><button type="button" onClick={()=>setOpen(false)}><X/></button></div><input className="w-full border rounded-xl p-3" placeholder="Título" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/><select className="w-full border rounded-xl p-3" value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{cats.map(x=><option key={x}>{x}</option>)}</select><input className="w-full border rounded-xl p-3" placeholder="Tags separadas por vírgula" value={form.tags} onChange={e=>setForm({...form,tags:e.target.value})}/><textarea className="w-full border rounded-xl p-3" placeholder="Observações" value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})}/><input required type="file" className="w-full" onChange={e=>setForm({...form,file:e.target.files[0]})}/><button disabled={busy} className="w-full bg-[#104496] text-white rounded-xl p-3 font-semibold">{busy?"Enviando...":"Salvar documento"}</button></form></div>}
+ </div>
 }
