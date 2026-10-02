@@ -34,9 +34,28 @@ def _search(query: str, limit: int = 8) -> List[Dict]:
 def _text(item: Dict) -> str:
     return " ".join(str(item.get(k, "") or "") for k in ("title", "description", "snippet", "markdown"))
 
-def _score(text: str) -> int:
+def _normalize(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+def _product_terms(product: str) -> List[str]:
+    stop = {"powder", "juice", "concentrate", "extract", "organic", "natural", "frozen", "pulp", "puree"}
+    return [x for x in _normalize(product).split() if len(x) >= 3 and x not in stop]
+
+def _is_product_relevant(item: Dict, product: str) -> bool:
+    text = _normalize(_text(item))
+    phrase = _normalize(product)
+    terms = _product_terms(product)
+    if phrase and phrase in text:
+        return True
+    # Require the distinctive product identity (e.g. "acerola"), not merely
+    # generic form words such as powder/juice/extract.
+    return bool(terms) and all(term in text for term in terms)
+
+def _score(text: str, product: str = "") -> int:
     t = (text or "").lower()
     score = 20
+    if product and _normalize(product) in _normalize(text):
+        score += 30
     for word, points in [("import",20),("importer",20),("buyer",18),("purchasing",15),("procurement",15),("ingredient",12),("distributor",10),("manufacturer",10),("juice",8),("powder",8),("organic",5)]:
         if word in t: score += points
     return min(score, 100)
@@ -58,9 +77,9 @@ def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
         url, domain = item.get("url", ""), _extract_domain(item.get("url", ""))
         title, desc = item.get("title", "") or "", item.get("description", "") or ""
         key = domain or title.lower()
-        if not key or key in seen: continue
+        if not key or key in seen or not _is_product_relevant(item, product): continue
         seen.add(key)
-        buyers.append({"company": re.sub(r"\s*[|–—-]\s*.*$", "", title).strip() or domain.split(".")[0].title(), "website": url, "domain": domain, "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item)), "source": "firecrawl_web"})
+        buyers.append({"company": re.sub(r"\s*[|–—-]\s*.*$", "", title).strip() or domain.split(".")[0].title(), "website": url, "domain": domain, "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item), product), "source": "firecrawl_web"})
     return sorted(buyers, key=lambda x: x["priority_score"], reverse=True)
 
 def discover_decision_maker(company: str, country: str, product: str) -> Dict:
