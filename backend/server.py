@@ -310,6 +310,10 @@ class Document(BaseModel):
     size: int = 0
     tags: List[str] = []
     notes: str = ""
+    supplier_id: str = ""
+    supplier_name: str = ""
+    product_id: str = ""
+    product_name: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 class Certification(BaseModel):
