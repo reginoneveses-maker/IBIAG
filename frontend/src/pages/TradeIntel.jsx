@@ -45,9 +45,9 @@ const TradeIntel = () => {
         setCountries(uniq);
       }
     }).catch(() => {});
-  };
+  }, [search, country, industry, countries.length]);
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [country, industry]);
+  useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     api.get("/trade-data").then(r => {
