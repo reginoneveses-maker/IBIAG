@@ -1054,6 +1054,62 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
     }}, upsert=True)
     return PortfolioImportResult(products=len(product_map), suppliers=len(supplier_map), offers=offer_count, source_rows=len(rows))
 
+
+@api.post("/portfolio/restore-commissions")
+async def restore_portfolio_commissions(file: UploadFile = File(...), dry_run: bool = True, user=Depends(get_current_user)):
+    """Restore only commission fields; preserve IDs, prices and document links."""
+    require_admin(user)
+    try:
+        df = pd.read_excel(io.BytesIO(await file.read()), sheet_name="IBIAG", header=2, dtype=object).fillna("")
+    except Exception as exc:
+        raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {exc}")
+    df.columns = [str(c).strip() for c in df.columns]
+    if not {"Produto", "Fornecedor", "Comissão"}.issubset(df.columns):
+        raise HTTPException(400, "Planilha sem Produto, Fornecedor ou Comissão")
+    def clean(value):
+        if value is None: return ""
+        if isinstance(value, float) and value.is_integer(): return str(int(value))
+        return str(value).strip()
+    def key(name, supplier):
+        return (clean(name).casefold(), clean(supplier).casefold())
+    source = {}
+    for _, row in df.iterrows():
+        if not clean(row["Produto"]): continue
+        k = key(row["Produto"], row["Fornecedor"])
+        raw = clean(row["Comissão"])
+        value = raw.replace(",", ".")
+        try:
+            number = float(value.rstrip("%")) if value else 0
+            if value.endswith("%"): number /= 100
+            if not math.isfinite(number): number = 0
+        except (ValueError, TypeError): number = 0
+        source.setdefault(k, []).append((number, raw))
+    offers = await db.product_offers.find({"source": "Tabela Produtos Ibiag 2026 - COMPLETA / aba IBIAG"}, {"_id": 0}).to_list(None)
+    groups = {}
+    for offer in offers:
+        groups.setdefault(key(offer.get("product_name"), offer.get("supplier_name")), []).append(offer)
+    updates = []
+    conflicts = []
+    for k, values in source.items():
+        targets = groups.get(k, [])
+        unique = set(values)
+        if not targets or (len(unique) > 1):
+            conflicts.append(" / ".join(k))
+            continue
+        number, raw = values[0]
+        if len(targets) != len(values):
+            conflicts.append(" / ".join(k))
+            continue
+        for offer in targets:
+            if offer.get("commission", 0) != number or offer.get("commission_text", "") != raw:
+                updates.append((offer["id"], number, raw))
+    if conflicts:
+        raise HTTPException(409, {"message": "Nenhum dado alterado: há vínculos ausentes ou comissões ambíguas", "conflicts": conflicts})
+    if not dry_run:
+        for oid, number, raw in updates:
+            await db.product_offers.update_one({"id": oid}, {"$set": {"commission": number, "commission_text": raw, "updated_at": now_iso()}})
+    return {"matched": sum(len(x) for x in groups.values()), "updated": 0 if dry_run else len(updates), "planned_updates": len(updates), "dry_run": dry_run}
+
 # ============ LEADS (CRM) ============
 class LeadImportResult(BaseModel):
     imported: int
