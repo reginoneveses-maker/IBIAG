@@ -954,11 +954,14 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
             continue
         rows.append({str(k).strip(): clean(v) for k, v in row.to_dict().items()})
 
+    supplier_names = sorted({r.get("Fornecedor","") for r in rows if r.get("Fornecedor","")})
+    product_names = {re.sub(r"\\s+", " ", r.get("Produto","")).strip().casefold() for r in rows if r.get("Produto","").strip()}
+    if dry_run:
+        return PortfolioImportResult(products=len(product_names), suppliers=len(supplier_names), offers=len(rows), source_rows=len(rows))
+
     if replace:
         await db.products.delete_many({})
         await db.product_offers.delete_many({})
-
-    supplier_names = sorted({r.get("Fornecedor","") for r in rows if r.get("Fornecedor","")})
     supplier_map = {}
     for name in supplier_names:
         existing = await db.suppliers.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
