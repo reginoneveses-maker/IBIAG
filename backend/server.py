@@ -1462,7 +1462,7 @@ async def dashboard():
     active = await db.leads.count_documents({"stage": {"$nin": ["closed_won", "closed_lost"]}})
     won = await db.leads.count_documents({"stage": "closed_won"})
     lost = await db.leads.count_documents({"stage": "closed_lost"})
-    samples = await db.leads.count_documents({"stage": "sample_sent"})
+    samples = await db.leads.count_documents({"stage": {"$in": ["sample_quote", "sample_sent"]}})
     conv = round((won / (won + lost)) * 100, 1) if (won + lost) > 0 else 0.0
     pipeline_value = 0.0
     async for d in db.leads.aggregate([
@@ -1499,6 +1499,12 @@ async def dashboard():
         "orders_pending": orders_pending, "finance_receivable": fin_receivable,
         "finance_payable": fin_payable, "contracts_expiring": expiring
     }
+
+@api.post("/admin/migrate-crm-stages")
+async def migrate_crm_stages(user=Depends(get_current_user)):
+    require_admin(user)
+    legacy = await db.leads.update_many({"stage": "sample_sent"}, {"$set": {"stage": "sample_quote", "updated_at": now_iso()}})
+    return {"migrated_sample_sent_to_sample_quote": legacy.modified_count}
 
 @api.get("/health")
 async def health():
