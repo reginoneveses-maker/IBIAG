@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, useAuth } from "@/AuthContext";
 import { FolderArchive, FileText, Search, Upload, Trash2, Download, X, Pencil, RotateCcw } from "lucide-react";
 
@@ -14,8 +14,8 @@ export default function Documentos({defaultSection="",title="Central de Document
  async function importBatch(e){const files=Array.from(e.target.files||[]);e.target.value="";if(!files.length)return;setBusy(true);let imported=0,skipped=0;try{for(const file of files){setBatchResult(`Importando ${file.name}...`);const fd=new FormData();fd.append("file",file);const r=(await api.post("/documents/import-batch",fd,{headers:{"Content-Type":"multipart/form-data"},timeout:180000})).data;imported+=r.imported;skipped+=r.skipped;await load();}setBatchResult(`${imported} documentos importados; ${skipped} duplicatas ignoradas.`);}catch(err){setBatchResult(`${imported} importados até agora. Erro: ${err.response?.data?.detail||err.message}. Você pode reenviar os lotes com segurança.`);await load();}finally{setBusy(false);}}
  const emptyForm={title:"",category:sectionAreas[defaultSection]||cats[0],section:defaultSection,tags:"",notes:"",product_id:"",supplier_id:"",file:null};
  const [form,setForm]=useState(emptyForm);
- const load=()=>api.get(trash?"/documents/trash":"/documents",{params:!trash&&defaultSection?{category:defaultSection}:{}}).then(r=>setDocs(r.data)).catch(err=>setBatchResult("Não foi possível carregar os documentos: "+(err.response?.data?.detail||err.message)));
- useEffect(()=>{load();},[trash,defaultSection]);
+ const load=useCallback(()=>api.get(trash?"/documents/trash":"/documents",{params:!trash&&defaultSection?{category:defaultSection}:{}}).then(r=>setDocs(r.data)).catch(err=>setBatchResult("Não foi possível carregar os documentos: "+(err.response?.data?.detail||err.message))),[trash,defaultSection]);
+ useEffect(()=>{load();},[load]);
  useEffect(()=>{api.get("/products").then(r=>setProducts(r.data)).catch(()=>setProducts([])); api.get("/suppliers").then(r=>setSuppliers(r.data)).catch(()=>setSuppliers([]));},[]);
  const filtered=useMemo(()=>docs.filter(d=>(!area||d.category===area)&&(!sectionFilter||d.section===sectionFilter)&&[d.title,d.category,d.file_name,d.supplier_name,d.product_name,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q,area,sectionFilter]);
  async function submit(e){e.preventDefault(); if(!form.file)return; setBusy(true); try{
