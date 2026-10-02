@@ -34,26 +34,26 @@ export default function Home() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-12">
           <Link to="/gestao" data-testid="module-gestao" className="group relative overflow-hidden rounded-3xl bg-[#104496] text-white p-8 sm:p-10 min-h-[300px] flex flex-col justify-between hover:-translate-y-1 transition-transform">
-            <div className="absolute -right-12 -top-12 w-56 h-56 rounded-full bg-#CAD51B/15 blur-2xl" />
+            <div className="absolute -right-12 -top-12 w-56 h-56 rounded-full bg-[#CAD51B]/15 blur-2xl" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-#CAD51B" /></div>
-              <div className="mt-6 text-xs font-mono-alt uppercase tracking-[0.25em] text-#CAD51B/90">01 · {t("module_gestao_kicker")}</div>
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-[#CAD51B]" /></div>
+              <div className="mt-6 text-xs font-mono-alt uppercase tracking-[0.25em] text-[#CAD51B]/90">01 · {t("module_gestao_kicker")}</div>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold mt-2">{t("module_gestao_title")}</h2>
               <p className="text-sm sm:text-base text-white/70 mt-3 max-w-md">{t("module_gestao_desc")}</p>
             </div>
             <div className="flex items-center justify-between mt-8">
               {alerts > 0 ? (
-                <span data-testid="home-alerts-badge" className="inline-flex items-center gap-1.5 text-xs font-semibold bg-#CAD51B text-[#104496] px-3 py-1.5 rounded-full"><AlertTriangle className="w-3.5 h-3.5" />{alerts} {t("home_alerts")}</span>
+                <span data-testid="home-alerts-badge" className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#CAD51B] text-[#104496] px-3 py-1.5 rounded-full"><AlertTriangle className="w-3.5 h-3.5" />{alerts} {t("home_alerts")}</span>
               ) : <span className="text-xs text-white/50">{stats ? t("home_no_alerts") : ""}</span>}
               <span className="inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-all">{t("open")} <ArrowRight className="w-4 h-4" /></span>
             </div>
           </Link>
 
-          <Link to="/prospects" data-testid="module-prospects" className="group relative overflow-hidden rounded-3xl bg-white border border-[#104496]/10 p-8 sm:p-10 min-h-[300px] flex flex-col justify-between hover:-translate-y-1 hover:border-#104496/40 transition-all">
+          <Link to="/prospects" data-testid="module-prospects" className="group relative overflow-hidden rounded-3xl bg-white border border-[#104496]/10 p-8 sm:p-10 min-h-[300px] flex flex-col justify-between hover:-translate-y-1 hover:border-[#104496]/40 transition-all">
             <div className="absolute -right-12 -bottom-12 w-56 h-56 rounded-full bg-[#104496]/5 blur-2xl" />
             <div>
-              <div className="w-12 h-12 rounded-2xl bg-#104496 flex items-center justify-center"><Leaf className="w-6 h-6 text-white" /></div>
-              <div className="mt-6 text-xs font-mono-alt uppercase tracking-[0.25em] text-#104496">02 · {t("module_crm_kicker")}</div>
+              <div className="w-12 h-12 rounded-2xl bg-[#104496] flex items-center justify-center"><Leaf className="w-6 h-6 text-white" /></div>
+              <div className="mt-6 text-xs font-mono-alt uppercase tracking-[0.25em] text-[#104496]">02 · {t("module_crm_kicker")}</div>
               <h2 className="font-display text-3xl sm:text-4xl font-extrabold mt-2 text-[#104496]">Tropical Prospects</h2>
               <p className="text-sm sm:text-base text-[#104496]/70 mt-3 max-w-md">{t("module_crm_desc")}</p>
             </div>
