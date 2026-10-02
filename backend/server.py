@@ -915,7 +915,7 @@ class PortfolioImportResult(BaseModel):
     source_rows: int
 
 @api.post("/portfolio/import-xlsx", response_model=PortfolioImportResult)
-async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, user=Depends(get_current_user)):
+async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, dry_run: bool = False, user=Depends(get_current_user)):
     """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
     require_admin(user)
     raw = await file.read()
