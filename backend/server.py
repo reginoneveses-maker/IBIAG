@@ -505,6 +505,9 @@ async def upload_file(file: UploadFile = File(...), user=Depends(get_current_use
 
 @api.get("/files/{full_path:path}")
 async def download_file(full_path: str, user=Depends(get_current_user)):
+    allowed_prefix = f"{APP_NAME}/uploads/{user['id']}/"
+    if user.get("role") != "admin" and not full_path.startswith(allowed_prefix):
+        raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)
     return Response(content=data, media_type=ct)
 
