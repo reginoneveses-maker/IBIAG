@@ -3,9 +3,10 @@ import {
   LayoutDashboard, Package, Kanban, Globe2, Mail, CheckSquare, Leaf, ShoppingCart,
   Boxes, LogOut, ClipboardList, Wallet, Truck, FlaskConical, Calculator, LayoutGrid,
   Building2, Upload, ChevronRight, Home, FolderArchive, BriefcaseBusiness, Settings,
-  Warehouse, FileText
+  Warehouse, FileText, Menu
 } from "lucide-react";
-import { Link, NavLink, Outlet } from "react-router-dom";\nimport { useState } from "react";
+import { Link, NavLink, Outlet } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "@/AuthContext";
 import { useLang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
@@ -79,6 +80,7 @@ const groups = (module, t) => module === "gestao"
 const Layout = ({ module = "crm" }) => {
   const { lang, setLang, t } = useLang();
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const navGroups = groups(module, t);
 
   const brand = module === "gestao"
