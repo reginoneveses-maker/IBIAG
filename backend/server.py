@@ -1,3 +1,4 @@
+import math
 from dotenv import load_dotenv
 from pathlib import Path
 ROOT_DIR = Path(__file__).parent
@@ -422,6 +423,7 @@ class ProductOffer(BaseModel):
     fob_price_text: str = ""
     organic_version: str = ""
     commission: float = 0
+    commission_text: str = ""
     certifications_text: str = ""
     spec_url: str = ""
     marketing_claim: str = ""
@@ -1015,9 +1017,14 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
         supplier_name = r.get("Fornecedor","")
         supplier = supplier_map.get(supplier_name, {})
         commission_raw = r.get("Comissão","")
+        commission_value = commission_raw.strip().replace(",", ".")
         try:
-            commission = float(str(commission_raw).replace(",", ".")) if commission_raw else 0
-        except Exception:
+            commission = float(commission_value.rstrip("%")) if commission_value else 0
+            if commission_value.endswith("%"):
+                commission /= 100
+            if not math.isfinite(commission):
+                commission = 0
+        except (ValueError, TypeError):
             commission = 0
         offer = ProductOffer(
             product_id=p["id"], product_name=p["name"], form=p["name"],
@@ -1026,7 +1033,7 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
             packaging_type=r.get("Tipo Embalagem",""), packaging=r.get("Embalagem",""),
             palletization=r.get("Palletização",""), export_price_text=r.get("Preço Exportação",""),
             fob_price_text="" if r.get("Preço FOB","") == "#VALUE!" else r.get("Preço FOB",""),
-            organic_version=r.get("Versão Orgânica",""), commission=commission,
+            organic_version=r.get("Versão Orgânica",""), commission=commission, commission_text=commission_raw,
             certifications_text=r.get("Certificações",""), spec_url=r.get("Spec",""),
             marketing_claim=r.get("Apelo MKT",""), harvest=r.get("Safra",""),
             checked=r.get("Conferido",""), notes=r.get("Observações",""),
