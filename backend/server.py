@@ -13,6 +13,8 @@ import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker
+from document_categories import normalize_document, matches_document, validate_classification
+from finance_reporting import cashflow_rows, pending_totals, currency_code
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -306,6 +308,8 @@ class Document(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
     category: str = "general"
+    section: str = ""
+    deleted_at: str = ""
     file_path: str
     file_name: str
     content_type: str = ""
@@ -618,25 +622,68 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
     return {"imported": imported, "skipped": skipped, "total": len(plan)}
 
 @api.get("/documents", response_model=List[Document])
-async def list_docs(category: Optional[str] = None, user=Depends(get_current_user)):
-    q = {"category": category} if category else {}
-    return await db.documents.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+async def list_docs(category: Optional[str] = None, section: Optional[str] = None,
+                    user=Depends(get_current_user)):
+    records = await db.documents.find({"deleted_at": {"$in": [None, ""]}}, {"_id": 0}).sort("created_at", -1).to_list(10000)
+    return [normalize_document(d) for d in records if matches_document(d, category, section)]
 
 @api.post("/documents", response_model=Document)
 async def create_doc(d: Document, user=Depends(get_current_user)):
+    try:
+        d.category, d.section = validate_classification(d.category, d.section)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    d.deleted_at = ""
     await db.documents.insert_one(d.model_dump())
     return d
 
+class DocumentClassification(BaseModel):
+    category: str
+    section: str = ""
+    title: Optional[str] = None
+    notes: Optional[str] = None
+
+@api.get("/documents/trash", response_model=List[Document])
+async def document_trash(user=Depends(get_current_user)):
+    require_admin(user)
+    records = await db.documents.find({"deleted_at": {"$exists": True, "$nin": [None, ""]}}, {"_id": 0}).sort("deleted_at", -1).to_list(10000)
+    return [normalize_document(d) for d in records]
+
+@api.patch("/documents/{did}/classification", response_model=Document)
+async def classify_document(did: str, body: DocumentClassification, user=Depends(get_current_user)):
+    require_admin(user)
+    try:
+        category, section = validate_classification(body.category, body.section)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    changes = {"category": category, "section": section, "updated_at": now_iso()}
+    if body.title is not None:
+        if not body.title.strip():
+            raise HTTPException(400, "Título obrigatório")
+        changes["title"] = body.title.strip()
+    if body.notes is not None:
+        changes["notes"] = body.notes
+    result = await db.documents.update_one({"id": did}, {"$set": changes})
+    if not result.matched_count:
+        raise HTTPException(404, "Documento não encontrado")
+    return normalize_document(await db.documents.find_one({"id": did}, {"_id": 0}))
+
+@api.post("/documents/{did}/restore", response_model=Document)
+async def restore_document(did: str, user=Depends(get_current_user)):
+    require_admin(user)
+    result = await db.documents.update_one({"id": did}, {"$unset": {"deleted_at": "", "deleted_by": ""}})
+    if not result.matched_count:
+        raise HTTPException(404, "Documento não encontrado")
+    return normalize_document(await db.documents.find_one({"id": did}, {"_id": 0}))
+
 @api.delete("/documents/{did}")
 async def delete_doc(did: str, user=Depends(get_current_user)):
+    require_admin(user)
     doc = await db.documents.find_one({"id": did}, {"_id": 0})
     if not doc:
         raise HTTPException(404, "Documento não encontrado")
-    path = doc.get("path") or doc.get("file_path") or ""
-    r = await db.documents.delete_one({"id": did})
-    if r.deleted_count and path:
-        await delete_object(path)
-    return {"deleted": r.deleted_count, "file_deleted": bool(path)}
+    await db.documents.update_one({"id": did}, {"$set": {"deleted_at": now_iso(), "deleted_by": user["id"]}})
+    return {"deleted": 1, "file_deleted": False, "restorable": True}
 
 # ============ SUPPLIERS ============
 @api.get("/suppliers", response_model=List[Supplier])
@@ -736,6 +783,16 @@ async def list_fin(kind: Optional[str] = None, paid: Optional[bool] = None, user
 
 @api.post("/finance", response_model=FinanceEntry)
 async def create_fin(f: FinanceEntry, user=Depends(get_current_user)):
+    if f.kind not in {"receivable", "payable"} or not math.isfinite(f.amount) or f.amount <= 0:
+        raise HTTPException(400, "Informe tipo válido e valor maior que zero")
+    f.currency = currency_code(f.currency)
+    if f.currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
+        raise HTTPException(400, "Moeda não suportada")
+    if f.due_date:
+        try:
+            datetime.strptime(f.due_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(400, "Data de vencimento inválida")
     await db.finance.insert_one(f.model_dump()); return f
 
 @api.patch("/finance/{fid}/toggle-paid", response_model=FinanceEntry)
@@ -870,43 +927,25 @@ async def del_price(pid: str, user=Depends(get_current_user)):
 
 # ============ CASHFLOW ============
 @api.get("/finance/cashflow")
-async def cashflow(months: int = 12, user=Depends(get_current_user)):
+async def cashflow(months: int = 12, currency: str = "BRL", user=Depends(get_current_user)):
+    if months < 1 or months > 60:
+        raise HTTPException(400, "Informe de 1 a 60 meses")
+    currency = currency_code(currency)
+    if currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
+        raise HTTPException(400, "Moeda não suportada")
     today = datetime.now(timezone.utc)
     keys = []
     y, m = today.year, today.month
     for _ in range(months):
         keys.append(f"{y:04d}-{m:02d}")
         m -= 1
-        if m == 0: m = 12; y -= 1
+        if m == 0:
+            m = 12
+            y -= 1
     keys.reverse()
-    data = {k: {"month": k, "receivable": 0.0, "payable": 0.0, "received": 0.0, "paid": 0.0, "nf_saida": 0.0, "nf_entrada": 0.0} for k in keys}
-    async for f in db.finance.find({}, {"_id": 0}):
-        k = (f.get("due_date") or "")[:7]
-        if k not in data: continue
-        amt = float(f.get("amount", 0) or 0)
-        if f.get("kind") == "receivable":
-            data[k]["receivable"] += amt
-            if f.get("paid"): data[k]["received"] += amt
-        else:
-            data[k]["payable"] += amt
-            if f.get("paid"): data[k]["paid"] += amt
-    async for i in db.invoices.find({}, {"_id": 0}):
-        k = (i.get("issue_date") or "")[:7]
-        if k not in data: continue
-        amt = float(i.get("total", 0) or 0)
-        if i.get("kind") == "saida": data[k]["nf_saida"] += amt
-        else: data[k]["nf_entrada"] += amt
-    out = []
-    running = 0.0
-    for k in keys:
-        d = data[k]
-        d["balance"] = round(d["receivable"] - d["payable"], 2)
-        running += d["balance"]
-        d["cumulative"] = round(running, 2)
-        for f in ("receivable", "payable", "received", "paid", "nf_saida", "nf_entrada"):
-            d[f] = round(d[f], 2)
-        out.append(d)
-    return out
+    entries = await db.finance.find({}, {"_id": 0}).to_list(10000)
+    invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
+    return cashflow_rows(entries, invoices, keys, currency)
 
 # ============ GESTÃO STATS ============
 @api.get("/gestao/stats")
@@ -924,10 +963,10 @@ async def gestao_stats(user=Depends(get_current_user)):
         elif days <= int(c.get("alert_days", 30) or 30): expiring.append(item)
     soon = (today + timedelta(days=30)).isoformat()
     contracts_expiring = await db.contracts.count_documents({"end_date": {"$gte": today.isoformat(), "$lte": soon}})
-    fin_recv = 0.0; fin_pay = 0.0
-    async for d in db.finance.aggregate([{"$match": {"paid": False}}, {"$group": {"_id": "$kind", "total": {"$sum": "$amount"}}}]):
-        if d["_id"] == "receivable": fin_recv = d["total"]
-        else: fin_pay = d["total"]
+    totals = pending_totals(await db.finance.find({}, {"_id": 0}).to_list(10000))
+    brl = next((row for row in totals if row["currency"] == "BRL"), {})
+    fin_recv, fin_pay = brl.get("receivable", 0.0), brl.get("payable", 0.0)
+    documents = await db.documents.find({}, {"_id": 0}).to_list(10000)
     return {
         "certs_total": len(certs), "certs_expiring": sorted(expiring, key=lambda x: x["days"]),
         "certs_expired": sorted(expired, key=lambda x: x["days"]),
@@ -936,10 +975,10 @@ async def gestao_stats(user=Depends(get_current_user)):
         "suppliers": await db.suppliers.count_documents({}),
         "specs": await db.specs.count_documents({}),
         "prices": await db.prices.count_documents({}),
-        "pops": await db.documents.count_documents({"category": {"$in": ["pop", "pop_signed"]}}),
+        "pops": sum(matches_document(d, section="pop") or matches_document(d, section="pop_signed") for d in documents),
         "invoices_in": await db.invoices.count_documents({"kind": "entrada"}),
         "invoices_out": await db.invoices.count_documents({"kind": "saida"}),
-        "finance_receivable": fin_recv, "finance_payable": fin_pay,
+        "finance_receivable": fin_recv, "finance_payable": fin_pay, "finance_by_currency": totals,
     }
 
 # ============ INVENTORY ============

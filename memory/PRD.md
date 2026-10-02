@@ -60,9 +60,8 @@ Expandido de CRM para **ERP + CRM** completo com autenticação.
 - `/api/documents`, `/api/invoices` (+ `parse-xml`), `/api/suppliers`, `/api/orders`, `/api/finance` (+ `toggle-paid`), `/api/contracts`, `/api/products/{id}/stock`
 - Dashboard estendido com KPIs de ERP: documents, invoices, suppliers, orders_pending, finance_receivable, finance_payable, contracts_expiring
 
-### Credenciais (admin/owner)
-- Email: `reginoneveses@gmail.com`
-- Senha: `AgroBrasil@2026`
+### Acesso administrativo
+- Credenciais são configuradas fora da documentação, nas variáveis do ambiente de implantação.
 
 ### Backlog restante
 - P1: Parse automático de PDF de NF-e (hoje só XML)
@@ -70,3 +69,4 @@ Expandido de CRM para **ERP + CRM** completo com autenticação.
 - P2: Módulo de usuários (convidar funcionários com permissões)
 - P2: Alertas por email quando contrato vence (integrar Resend)
 - P2: Exportar relatórios em PDF (financeiro, pedidos, estoque)
+
