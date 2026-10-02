@@ -488,6 +488,7 @@ async def me(user=Depends(get_current_user)):
 @api.post("/auth/logout")
 async def logout(): return {"ok": True}
 
+# Deployment sync: document storage cleanup enabled.
 # ============ FILES / STORAGE ============
 @api.post("/upload")
 async def upload_file(file: UploadFile = File(...), user=Depends(get_current_user)):
