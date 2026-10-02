@@ -516,8 +516,14 @@ async def create_doc(d: Document, user=Depends(get_current_user)):
 
 @api.delete("/documents/{did}")
 async def delete_doc(did: str, user=Depends(get_current_user)):
+    doc = await db.documents.find_one({"id": did}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Documento não encontrado")
+    path = doc.get("path") or doc.get("file_path") or ""
     r = await db.documents.delete_one({"id": did})
-    return {"deleted": r.deleted_count}
+    if r.deleted_count and path:
+        await delete_object(path)
+    return {"deleted": r.deleted_count, "file_deleted": bool(path)}
 
 # ============ SUPPLIERS ============
 @api.get("/suppliers", response_model=List[Supplier])
