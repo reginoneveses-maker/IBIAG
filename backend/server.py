@@ -14,7 +14,10 @@ from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker
 from document_categories import normalize_document, matches_document, validate_classification
-from finance_reporting import cashflow_rows, pending_totals, currency_code
+from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
+from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
+from contextlib import asynccontextmanager
+from pymongo import ReturnDocument
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -22,7 +25,7 @@ import xml.etree.ElementTree as ET
 
 # ----- Config -----
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=15000, socketTimeoutMS=45000)
 db = client[os.environ['DB_NAME']]
 gridfs = AsyncIOMotorGridFSBucket(db, bucket_name="ibiag_files")
 
@@ -170,6 +173,8 @@ class Product(BaseModel):
     image_url: str = ""
     sku: str = ""
     stock: float = 0
+    stock_reserved: float = 0
+    stock_available: float = 0
     origin: str = ""
     ncm: str = ""
     technical_name: str = ""
@@ -259,6 +264,16 @@ class Invoice(BaseModel):
     file_name: str = ""
     created_at: str = Field(default_factory=now_iso)
 
+class OrderItem(BaseModel):
+    product_id: str
+    product_name: str = ""
+    offer_id: str
+    supplier_id: str = ""
+    supplier_name: str = ""
+    quantity: float
+    unit: str = "kg"
+    unit_price: float
+
 class SalesOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -273,6 +288,14 @@ class SalesOrder(BaseModel):
     delivery_date: str = ""
     notes: str = ""
     created_at: str = Field(default_factory=now_iso)
+    items: List[OrderItem] = []
+    track_stock: bool = False
+    receivable_due_date: str = ""
+    workflow_enabled: bool = False
+    finance_paid: bool = False
+    finance_paid_date: str = ""
+    version: int = 0
+    deleted_at: str = ""
 
 class FinanceEntry(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -287,6 +310,8 @@ class FinanceEntry(BaseModel):
     paid_date: str = ""
     category: str = ""
     created_at: str = Field(default_factory=now_iso)
+    source_order_id: str = ""
+    source_purchase_id: str = ""
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -357,6 +382,15 @@ class Purchase(BaseModel):
     file_name: str = ""
     notes: str = ""
     created_at: str = Field(default_factory=now_iso)
+    product_id: str = ""
+    track_stock: bool = False
+    stock_received: bool = False
+    due_date: str = ""
+    workflow_enabled: bool = False
+    finance_paid: bool = False
+    finance_paid_date: str = ""
+    version: int = 0
+    deleted_at: str = ""
 
 class Spec(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -755,57 +789,221 @@ async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_current_u
     except Exception as e:
         raise HTTPException(400, f"XML inválido: {str(e)[:150]}")
 
+@asynccontextmanager
+async def business_write_lock():
+    """Serialize stock-affecting writes across API processes on standalone MongoDB.
+
+    One order/purchase document is committed atomically. Stock and linked accounts
+    are derived from that ledger, so a process crash cannot leave half a movement.
+    """
+    key = "business-workflow-lock"
+    await db.workflow_locks.update_one({"_id": key}, {"$setOnInsert": {"_id": key, "locked_until": ""}}, upsert=True)
+    owner = str(uuid.uuid4())
+    now = now_iso()
+    lock = await db.workflow_locks.find_one_and_update(
+        {"_id": key, "locked_until": {"$lte": now}},
+        {"$set": {"lock_owner": owner, "locked_until": (datetime.now(timezone.utc)+timedelta(minutes=5)).isoformat()}},
+        return_document=ReturnDocument.AFTER)
+    if not lock:
+        raise HTTPException(409, "Outra operação de estoque está em andamento. Tente novamente.")
+    async def ensure_owned():
+        threshold = (datetime.now(timezone.utc)+timedelta(seconds=60)).isoformat()
+        if not await db.workflow_locks.find_one({"_id": key, "lock_owner": owner, "locked_until": {"$gt": threshold}}):
+            raise HTTPException(409, "A operação demorou mais que o permitido. Recarregue e tente novamente.")
+    try:
+        yield ensure_owned
+    finally:
+        await db.workflow_locks.update_one({"_id": key, "lock_owner": owner}, {"$set": {"locked_until": ""}, "$unset": {"lock_owner": ""}})
+
+async def business_snapshot():
+    active = {"deleted_at": {"$in": [None, ""]}}
+    products = await db.products.find({}, {"_id": 0}).to_list(None)
+    orders = await db.orders.find(active, {"_id": 0}).to_list(None)
+    purchases = await db.purchases.find(active, {"_id": 0}).to_list(None)
+    return products, orders, purchases
+
+async def all_finance_entries():
+    _, orders, purchases = await business_snapshot()
+    manual = await db.finance.find({}, {"_id": 0}).to_list(None)
+    return manual + linked_finance(orders, purchases)
+
+def version_query(record):
+    version = int(record.get("version") or 0)
+    if version:
+        return {"id": record["id"], "version": version}
+    return {"id": record["id"], "version": {"$in": [None, 0]}}
+
+async def save_order_workflow(order, create=False):
+    async with business_write_lock() as ensure_owned:
+        previous = await db.orders.find_one({"id": order.id}, {"_id": 0})
+        if not create and not previous:
+            raise HTTPException(404, "Pedido não encontrado")
+        if create and previous:
+            raise HTTPException(409, "Registro já existente. Recarregue para verificar o resultado anterior.")
+        if previous and previous.get("deleted_at"):
+            raise HTTPException(409, "Pedido arquivado")
+        if previous and int(order.version or 0) != int(previous.get("version") or 0):
+            raise HTTPException(409, "Pedido alterado por outra operação. Recarregue antes de salvar.")
+        products, orders, purchases = await business_snapshot()
+        offers = await db.product_offers.find({}, {"_id": 0}).to_list(None)
+        try:
+            result = normalize_order(order.model_dump(), previous, {p["id"]:p for p in products}, {o["id"]:o for o in offers})
+            validate_balances(inventory_balances(products, [o for o in orders if o["id"] != order.id]+[result], purchases))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        result.update(version=int((previous or {}).get("version") or 0)+1, updated_at=now_iso())
+        await ensure_owned()
+        if previous:
+            saved = await db.orders.replace_one(version_query(previous), result)
+            if not saved.matched_count:
+                raise HTTPException(409, "Pedido alterado. Recarregue e tente novamente.")
+        else:
+            await db.orders.insert_one(result)
+        return result
+
+async def save_purchase_workflow(purchase, create=False):
+    async with business_write_lock() as ensure_owned:
+        previous = await db.purchases.find_one({"id": purchase.id}, {"_id": 0})
+        if not create and not previous:
+            raise HTTPException(404, "Compra não encontrada")
+        if create and previous:
+            raise HTTPException(409, "Registro já existente. Recarregue para verificar o resultado anterior.")
+        if previous and previous.get("deleted_at"):
+            raise HTTPException(409, "Compra arquivada")
+        if previous and int(purchase.version or 0) != int(previous.get("version") or 0):
+            raise HTTPException(409, "Compra alterada por outra operação. Recarregue antes de salvar.")
+        products, orders, purchases = await business_snapshot()
+        suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(None)
+        try:
+            body = purchase.model_dump()
+            body["updated_at"] = now_iso()
+            result = normalize_purchase(body, previous, {p["id"]:p for p in products}, {s["id"]:s for s in suppliers})
+            validate_balances(inventory_balances(products, orders, [p for p in purchases if p["id"] != purchase.id]+[result]))
+        except ValueError as exc:
+            raise HTTPException(400, str(exc))
+        result.update(version=int((previous or {}).get("version") or 0)+1)
+        await ensure_owned()
+        if previous:
+            saved = await db.purchases.replace_one(version_query(previous), result)
+            if not saved.matched_count:
+                raise HTTPException(409, "Compra alterada. Recarregue e tente novamente.")
+        else:
+            await db.purchases.insert_one(result)
+        return result
+
 # ============ SALES ORDERS ============
 @api.get("/orders", response_model=List[SalesOrder])
-async def list_ord(status: Optional[str] = None, user=Depends(get_current_user)):
-    q = {"status": status} if status else {}
+async def list_ord(status: Optional[str] = None, archived: bool = False, user=Depends(get_current_user)):
+    if archived: require_admin(user)
+    q = {"deleted_at": {"$nin": [None, ""]}} if archived else {"deleted_at": {"$in": [None, ""]}}
+    if status: q["status"] = status
     return await db.orders.find(q, {"_id": 0}).sort("order_date", -1).to_list(1000)
 
 @api.post("/orders", response_model=SalesOrder)
 async def create_ord(o: SalesOrder, user=Depends(get_current_user)):
-    await db.orders.insert_one(o.model_dump()); return o
+    return await save_order_workflow(o, create=True)
 
 @api.put("/orders/{oid}", response_model=SalesOrder)
 async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_current_user)):
-    o.id = oid; await db.orders.replace_one({"id": oid}, o.model_dump()); return o
+    o.id = oid
+    return await save_order_workflow(o)
 
 @api.delete("/orders/{oid}")
 async def del_ord(oid: str, user=Depends(get_current_user)):
-    r = await db.orders.delete_one({"id": oid}); return {"deleted": r.deleted_count}
+    require_admin(user)
+    async with business_write_lock() as ensure_owned:
+        record = await db.orders.find_one({"id": oid}, {"_id": 0})
+        if not record: raise HTTPException(404, "Pedido não encontrado")
+        if record.get("status") not in {"draft", "cancelled"}:
+            raise HTTPException(400, "Cancele o pedido antes de arquivá-lo")
+        await ensure_owned()
+        await db.orders.update_one({"id": oid}, {"$set": {"deleted_at": now_iso()}})
+        return {"deleted": 1, "restorable": True}
+
+async def restore_business_record(collection, rid, user):
+    require_admin(user)
+    async with business_write_lock() as ensure_owned:
+        record = await collection.find_one({"id": rid}, {"_id": 0})
+        if not record: raise HTTPException(404, "Registro não encontrado")
+        if record.get("status") not in {"draft", "cancelled"}:
+            raise HTTPException(400, "Registro com movimentação não pode ser restaurado por esta ação")
+        await ensure_owned()
+        await collection.update_one(version_query(record), {"$set": {"deleted_at": "", "version": int(record.get("version") or 0)+1}})
+        return {"restored": True}
+
+@api.post("/orders/{oid}/restore")
+async def restore_order(oid: str, user=Depends(get_current_user)):
+    return await restore_business_record(db.orders, oid, user)
+
+@api.post("/purchases/{pid}/restore")
+async def restore_purchase(pid: str, user=Depends(get_current_user)):
+    return await restore_business_record(db.purchases, pid, user)
 
 # ============ FINANCE ============
 @api.get("/finance", response_model=List[FinanceEntry])
 async def list_fin(kind: Optional[str] = None, paid: Optional[bool] = None, user=Depends(get_current_user)):
-    q = {}
-    if kind: q["kind"] = kind
-    if paid is not None: q["paid"] = paid
-    return await db.finance.find(q, {"_id": 0}).sort("due_date", 1).to_list(1000)
+    entries = await all_finance_entries()
+    return sorted([f for f in entries if (not kind or f["kind"] == kind) and (paid is None or f.get("paid", False) == paid)], key=lambda f:f.get("due_date", ""))
 
 @api.post("/finance", response_model=FinanceEntry)
 async def create_fin(f: FinanceEntry, user=Depends(get_current_user)):
-    if f.kind not in {"receivable", "payable"} or not math.isfinite(f.amount) or f.amount <= 0:
-        raise HTTPException(400, "Informe tipo válido e valor maior que zero")
-    f.currency = currency_code(f.currency)
-    if f.currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
-        raise HTTPException(400, "Moeda não suportada")
-    if f.due_date:
-        try:
-            datetime.strptime(f.due_date, "%Y-%m-%d")
-        except ValueError:
-            raise HTTPException(400, "Data de vencimento inválida")
-    await db.finance.insert_one(f.model_dump()); return f
+    async with business_write_lock() as ensure_owned:
+        if f.id.startswith(("order:", "purchase:")) or f.source_order_id or f.source_purchase_id:
+            raise HTTPException(400, "Lançamentos de pedidos e compras são gerados pela operação de origem")
+        if f.kind not in {"receivable", "payable"} or not math.isfinite(f.amount) or f.amount <= 0:
+            raise HTTPException(400, "Informe tipo válido e valor maior que zero")
+        f.currency = currency_code(f.currency)
+        if f.currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
+            raise HTTPException(400, "Moeda não suportada")
+        if not f.description.strip(): raise HTTPException(400, "Descrição obrigatória")
+        if not f.due_date: raise HTTPException(400, "Vencimento obrigatório")
+        if f.due_date:
+            try:
+                datetime.strptime(f.due_date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(400, "Data de vencimento inválida")
+        if await db.finance.find_one({"id": f.id}): raise HTTPException(409, "Lançamento já registrado. Recarregue para verificar.")
+        f.paid = False
+        f.paid_date = ""
+        await ensure_owned()
+        await db.finance.insert_one(f.model_dump()); return f
 
 @api.patch("/finance/{fid}/toggle-paid", response_model=FinanceEntry)
-async def toggle_paid(fid: str, user=Depends(get_current_user)):
+async def toggle_paid(fid: str, body: Optional[dict] = None, user=Depends(get_current_user)):
+    if body is not None and not isinstance(body.get("paid"), bool):
+        raise HTTPException(400, "Informe o estado de pagamento")
+    if fid.startswith(("order:", "purchase:")):
+        source, source_id = fid.split(":", 1)
+        collection = db.orders if source == "order" else db.purchases
+        async with business_write_lock() as ensure_owned:
+            record = await collection.find_one({"id": source_id}, {"_id": 0})
+            if not record or not record.get("workflow_enabled") or record.get("deleted_at") or record.get("status") in {"draft", "cancelled"}:
+                raise HTTPException(404, "Operação financeira não encontrada")
+            paid = body["paid"] if body is not None else not bool(record.get("finance_paid"))
+            if paid == bool(record.get("finance_paid")):
+                return linked_finance([record] if source=="order" else [], [record] if source=="purchase" else [])[0]
+            changes = {"finance_paid": paid, "finance_paid_date": now_iso() if paid else "", "version": int(record.get("version") or 0)+1}
+            if source == "purchase":
+                changes["status"] = "paid" if paid else ("received" if record.get("stock_received") else "ordered")
+            await ensure_owned()
+            changed = await collection.update_one(version_query(record), {"$set": changes})
+            if not changed.matched_count:
+                raise HTTPException(409, "Operação alterada. Recarregue e tente novamente.")
+            record.update(changes)
+            return linked_finance([record] if source=="order" else [], [record] if source=="purchase" else [])[0]
     doc = await db.finance.find_one({"id": fid}, {"_id": 0})
     if not doc: raise HTTPException(404, "Not found")
-    doc["paid"] = not doc["paid"]
+    new_paid = body["paid"] if body is not None else not doc["paid"]
+    if new_paid == bool(doc.get("paid")): return doc
+    doc["paid"] = new_paid
     doc["paid_date"] = now_iso() if doc["paid"] else ""
     await db.finance.update_one({"id": fid}, {"$set": {"paid": doc["paid"], "paid_date": doc["paid_date"]}})
     return doc
 
 @api.delete("/finance/{fid}")
 async def del_fin(fid: str, user=Depends(get_current_user)):
+    if fid.startswith(("order:", "purchase:")):
+        raise HTTPException(400, "Cancele o pedido ou a compra de origem para retirar este lançamento")
     r = await db.finance.delete_one({"id": fid}); return {"deleted": r.deleted_count}
 
 # ============ CONTRACTS ============
@@ -846,26 +1044,33 @@ async def del_cert(cid: str, user=Depends(get_current_user)):
 
 # ============ PURCHASES (Compras) ============
 @api.get("/purchases", response_model=List[Purchase])
-async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = None, user=Depends(get_current_user)):
-    q = {}
+async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = None, archived: bool = False, user=Depends(get_current_user)):
+    if archived: require_admin(user)
+    q = {"deleted_at": {"$nin": [None, ""]}} if archived else {"deleted_at": {"$in": [None, ""]}}
     if status: q["status"] = status
     if supplier_id: q["supplier_id"] = supplier_id
     return await db.purchases.find(q, {"_id": 0}).sort("date", -1).to_list(1000)
 
 @api.post("/purchases", response_model=Purchase)
 async def create_pur(p: Purchase, user=Depends(get_current_user)):
-    p.total = round(p.quantity * p.unit_price, 2) if not p.total else p.total
-    await db.purchases.insert_one(p.model_dump()); return p
+    return await save_purchase_workflow(p, create=True)
 
 @api.put("/purchases/{pid}", response_model=Purchase)
 async def upd_pur(pid: str, p: Purchase, user=Depends(get_current_user)):
     p.id = pid
-    p.total = round(p.quantity * p.unit_price, 2) if not p.total else p.total
-    await db.purchases.replace_one({"id": pid}, p.model_dump()); return p
+    return await save_purchase_workflow(p)
 
 @api.delete("/purchases/{pid}")
 async def del_pur(pid: str, user=Depends(get_current_user)):
-    r = await db.purchases.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+    require_admin(user)
+    async with business_write_lock() as ensure_owned:
+        record = await db.purchases.find_one({"id": pid}, {"_id": 0})
+        if not record: raise HTTPException(404, "Compra não encontrada")
+        if record.get("status") != "cancelled":
+            raise HTTPException(400, "Cancele a compra antes de arquivá-la")
+        await ensure_owned()
+        await db.purchases.update_one({"id": pid}, {"$set": {"deleted_at": now_iso()}})
+        return {"deleted": 1, "restorable": True}
 
 # ============ SPECS (Prospecção IBIAG) ============
 @api.get("/specs", response_model=List[Spec])
@@ -927,23 +1132,18 @@ async def del_price(pid: str, user=Depends(get_current_user)):
 
 # ============ CASHFLOW ============
 @api.get("/finance/cashflow")
-async def cashflow(months: int = 12, currency: str = "BRL", user=Depends(get_current_user)):
+async def cashflow(months: int = 12, currency: str = "BRL", period: str = "history", user=Depends(get_current_user)):
     if months < 1 or months > 60:
         raise HTTPException(400, "Informe de 1 a 60 meses")
     currency = currency_code(currency)
     if currency not in {"BRL", "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CNY"}:
         raise HTTPException(400, "Moeda não suportada")
     today = datetime.now(timezone.utc)
-    keys = []
-    y, m = today.year, today.month
-    for _ in range(months):
-        keys.append(f"{y:04d}-{m:02d}")
-        m -= 1
-        if m == 0:
-            m = 12
-            y -= 1
-    keys.reverse()
-    entries = await db.finance.find({}, {"_id": 0}).to_list(10000)
+    try:
+        keys = month_keys(datetime.now(timezone.utc).date(), months, period)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    entries = await all_finance_entries()
     invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
     return cashflow_rows(entries, invoices, keys, currency)
 
@@ -963,7 +1163,7 @@ async def gestao_stats(user=Depends(get_current_user)):
         elif days <= int(c.get("alert_days", 30) or 30): expiring.append(item)
     soon = (today + timedelta(days=30)).isoformat()
     contracts_expiring = await db.contracts.count_documents({"end_date": {"$gte": today.isoformat(), "$lte": soon}})
-    totals = pending_totals(await db.finance.find({}, {"_id": 0}).to_list(10000))
+    totals = pending_totals(await all_finance_entries())
     brl = next((row for row in totals if row["currency"] == "BRL"), {})
     fin_recv, fin_pay = brl.get("receivable", 0.0), brl.get("payable", 0.0)
     documents = await db.documents.find({}, {"_id": 0}).to_list(10000)
@@ -987,10 +1187,21 @@ class StockUpd(BaseModel):
 
 @api.patch("/products/{pid}/stock", response_model=Product)
 async def upd_stock(pid: str, body: StockUpd, user=Depends(get_current_user)):
-    await db.products.update_one({"id": pid}, {"$set": {"stock": body.stock}})
-    doc = await db.products.find_one({"id": pid}, {"_id": 0})
-    if not doc: raise HTTPException(404, "Not found")
-    return doc
+    require_admin(user)
+    if not math.isfinite(body.stock) or body.stock < 0:
+        raise HTTPException(400, "Saldo de estoque deve ser zero ou positivo")
+    async with business_write_lock() as ensure_owned:
+        products, orders, purchases = await business_snapshot()
+        balances = inventory_balances(products, orders, purchases)
+        doc = balances.get(pid)
+        if not doc: raise HTTPException(404, "Produto não encontrado")
+        if body.stock < doc["stock_reserved"]:
+            raise HTTPException(400, "O saldo não pode ser menor que a quantidade reservada")
+        base = round(body.stock - doc["stock_movement"], 6)
+        await ensure_owned()
+        await db.products.update_one({"id": pid}, {"$set": {"stock": base, "stock_adjusted_at": now_iso(), "stock_adjusted_by": user["id"]}})
+        doc.update(stock=body.stock, stock_available=round(body.stock-doc["stock_reserved"], 6))
+        return doc
 
 
 # ============ PRODUCT PORTFOLIO OFFERS ============
@@ -1004,42 +1215,49 @@ async def list_product_offers(product_id: Optional[str] = None, supplier_id: Opt
 
 @api.post("/product-offers", response_model=ProductOffer)
 async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
-    if not await db.products.find_one({"id": o.product_id}):
-        raise HTTPException(404, "Produto não encontrado")
-    if o.supplier_id and not await db.suppliers.find_one({"id": o.supplier_id}):
-        raise HTTPException(404, "Fornecedor não encontrado")
-    if not o.product_name:
-        product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
-        o.product_name = product.get("name", "") if product else ""
-    if o.supplier_id and not o.supplier_name:
-        supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
-        o.supplier_name = supplier.get("name", "") if supplier else ""
-    await db.product_offers.insert_one(o.model_dump())
-    return o
+    async with business_write_lock() as ensure_owned:
+        if not await db.products.find_one({"id": o.product_id}):
+            raise HTTPException(404, "Produto não encontrado")
+        if o.supplier_id and not await db.suppliers.find_one({"id": o.supplier_id}):
+            raise HTTPException(404, "Fornecedor não encontrado")
+        if not o.product_name:
+            product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
+            o.product_name = product.get("name", "") if product else ""
+        if o.supplier_id and not o.supplier_name:
+            supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
+            o.supplier_name = supplier.get("name", "") if supplier else ""
+        await db.product_offers.insert_one(o.model_dump())
+        return o
 
 @api.put("/product-offers/{oid}", response_model=ProductOffer)
 async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_current_user)):
-    if not await db.product_offers.find_one({"id": oid}):
-        raise HTTPException(404, "Oferta não encontrada")
-    o.id = oid
-    o.updated_at = now_iso()
-    if not o.product_name:
-        product = await db.products.find_one({"id": o.product_id}, {"_id": 0, "name": 1})
-        o.product_name = product.get("name", "") if product else ""
-    if o.supplier_id:
-        supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0, "name": 1})
-        if not supplier:
-            raise HTTPException(404, "Fornecedor não encontrado")
-        o.supplier_name = supplier.get("name", "")
-    else:
-        o.supplier_name = ""
-    await db.product_offers.replace_one({"id": oid}, o.model_dump())
-    return o
+    async with business_write_lock() as ensure_owned:
+        existing = await db.product_offers.find_one({"id": oid}, {"_id": 0})
+        if not existing: raise HTTPException(404, "Oferta não encontrada")
+        product = await db.products.find_one({"id": o.product_id}, {"_id": 0})
+        if not product: raise HTTPException(404, "Produto não encontrado")
+        supplier = await db.suppliers.find_one({"id": o.supplier_id}, {"_id": 0}) if o.supplier_id else None
+        if o.supplier_id and not supplier: raise HTTPException(404, "Fornecedor não encontrado")
+        if await db.orders.find_one({"items.offer_id": oid}):
+            if any(getattr(o, field) != existing.get(field, "") for field in ("product_id", "supplier_id", "unit")):
+                raise HTTPException(400, "Oferta com pedidos vinculados não pode trocar produto, fornecedor ou unidade")
+        o.id = oid
+        o.product_name = product["name"]
+        o.supplier_name = supplier["name"] if supplier else ""
+        o.updated_at = now_iso()
+        await ensure_owned()
+        await db.product_offers.replace_one({"id": oid}, o.model_dump())
+        return o
 
 @api.delete("/product-offers/{oid}")
 async def delete_product_offer(oid: str, user=Depends(get_current_user)):
-    r = await db.product_offers.delete_one({"id": oid})
-    return {"deleted": r.deleted_count}
+    require_admin(user)
+    async with business_write_lock() as ensure_owned:
+        if await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}):
+            raise HTTPException(400, "Oferta vinculada não pode ser excluída. Marque-a como inativa.")
+        await ensure_owned()
+        r = await db.product_offers.delete_one({"id": oid})
+        return {"deleted": r.deleted_count}
 
 @api.get("/product-offers/{oid}/documents")
 async def product_offer_documents(oid: str, user=Depends(get_current_user)):
@@ -1063,21 +1281,53 @@ async def product_offer_documents(oid: str, user=Depends(get_current_user)):
 
 # ============ PRODUCTS (public read + auth write) ============
 @api.get("/products", response_model=List[Product])
-async def list_products(category: Optional[str] = None):
-    q = {"category": category} if category else {}
-    return await db.products.find(q, {"_id": 0}).to_list(500)
+async def list_products(category: Optional[str] = None, user=Depends(get_current_user)):
+    products, orders, purchases = await business_snapshot()
+    balances = inventory_balances(products, orders, purchases)
+    return [p for p in balances.values() if not category or p.get("category") == category]
 
 @api.post("/products", response_model=Product)
 async def create_product(p: Product, user=Depends(get_current_user)):
-    await db.products.insert_one(p.model_dump()); return p
+    require_admin(user)
+    if not math.isfinite(p.stock) or p.stock < 0: raise HTTPException(400, "Estoque inicial inválido")
+    body = p.model_dump()
+    body.update(stock_reserved=0, stock_available=p.stock)
+    await db.products.insert_one(body)
+    return body
 
 @api.put("/products/{pid}", response_model=Product)
 async def upd_product(pid: str, p: Product, user=Depends(get_current_user)):
-    p.id = pid; await db.products.replace_one({"id": pid}, p.model_dump()); return p
+    async with business_write_lock() as ensure_owned:
+        existing = await db.products.find_one({"id": pid}, {"_id": 0})
+        if not existing: raise HTTPException(404, "Produto não encontrado")
+        if p.unit != existing.get("unit", "kg"):
+            _, orders, purchases = await business_snapshot()
+            referenced = any(any(i.get("product_id")==pid for i in o.get("items", [])) for o in orders) or any(c.get("product_id")==pid for c in purchases)
+            if referenced: raise HTTPException(400, "Unidade de produto com operações registradas não pode ser alterada")
+        p.id = pid
+        changes = p.model_dump()
+        changes.pop("stock", None); changes.pop("stock_reserved", None); changes.pop("stock_available", None)
+        await ensure_owned()
+        await db.products.update_one({"id": pid}, {"$set": changes})
+        products, orders, purchases = await business_snapshot()
+        return inventory_balances(products, orders, purchases)[pid]
 
 @api.delete("/products/{pid}")
 async def del_product(pid: str, user=Depends(get_current_user)):
-    r = await db.products.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+    require_admin(user)
+    async with business_write_lock() as ensure_owned:
+        checks = [
+            (db.product_offers, {"product_id": pid}),
+            (db.orders, {"items.product_id": pid}),
+            (db.purchases, {"product_id": pid}),
+            (db.documents, {"product_id": pid}),
+        ]
+        for collection, query in checks:
+            if await collection.find_one(query):
+                raise HTTPException(400, "Produto vinculado a ofertas, documentos ou operações não pode ser excluído")
+        await ensure_owned()
+        r = await db.products.delete_one({"id": pid})
+        return {"deleted": r.deleted_count}
 
 
 class PortfolioImportResult(BaseModel):
@@ -1117,86 +1367,88 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
     if dry_run:
         return PortfolioImportResult(products=len(product_names), suppliers=len(supplier_names), offers=len(rows), source_rows=len(rows))
 
-    if replace:
-        await db.products.delete_many({})
-        await db.product_offers.delete_many({})
-    supplier_map = {}
-    for name in supplier_names:
-        existing = await db.suppliers.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
-        if not existing:
-            s = Supplier(name=name, notes="Importado da Tabela Produtos IBIAG 2026")
-            await db.suppliers.insert_one(s.model_dump())
-            existing = s.model_dump()
-        supplier_map[name] = existing
-
-    product_map = {}
-    for r in rows:
-        name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
-        key = name.casefold()
-        if key in product_map:
-            continue
-        ncm = r.get("NCM/HS","")
-        p = Product(
-            name=name,
-            category=r.get("Linha","") or "portfolio",
-            hs_code=ncm,
-            ncm=ncm,
-            sku=r.get("SKU",""),
-            packaging=" · ".join(x for x in [r.get("Tipo Embalagem",""), r.get("Embalagem","")] if x),
-            available_capacity=r.get("Capacidade de Produção",""),
-            price_range=r.get("Preço Exportação",""),
-            specs=r.get("Spec",""),
-            price_history_notes=r.get("Observações",""),
-            description_pt="Produto do portfólio operacional IBIAG 2026",
-        )
-        await db.products.insert_one(p.model_dump())
-        product_map[key] = p.model_dump()
-
-    offer_count = 0
-    for r in rows:
-        name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
-        p = product_map[name.casefold()]
-        supplier_name = r.get("Fornecedor","")
-        supplier = supplier_map.get(supplier_name, {})
-        commission_raw = r.get("Comissão","")
-        commission_value = commission_raw.strip().replace(",", ".")
-        try:
-            commission = float(commission_value.rstrip("%")) if commission_value else 0
-            if commission_value.endswith("%"):
-                commission /= 100
-            if not math.isfinite(commission):
+    async with business_write_lock() as ensure_owned:
+        if replace and (await db.orders.find_one({"items.0": {"$exists": True}}) or await db.purchases.find_one({"product_id": {"$nin": [None, ""]}})):
+            raise HTTPException(400, "Portfólio com operações vinculadas não pode ser substituído. Use importação incremental.")
+        await ensure_owned()
+        if replace:
+            await db.products.delete_many({})
+            await db.product_offers.delete_many({})
+        supplier_map = {}
+        for name in supplier_names:
+            existing = await db.suppliers.find_one({"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
+            if not existing:
+                s = Supplier(name=name, notes="Importado da Tabela Produtos IBIAG 2026")
+                await db.suppliers.insert_one(s.model_dump())
+                existing = s.model_dump()
+            supplier_map[name] = existing
+    
+        product_map = {}
+        for r in rows:
+            name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
+            key = name.casefold()
+            if key in product_map:
+                continue
+            ncm = r.get("NCM/HS","")
+            p = Product(
+                name=name,
+                category=r.get("Linha","") or "portfolio",
+                hs_code=ncm,
+                ncm=ncm,
+                sku=r.get("SKU",""),
+                packaging=" · ".join(x for x in [r.get("Tipo Embalagem",""), r.get("Embalagem","")] if x),
+                available_capacity=r.get("Capacidade de Produção",""),
+                price_range=r.get("Preço Exportação",""),
+                specs=r.get("Spec",""),
+                price_history_notes=r.get("Observações",""),
+                description_pt="Produto do portfólio operacional IBIAG 2026",
+            )
+            await db.products.insert_one(p.model_dump())
+            product_map[key] = p.model_dump()
+    
+        offer_count = 0
+        for r in rows:
+            name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
+            p = product_map[name.casefold()]
+            supplier_name = r.get("Fornecedor","")
+            supplier = supplier_map.get(supplier_name, {})
+            commission_raw = r.get("Comissão","")
+            commission_value = commission_raw.strip().replace(",", ".")
+            try:
+                commission = float(commission_value.rstrip("%")) if commission_value else 0
+                if commission_value.endswith("%"):
+                    commission /= 100
+                if not math.isfinite(commission):
+                    commission = 0
+            except (ValueError, TypeError):
                 commission = 0
-        except (ValueError, TypeError):
-            commission = 0
-        offer = ProductOffer(
-            product_id=p["id"], product_name=p["name"], form=p["name"],
-            supplier_id=supplier.get("id",""), supplier_name=supplier_name,
-            capacity=r.get("Capacidade de Produção",""), ncm=r.get("NCM/HS",""), hs_code=r.get("NCM/HS",""),
-            packaging_type=r.get("Tipo Embalagem",""), packaging=r.get("Embalagem",""),
-            palletization=r.get("Palletização",""), export_price_text=r.get("Preço Exportação",""),
-            fob_price_text="" if r.get("Preço FOB","") == "#VALUE!" else r.get("Preço FOB",""),
-            organic_version=r.get("Versão Orgânica",""), commission=commission, commission_text=commission_raw,
-            certifications_text=r.get("Certificações",""), spec_url=r.get("Spec",""),
-            marketing_claim=r.get("Apelo MKT",""), harvest=r.get("Safra",""),
-            checked=r.get("Conferido",""), notes=r.get("Observações",""),
-            source="Tabela Produtos Ibiag 2026 - COMPLETA / aba IBIAG"
-        )
-        await db.product_offers.insert_one(offer.model_dump())
-        offer_count += 1
-
-    # Refresh each supplier's product summary without inventing contact data.
-    for name, supplier in supplier_map.items():
-        supplied = sorted({r.get("Produto","").strip() for r in rows if r.get("Fornecedor","") == name and r.get("Produto","").strip()})
-        await db.suppliers.update_one({"id": supplier["id"]}, {"$set": {"products": ", ".join(supplied)}})
-
-    await db.settings.update_one({"key":"portfolio_source"}, {"$set":{
-        "key":"portfolio_source","value":"Tabela Produtos Ibiag 2026 - COMPLETA (1).xlsx",
-        "source_rows":len(rows),"products":len(product_map),"suppliers":len(supplier_map),
-        "offers":offer_count,"updated_at":now_iso()
-    }}, upsert=True)
-    return PortfolioImportResult(products=len(product_map), suppliers=len(supplier_map), offers=offer_count, source_rows=len(rows))
-
-
+            offer = ProductOffer(
+                product_id=p["id"], product_name=p["name"], form=p["name"],
+                supplier_id=supplier.get("id",""), supplier_name=supplier_name,
+                capacity=r.get("Capacidade de Produção",""), ncm=r.get("NCM/HS",""), hs_code=r.get("NCM/HS",""),
+                packaging_type=r.get("Tipo Embalagem",""), packaging=r.get("Embalagem",""),
+                palletization=r.get("Palletização",""), export_price_text=r.get("Preço Exportação",""),
+                fob_price_text="" if r.get("Preço FOB","") == "#VALUE!" else r.get("Preço FOB",""),
+                organic_version=r.get("Versão Orgânica",""), commission=commission, commission_text=commission_raw,
+                certifications_text=r.get("Certificações",""), spec_url=r.get("Spec",""),
+                marketing_claim=r.get("Apelo MKT",""), harvest=r.get("Safra",""),
+                checked=r.get("Conferido",""), notes=r.get("Observações",""),
+                source="Tabela Produtos Ibiag 2026 - COMPLETA / aba IBIAG"
+            )
+            await db.product_offers.insert_one(offer.model_dump())
+            offer_count += 1
+    
+        # Refresh each supplier's product summary without inventing contact data.
+        for name, supplier in supplier_map.items():
+            supplied = sorted({r.get("Produto","").strip() for r in rows if r.get("Fornecedor","") == name and r.get("Produto","").strip()})
+            await db.suppliers.update_one({"id": supplier["id"]}, {"$set": {"products": ", ".join(supplied)}})
+    
+        await db.settings.update_one({"key":"portfolio_source"}, {"$set":{
+            "key":"portfolio_source","value":"Tabela Produtos Ibiag 2026 - COMPLETA (1).xlsx",
+            "source_rows":len(rows),"products":len(product_map),"suppliers":len(supplier_map),
+            "offers":offer_count,"updated_at":now_iso()
+        }}, upsert=True)
+        return PortfolioImportResult(products=len(product_map), suppliers=len(supplier_map), offers=offer_count, source_rows=len(rows))
 @api.post("/portfolio/restore-commissions")
 async def restore_portfolio_commissions(file: UploadFile = File(...), dry_run: bool = True, user=Depends(get_current_user)):
     """Restore only commission fields; preserve IDs, prices and document links."""
@@ -1697,18 +1949,14 @@ async def dashboard(user=Depends(get_current_user)):
     async for d in db.leads.aggregate([{"$group": {"_id": "$industry", "count": {"$sum": 1}}}]):
         by_industry[d["_id"]] = d["count"]
     # ERP stats
-    docs_count = await db.documents.count_documents({})
+    docs_count = await db.documents.count_documents({"deleted_at": {"$in": [None, ""]}})
     invoices_count = await db.invoices.count_documents({})
     suppliers_count = await db.suppliers.count_documents({})
-    orders_pending = await db.orders.count_documents({"status": {"$in": ["draft", "confirmed"]}})
-    fin_receivable = 0.0
-    async for d in db.finance.aggregate([{"$match": {"kind": "receivable", "paid": False}},
-                                         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]):
-        fin_receivable = d.get("total", 0.0)
-    fin_payable = 0.0
-    async for d in db.finance.aggregate([{"$match": {"kind": "payable", "paid": False}},
-                                         {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]):
-        fin_payable = d.get("total", 0.0)
+    orders_pending = await db.orders.count_documents({"status": {"$in": ["draft", "confirmed"]}, "deleted_at": {"$in": [None, ""]}})
+    finance_by_currency = pending_totals(await all_finance_entries())
+    brl = next((row for row in finance_by_currency if row["currency"] == "BRL"), {})
+    fin_receivable = brl.get("receivable", 0)
+    fin_payable = brl.get("payable", 0)
     today = datetime.now(timezone.utc).date().isoformat()
     soon = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
     expiring = await db.contracts.count_documents({"end_date": {"$gte": today, "$lte": soon}})
@@ -1718,7 +1966,7 @@ async def dashboard(user=Depends(get_current_user)):
         "by_stage": by_stage, "by_industry": by_industry,
         "documents": docs_count, "invoices": invoices_count, "suppliers": suppliers_count,
         "orders_pending": orders_pending, "finance_receivable": fin_receivable,
-        "finance_payable": fin_payable, "contracts_expiring": expiring
+        "finance_payable": fin_payable, "finance_by_currency": finance_by_currency, "contracts_expiring": expiring
     }
 
 @api.post("/admin/migrate-crm-stages")
