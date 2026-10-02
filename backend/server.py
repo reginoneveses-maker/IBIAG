@@ -352,6 +352,9 @@ class Document(BaseModel):
     supplier_name: str = ""
     product_id: str = ""
     product_name: str = ""
+    document_type: str = ""
+    certificate_type: str = ""
+    folder_path: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 class Certification(BaseModel):
@@ -683,6 +686,9 @@ class DocumentClassification(BaseModel):
     section: str = ""
     title: Optional[str] = None
     notes: Optional[str] = None
+    document_type: Optional[str] = None
+    certificate_type: Optional[str] = None
+    folder_path: Optional[str] = None
 
 @api.get("/documents/trash", response_model=List[Document])
 async def document_trash(user=Depends(get_current_user)):
@@ -704,6 +710,15 @@ async def classify_document(did: str, body: DocumentClassification, user=Depends
         changes["title"] = body.title.strip()
     if body.notes is not None:
         changes["notes"] = body.notes
+    if body.document_type is not None:
+        changes["document_type"] = body.document_type.strip()
+    if body.certificate_type is not None:
+        changes["certificate_type"] = body.certificate_type.strip()
+    if body.folder_path is not None:
+        folder_path = "/".join(p.strip() for p in body.folder_path.replace("\\", "/").split("/") if p.strip())
+        if ".." in folder_path.split("/"):
+            raise HTTPException(400, "Caminho de pasta inválido")
+        changes["folder_path"] = folder_path[:500]
     result = await db.documents.update_one({"id": did}, {"$set": changes})
     if not result.matched_count:
         raise HTTPException(404, "Documento não encontrado")
