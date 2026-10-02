@@ -114,9 +114,10 @@ export default function Produtos() {
               <div className="mt-5 rounded-xl border border-[#104496]/8 bg-[#EEF3FB]/50 p-3">
                 <div className="flex items-center justify-between gap-2 mb-2"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]"><Truck className="inline w-3.5 h-3.5 mr-1" /> Formas, fornecedores e preços</div><Button size="sm" variant="outline" onClick={() => openOffer(p)}><Plus className="w-3 h-3 mr-1" />Adicionar</Button></div>
                 {offers.filter(x=>x.product_id===p.id).map(o=><div key={o.id} className="border-t border-[#104496]/8 py-3 first:border-t-0">
-                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-[#104496]">${Number(o.sale_price_usd||0).toFixed(2)}</div></div></div>
+                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{o.export_price_text || (Number(o.supplier_price) ? Number(o.supplier_price).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "Sob consulta")}</div><div className="text-[#104496]">{Number(o.sale_price_usd) ? `$${Number(o.sale_price_usd).toFixed(2)}` : ""}</div></div></div>
                   <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
                   <div className="flex flex-wrap gap-1 mt-2">{o.spec_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Spec vinculada</span>}{o.certification_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Certificado vinculado</span>}{o.other_document_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Arquivo</span>}</div>
+                  {(o.commission_text || Number(o.commission)) && <div className="text-[11px] text-[#104496]/55 mt-2">Comissão: {o.commission_text && !/^\d+(?:[.,]\d+)?$/.test(o.commission_text.trim()) ? o.commission_text : `${(Number(o.commission || o.commission_text) * 100).toLocaleString("pt-BR")}%`}</div>}
                   {o.notes&&<div className="text-[11px] text-[#104496]/55 mt-2">{o.notes}</div>}
                 </div>)}
                 {!offers.some(x=>x.product_id===p.id)&&<div className="text-xs text-[#104496]/45">Nenhuma forma/fornecedor cadastrada ainda.</div>}
@@ -229,3 +230,4 @@ export default function Produtos() {
     </div>
   );
 }
+
