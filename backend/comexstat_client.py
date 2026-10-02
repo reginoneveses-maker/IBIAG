@@ -2,6 +2,7 @@
 The official API is public and exposes aggregated trade statistics.
 """
 import os
+import time
 import requests
 
 BASE_URL = os.environ.get("COMEXSTAT_API_URL", "https://api-comexstat.mdic.gov.br").rstrip("/")
@@ -24,6 +25,25 @@ def ncm_search(search="", page=1, per_page=50):
     return r.json()
 
 def general(payload):
-    r=requests.post(f"{BASE_URL}/general?language=pt",json=payload,headers=headers(),timeout=60)
-    r.raise_for_status()
-    return r.json()
+    """Query Comex Stat with bounded retry/backoff for transient throttling."""
+    last_response = None
+    for attempt in range(3):
+        r = requests.post(
+            f"{BASE_URL}/general?language=pt",
+            json=payload,
+            headers=headers(),
+            timeout=60,
+        )
+        last_response = r
+        if r.status_code != 429:
+            r.raise_for_status()
+            return r.json()
+        if attempt < 2:
+            retry_after = r.headers.get("Retry-After", "").strip()
+            try:
+                delay = min(max(float(retry_after), 1.0), 8.0) if retry_after else (2 ** attempt)
+            except ValueError:
+                delay = 2 ** attempt
+            time.sleep(delay)
+    last_response.raise_for_status()
+    return last_response.json()
