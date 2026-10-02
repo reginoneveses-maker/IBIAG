@@ -48,6 +48,8 @@ function App() {
                 <Route path="prospeccao" element={<Specs />} />
                 <Route path="precos" element={<Precos />} />
                 <Route path="documentos" element={<Documentos />} />
+                <Route path="pedidos" element={<Orders />} />
+                <Route path="estoque" element={<Inventory />} />
               </Route>
               <Route path="/prospects" element={<Protected><Layout module="crm" /></Protected>}>
                 <Route index element={<Dashboard />} />

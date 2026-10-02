@@ -1,39 +1,11 @@
 import { useEffect, useState } from "react";
-import { api } from "@/AuthContext";
+import { api, useAuth } from "@/AuthContext";
 import { PageHeader, Button, Input, Card, CardContent, toast } from "@/components/erp";
-
-export default function Inventory() {
-  const [items, setItems] = useState([]);
-  const [edits, setEdits] = useState({});
-  const load = () => api.get("/products").then(r => setItems(r.data));
-  useEffect(() => { load(); }, []);
-  const update = async (id) => {
-    const v = edits[id]; if (v === undefined) return;
-    await api.patch(`/products/${id}/stock`, { stock: parseFloat(v) || 0 });
-    toast.success("Estoque atualizado"); setEdits({ ...edits, [id]: undefined }); load();
-  };
-
-  return (
-    <div data-testid="inventory-page">
-      <PageHeader number="07 · Estoque" title="Estoque" subtitle="Controle de estoque por produto (SKU)" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {items.map(p => (
-          <Card key={p.id} className="bg-white border-[#0F382C]/10">
-            <CardContent className="p-4 flex items-center gap-3">
-              <img src={p.image_url} alt="" className="w-16 h-16 rounded-lg object-cover bg-[#EFECE6]" />
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-[#0F382C] truncate">{p.name}</div>
-                <div className="text-xs text-[#0F382C]/60 font-mono-alt">SKU: {p.sku || "—"}</div>
-                <div className="text-sm text-amber-700 font-mono-alt mt-1">{(p.stock || 0).toLocaleString()} {p.unit}</div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Input type="number" placeholder="Novo" value={edits[p.id] ?? ""} onChange={e => setEdits({ ...edits, [p.id]: e.target.value })} className="w-24" data-testid={`stock-input-${p.id}`} />
-                <Button size="sm" onClick={() => update(p.id)} data-testid={`update-stock-${p.id}`} className="bg-[#0F382C] text-white">OK</Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+export default function Inventory(){
+  const {user}=useAuth();
+  const [items,setItems]=useState([]),[edits,setEdits]=useState({}),[busy,setBusy]=useState(null),[query,setQuery]=useState("");
+  const load=()=>api.get("/products").then(r=>setItems(r.data)).catch(()=>toast.error("Não foi possível carregar o estoque."));
+  useEffect(()=>{load();},[]);
+  const update=async id=>{const raw=edits[id];if(raw===undefined||raw.trim()==="")return toast.error("Informe a quantidade física.");const value=Number(raw);if(!Number.isFinite(value)||value<0)return toast.error("Quantidade deve ser zero ou maior.");setBusy(id);try{await api.patch(`/products/${id}/stock`,{stock:value});toast.success("Estoque físico ajustado");setEdits(x=>({...x,[id]:""}));load();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível ajustar.");}finally{setBusy(null);}};
+  return <div data-testid="inventory-page"><PageHeader number="07 · Estoque" title="Estoque" subtitle="Saldo físico, reservas de pedidos confirmados e quantidade disponível"/><p className="text-sm mb-4">Compras recebidas acrescentam ao saldo; pedidos embarcados descontam uma vez. Entregas diretas pelo fornecedor não movimentam este estoque. O ajuste manual informa o saldo físico atual.</p><Input aria-label="Buscar produto no estoque" placeholder="Buscar produto ou SKU" value={query} onChange={e=>setQuery(e.target.value)} className="mb-4"/><div className="grid grid-cols-1 md:grid-cols-2 gap-4">{items.filter(p=>`${p.name} ${p.sku}`.toLowerCase().includes(query.toLowerCase())).map(p=><Card key={p.id}><CardContent className="p-4"><strong>{p.name}</strong><p className="text-xs">SKU: {p.sku||"—"} · {p.unit}</p><div className="grid grid-cols-3 gap-2 text-sm my-3"><div>Físico<br/><strong>{p.stock||0}</strong></div><div>Reservado<br/><strong>{p.stock_reserved||0}</strong></div><div>Disponível<br/><strong>{p.stock_available??p.stock??0}</strong></div></div>{user?.role==="admin"&&<div className="flex gap-2"><Input aria-label={`Novo saldo físico de ${p.name}`} type="number" min="0" step="any" placeholder="Saldo físico atual" value={edits[p.id]??""} onChange={e=>setEdits(x=>({...x,[p.id]:e.target.value}))} data-testid={`stock-input-${p.id}`}/><Button disabled={busy!==null} onClick={()=>update(p.id)} data-testid={`update-stock-${p.id}`}>{busy===p.id?"Salvando…":"Ajustar"}</Button></div>}</CardContent></Card>)}</div></div>;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/AuthContext";
 import { PageHeader, SectionBar, Button, Input, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, Plus, Trash2 } from "@/components/erp";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,6 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 const empty = { kind: "receivable", description: "", party: "", amount: 0, currency: "BRL", due_date: "", category: "" };
 
 export default function Finance({ embedded }) {
+  const [saving, setSaving] = useState(false);
+  const [busy, setBusy] = useState(null);
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState("all");
   const [dialog, setDialog] = useState(false);
@@ -17,10 +20,12 @@ export default function Finance({ embedded }) {
   useEffect(() => { load(); }, []);
   const save = async () => {
     if (!form.description) return toast.error("Descrição obrigatória");
+    if (!form.due_date) return toast.error("Vencimento obrigatório");
     if (!(form.amount > 0)) return toast.error("Informe um valor maior que zero");
-    try {await api.post("/finance", form); setDialog(false); setForm(empty); refresh();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível salvar o lançamento.");}
+    setSaving(true);
+    try {await api.post("/finance", form); setDialog(false); setForm(empty); refresh();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível salvar o lançamento.");}finally{setSaving(false);}
   };
-  const toggle = async (id) => { try{await api.patch(`/finance/${id}/toggle-paid`);refresh();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível alterar o pagamento.");} };
+  const toggle = async (entry, paid) => { setBusy(entry.id);try{await api.patch(`/finance/${entry.id}/toggle-paid`,{paid});refresh();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível alterar o pagamento.");}finally{setBusy(null);} };
   const del = async (id) => { if(!window.confirm("Excluir este lançamento?"))return;try{await api.delete(`/finance/${id}`);refresh();}catch(e){toast.error(e.response?.data?.detail||"Não foi possível excluir.");} };
   const currencyItems=items.filter(x=>(x.currency||"BRL")===currency&&!x.cancelled);
   const filtered = filter === "all" ? currencyItems : currencyItems.filter(x => filter === "paid" ? x.paid : filter === "pending" ? !x.paid : x.kind === filter);
@@ -30,9 +35,9 @@ export default function Finance({ embedded }) {
   return (
     <div data-testid="finance-page">
       {embedded
-        ? <SectionBar title="Contas a pagar e a receber" subtitle="Lançamentos que alimentam o fluxo de caixa acima" action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />
+        ? <SectionBar title="Contas a pagar e a receber" subtitle="Lançamentos que alimentam o fluxo de caixa acima" action={<Button onClick={() => { setForm({...empty,id:crypto.randomUUID()}); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />
         : <PageHeader number="05 · Financeiro" title="Financeiro" subtitle="Contas a pagar e a receber"
-        action={<Button onClick={() => { setForm(empty); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />}
+        action={<Button onClick={() => { setForm({...empty,id:crypto.randomUUID()}); setDialog(true); }} data-testid="new-finance-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Novo Lançamento</Button>} />}
       <div className="flex items-center gap-3 mb-4"><label htmlFor="finance-currency">Moeda dos lançamentos</label><select id="finance-currency" value={currency} onChange={e=>setCurrency(e.target.value)} className="border rounded-lg p-2 bg-white">{["BRL","USD","EUR","GBP","CAD","AUD","JPY","CNY"].map(c=><option key={c}>{c}</option>)}</select></div>
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card className="bg-white border-[#0F382C]/10"><CardContent className="p-4">
@@ -53,14 +58,15 @@ export default function Finance({ embedded }) {
         {filtered.map(f => (
           <Card key={f.id} className={`bg-white border-[#0F382C]/10 ${f.paid ? "opacity-60" : ""}`}>
             <CardContent className="p-4 flex items-center gap-3">
-              <Checkbox checked={f.paid} onCheckedChange={() => toggle(f.id)} data-testid={`fin-toggle-${f.id}`} />
+              <Checkbox checked={f.paid} aria-label={`Pagamento de ${f.description}`} disabled={busy!==null} onCheckedChange={paid => toggle(f,paid)} data-testid={`fin-toggle-${f.id}`} />
               <div className={`px-2 py-1 rounded text-[10px] font-mono-alt uppercase ${f.kind === "receivable" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"}`}>{f.kind === "receivable" ? "Receber" : "Pagar"}</div>
               <div className="flex-1">
                 <div className={`font-semibold text-[#0F382C] ${f.paid ? "line-through" : ""}`}>{f.description}</div>
-                <div className="text-xs text-[#0F382C]/60">{f.party} · vence {f.due_date || "—"}</div>
+                <div className="text-xs text-[#0F382C]/60">{f.party} · vence {f.due_date || "—"}{f.paid&&` · pago em ${(f.paid_date||"não informada").slice(0,10)}`}</div>
+                {(f.source_order_id||f.source_purchase_id)&&<Link className="text-xs underline" to={f.source_order_id?"/gestao/pedidos":"/gestao/fornecedores"}>{f.source_order_id?"Gerado pelo pedido":"Gerado pela compra"}</Link>}
               </div>
               <div className="font-mono-alt font-semibold">{money(f.amount,f.currency)}</div>
-              <Button size="sm" variant="ghost" onClick={() => del(f.id)} className="text-rose-600"><Trash2 className="w-3 h-3" /></Button>
+              {!f.source_order_id&&!f.source_purchase_id&&<Button size="sm" variant="ghost" onClick={() => del(f.id)} className="text-rose-600"><Trash2 className="w-3 h-3" /></Button>}
             </CardContent>
           </Card>
         ))}
@@ -83,7 +89,7 @@ export default function Finance({ embedded }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(false)}>Cancelar</Button>
-            <Button onClick={save} data-testid="save-finance-button" className="bg-[#0F382C] text-white">Salvar</Button>
+            <Button disabled={saving} onClick={save} data-testid="save-finance-button" className="bg-[#0F382C] text-white">Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
