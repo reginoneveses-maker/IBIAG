@@ -5,13 +5,15 @@ import { FolderArchive, FileText, Search, Upload, Trash2, Download, X } from "lu
 const cats=["Financeiro & Fiscal","Produtos","Fornecedores","Clientes & Comercial","Societário","Qualidade & Compliance","Exportação & Logística"];
 export default function Documentos(){
  const [docs,setDocs]=useState([]),[products,setProducts]=useState([]),[suppliers,setSuppliers]=useState([]),[q,setQ]=useState(""),[open,setOpen]=useState(false),[busy,setBusy]=useState(false);
- const emptyForm={title:"",category:cats[0],tags:"",notes:"",product_id:"",supplier_id:"",file:null};\n const [form,setForm]=useState(emptyForm);
+ const emptyForm={title:"",category:cats[0],tags:"",notes:"",product_id:"",supplier_id:"",file:null};
+ const [form,setForm]=useState(emptyForm);
  const load=()=>api.get("/documents").then(r=>setDocs(r.data)).catch(()=>setDocs([]));
  useEffect(()=>{load(); api.get("/products").then(r=>setProducts(r.data)).catch(()=>setProducts([])); api.get("/suppliers").then(r=>setSuppliers(r.data)).catch(()=>setSuppliers([]));},[]);
  const filtered=useMemo(()=>docs.filter(d=>[d.title,d.category,d.file_name,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q]);
  async function submit(e){e.preventDefault(); if(!form.file)return; setBusy(true); try{
    const fd=new FormData(); fd.append("file",form.file); const up=(await api.post("/upload",fd,{headers:{"Content-Type":"multipart/form-data"}})).data;
-   const product=products.find(x=>x.id===form.product_id), supplier=suppliers.find(x=>x.id===form.supplier_id);\n   await api.post("/documents",{title:form.title||up.name,category:form.category,file_path:up.path,file_name:up.name,content_type:up.content_type,size:up.size,tags:form.tags.split(",").map(x=>x.trim()).filter(Boolean),notes:form.notes,product_id:form.product_id||"",product_name:product?.name||"",supplier_id:form.supplier_id||"",supplier_name:supplier?.name||""});
+   const product=products.find(x=>x.id===form.product_id), supplier=suppliers.find(x=>x.id===form.supplier_id);
+   await api.post("/documents",{title:form.title||up.name,category:form.category,file_path:up.path,file_name:up.name,content_type:up.content_type,size:up.size,tags:form.tags.split(",").map(x=>x.trim()).filter(Boolean),notes:form.notes,product_id:form.product_id||"",product_name:product?.name||"",supplier_id:form.supplier_id||"",supplier_name:supplier?.name||""});
    setOpen(false); setForm(emptyForm); await load();
  }finally{setBusy(false)}}
  async function download(d){const r=await api.get("/files/"+d.file_path,{responseType:"blob"}); const u=URL.createObjectURL(r.data); const a=document.createElement("a");a.href=u;a.download=d.file_name;a.click();URL.revokeObjectURL(u)}
