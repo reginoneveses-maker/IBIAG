@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Globe2, Users } from "lucide-react";
 import { toast } from "sonner";
 
+const previousMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1);
+const initialEnd = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth()+1).padStart(2,"0")}`;
 const TradeIntel = () => {
   const { t } = useLang();
   const [records, setRecords] = useState([]);
@@ -19,8 +21,8 @@ const TradeIntel = () => {
   const [comexSearch, setComexSearch] = useState("");
   const [ncmOptions, setNcmOptions] = useState([]);
   const [selectedNcm, setSelectedNcm] = useState("");
-  const [comexFrom, setComexFrom] = useState("2026-01");
-  const [comexTo, setComexTo] = useState("2026-08");
+  const [comexFrom, setComexFrom] = useState(`${previousMonth.getFullYear()}-01`);
+  const [comexTo, setComexTo] = useState(initialEnd);
   const [comexFlow, setComexFlow] = useState("export");
   const [comexRows, setComexRows] = useState([]);
   const [prospectSummary, setProspectSummary] = useState(null);

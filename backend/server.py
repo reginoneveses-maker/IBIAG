@@ -2,6 +2,9 @@ import math
 import zipfile, json, hashlib, mimetypes
 from dotenv import load_dotenv
 from pathlib import Path
+import asyncio, shutil, tempfile
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -18,6 +21,7 @@ from finance_reporting import cashflow_rows, pending_totals, currency_code, mont
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -208,6 +212,9 @@ class Lead(BaseModel):
     decision_maker_email: str = ""
     decision_maker_phone: str = ""
     current_supplier: str = ""
+    validation_status: str = "needs_validation"
+    evidence_urls: List[str] = []
+    contact_candidates: dict = Field(default_factory=dict)
     priority: str = "normal"
     source_url: str = ""
     deal_value: float = 0.0
@@ -797,7 +804,11 @@ async def business_write_lock():
     are derived from that ledger, so a process crash cannot leave half a movement.
     """
     key = "business-workflow-lock"
-    await db.workflow_locks.update_one({"_id": key}, {"$setOnInsert": {"_id": key, "locked_until": ""}}, upsert=True)
+    try:
+        await db.workflow_locks.update_one({"_id": key}, {"$setOnInsert": {"_id": key, "locked_until": ""}}, upsert=True)
+    except DuplicateKeyError:
+        # Another process created the unique lock document first.
+        pass
     owner = str(uuid.uuid4())
     now = now_iso()
     lock = await db.workflow_locks.find_one_and_update(
@@ -1875,7 +1886,7 @@ async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_c
     if not product or not country:
         raise HTTPException(400, "Informe produto e país.")
     try:
-        buyers = discover_buyers(product, country, max(1, min(body.limit, 20)))
+        buyers = await asyncio.to_thread(discover_buyers, product, country, max(1, min(body.limit, 20)))
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except requests.RequestException as e:
@@ -1912,7 +1923,14 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "source_url": str(payload.get("source_url", "")),
         "source": "buyer_discovery",
         "priority": "high" if float(payload.get("priority_score", 0) or 0) >= 70 else "normal",
-        "notes": f"Descoberto via inteligência web. Score: {payload.get('priority_score', 0)}",
+        "notes": f"Candidato encontrado na web; empresa, atividade de compra e contatos exigem validação. Score de pesquisa: {payload.get('priority_score', 0)}",
+        "decision_maker": str(payload.get("decision_maker", "")),
+        "decision_maker_title": str(payload.get("decision_maker_title", "")),
+        "decision_maker_email": str(payload.get("decision_maker_email", "")),
+        "decision_maker_phone": str(payload.get("decision_maker_phone", "")),
+        "validation_status": "needs_validation",
+        "evidence_urls": [str(url) for url in payload.get("evidence_urls", []) if isinstance(url, str)][:20],
+        "contact_candidates": payload.get("contact_candidates") if isinstance(payload.get("contact_candidates"), dict) else {},
         "updated_at": now_iso(),
     }
     existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(country)}$", "$options": "i"}}, {"_id": 0})
@@ -1974,6 +1992,21 @@ async def migrate_crm_stages(user=Depends(get_current_user)):
     require_admin(user)
     legacy = await db.leads.update_many({"stage": "sample_sent"}, {"$set": {"stage": "sample_quote", "updated_at": now_iso()}})
     return {"migrated_sample_sent_to_sample_quote": legacy.modified_count}
+
+@api.get("/admin/backup")
+async def download_database_backup(user=Depends(get_current_user)):
+    require_admin(user)
+    from backup import create_backup
+    work = Path(tempfile.mkdtemp(prefix="ibiag-backup-download-"))
+    try:
+        async with business_write_lock() as ensure_owned:
+            archive = await asyncio.to_thread(create_backup, work)
+            await ensure_owned()
+        return FileResponse(archive, filename=archive.name, media_type="application/gzip",
+                            background=BackgroundTask(shutil.rmtree, work, ignore_errors=True))
+    except Exception:
+        shutil.rmtree(work, ignore_errors=True)
+        raise
 
 @api.get("/health")
 async def health():

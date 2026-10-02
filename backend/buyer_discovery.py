@@ -2,7 +2,7 @@ import os, re, requests
 from typing import List, Dict
 from urllib.parse import urlparse
 
-FIRECRAWL_URL = os.environ.get("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1").rstrip("/")
+FIRECRAWL_URL = os.environ.get("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v2").rstrip("/")
 FIRECRAWL_KEY = os.environ.get("FIRECRAWL_API_KEY", "").strip()
 
 def _headers():
@@ -17,10 +17,19 @@ def _extract_domain(url: str) -> str:
 def _search(query: str, limit: int = 8) -> List[Dict]:
     if not FIRECRAWL_KEY:
         raise RuntimeError("FIRECRAWL_API_KEY não configurada")
-    r = requests.post(f"{FIRECRAWL_URL}/search", headers=_headers(), json={"query": query, "limit": max(1, min(limit, 20))}, timeout=45)
-    r.raise_for_status()
+    try:
+        r = requests.post(f"{FIRECRAWL_URL}/search", headers=_headers(), json={"query": query, "limit": max(1, min(limit, 20))}, timeout=45)
+        r.raise_for_status()
+    except requests.RequestException:
+        raise RuntimeError("O serviço de pesquisa não respondeu. Confira a configuração e o saldo do serviço.") from None
     payload = r.json()
-    return payload.get("data", {}).get("web", []) or payload.get("web", []) or []
+    if not isinstance(payload, dict) or payload.get("success") is False:
+        raise RuntimeError("O serviço de pesquisa não retornou uma resposta válida.")
+    data = payload.get("data")
+    results = data if isinstance(data, list) else (data.get("web", []) if isinstance(data, dict) else payload.get("web", []))
+    if not isinstance(results, list):
+        raise RuntimeError("Formato de resultados de pesquisa não reconhecido.")
+    return [item for item in results if isinstance(item, dict) and item.get("url")]
 
 def _text(item: Dict) -> str:
     return " ".join(str(item.get(k, "") or "") for k in ("title", "description", "snippet", "markdown"))
@@ -40,7 +49,7 @@ def _phones(text: str) -> List[str]:
     return sorted(set(v.strip() for v in values if len(re.sub(r"\D", "", v)) >= 8))
 
 def _linkedin(results: List[Dict]) -> str:
-    return next((x.get("url", "") for x in results if "linkedin.com" in (x.get("url", "") or "").lower()), "")
+    return next((x.get("url", "") for x in results if _extract_domain(x.get("url", "")) in {"linkedin.com", "br.linkedin.com"}), "")
 
 def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
     results = _search(f'"{product}" importer buyer distributor ingredient "{country}"', limit)
