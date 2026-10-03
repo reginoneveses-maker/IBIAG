@@ -220,9 +220,12 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
                  "decision_source_url": "https://example.com/team", "decision_maker": "Ana Silva",
                  "decision_maker_email": "ana@example.com", "evidence_urls": ["https://example.com/team"],
                  "product_relationship":"seller", "product_evidence":"We supply Acerola ingredients.", "relationship_verified":True}
-        first = await self.client.post("/api/buyer-discovery/to-crm", json=buyer)
+        with patch.object(server,"enrich_company",return_value={"company":"Organic Acerola Extract with 32% Natural Vitamin C", "email":"info@example.com"}):
+            first = await self.client.post("/api/buyer-discovery/to-crm", json=buyer)
         self.assertEqual(first.status_code, 200, first.text)
         lead = first.json()
+        self.assertEqual(lead["company"],"ABC-Ingredients")
+        self.assertEqual(lead["email"],"info@example.com")
         reloaded = (await self.client.get("/api/leads/" + lead["id"])).json()
         self.assertEqual(reloaded["decision_maker_email"], buyer["decision_maker_email"])
         self.assertEqual(reloaded["source_url"], buyer["source_url"])

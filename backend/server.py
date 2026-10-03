@@ -2268,7 +2268,9 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
     except (ValueError, TypeError):
         raise HTTPException(400, "Score deve ser um número entre 0 e 100")
     enriched = await asyncio.to_thread(enrich_company, payload)
-    payload = {**payload, **{k: v for k, v in enriched.items() if v}}
+    # Preserve the identity already grounded on the product page; contact
+    # enrichment must not replace it with a homepage's product/article title.
+    payload = {**payload, **{k: v for k, v in enriched.items() if v and not (k == "company" and payload.get("relationship_verified") is True)}}
     company = str(payload.get("company", company)).strip()
     country = str(payload.get("country", ""))
     data = {
