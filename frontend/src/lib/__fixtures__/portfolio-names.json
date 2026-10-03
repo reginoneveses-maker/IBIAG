@@ -1,0 +1,662 @@
+[
+  {
+    "name": "AÇAÍ EXTRACT POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "AÇAÍ EXTRACT POWDER - ORGANIC",
+    "category": "Superfruits"
+  },
+  {
+    "name": "AÇAÍ FREEZE DRIED",
+    "category": "Superfruits"
+  },
+  {
+    "name": "AÇAÍ FREEZE DRIED - ORGANIC",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "AÇAÍ EM POLPA 12% SÓLIDOS",
+    "category": null
+  },
+  {
+    "name": "AÇAÍ PULP ORGANIC",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "AÇAÍ PULP SPECIAL",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CLARIFIED CONCENTRATE 50° BRIX",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CLARIFIED CONCENTRATE 50° BRIX - ORGANIC",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CONCENTRATE 20o BRIX ORGANIC GREEN",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CONCENTRATE 50o BRIX CLOUDY",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CONCENTRATE 65o BRIX CLOUDY",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA CONCENTRATE 65oBRIX ORGANIC CLARIFIED",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA DRY EXTRACT 25% VIT C",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA EXTRACT POWDER 17% CONVENTIONAL SANRISIL",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA EXTRACT POWDER 17% CONVENTIONAL SANTOS FLORA",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA EXTRACT POWDER 17% ORGANICA SANRISIL",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ACEROLA FREEZE DRIED 17% VIT C",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ACEROLA FREEZE DRIED 30% VIT C",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ACEROLA FREEZE DRIED 40% VIT C",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ACEROLA CONCENTRATE 65oBRIX CLARIFIED",
+    "category": null
+  },
+  {
+    "name": "ACEROLA PULP - ORGANIC",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ANDIROBA OIL",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "APPLE POWDER ORGANIC",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ARTICHOKE EXTRACT POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ARTICHOKE EXTRACT POWDER 5%",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "BABASSU FLOUR",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "BACABA FREEZE DRIED POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "BACURI FREEZE DRIED POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "BRAZILIAN NUTS",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "CACAU FREEZE DRIED POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "CAJA PULP",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "CAMU CAMU EXTRACT POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CAMU CAMU FREEZE DRIED POWDER",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CARIRU POWDER FREEZE POWDER",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "ACEROLA PULP",
+    "category": null
+  },
+  {
+    "name": "CASHEW JUICE CLARIFIED",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS W3 (SW) ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WS (SPLITS) ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW180 ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW210 ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW240 ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW320 ORGANIC",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW PULP",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW PURÉE WA",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASTANHA DE BARU",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASTANHA DE BARU ORGANICA",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CATUABA BARK CUT",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CATUABA EXTRACT POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "CATUABA POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "CHICÓRIA POWDER FREEZE DRIED",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCOA POWDER ALCALINIZADO",
+    "category": null
+  },
+  {
+    "name": "COCOA POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT MILK",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT FLOUR (DEGREASED DESICCATED)",
+    "category": null
+  },
+  {
+    "name": "COCONUT MILK CONCENTRATED",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT PULP GREEN INTEGRAL - ORGANIC",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT WATER ORGANIC",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CUPUAÇU FREEZE DRIED POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GRAPE SEED POWDER ORGANIC",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GRAPE SKIN POWDER ORGANIC",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GRAVIOLA FREEZE DRIED POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GRAVIOLA LEAVES CUT",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GRAVIOLA LEAVES POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "GREEN COFFEE COMPLEX POWDER- CONDIRE NUTRI P",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GREEN COFFEE DRY EXTRACT 10% CAFFEINE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GREEN COFFEE OIL",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANA DRY EXTRACT 9-11% CAFFEINE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANA DRY EXTRACT ORGANIC 9-11% CAFFEINE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANÁ EXTRACT POWDER 10% CAFFEINE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANÁ EXTRACT POWDER 22% CAFFEINE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANA FLUID EXTRACT 1,2%",
+    "category": null
+  },
+  {
+    "name": "GUARANÁ FLUID EXTRACT 4 - 6,0%",
+    "category": null
+  },
+  {
+    "name": "GUARANÁ POWDER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANÁ POWDER ORGANIC",
+    "category": null
+  },
+  {
+    "name": "GUARANÁ SEED",
+    "category": "Superfruits"
+  },
+  {
+    "name": "GUARANÁ SEED ORGANIC",
+    "category": null
+  },
+  {
+    "name": "GUAVA PULP",
+    "category": null
+  },
+  {
+    "name": "HIBISCUS SOLUBLE TEA",
+    "category": null
+  },
+  {
+    "name": "JAMBU (PARACRESS) POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "JAMBU IN FREEZE-DRIED LEAVES",
+    "category": null
+  },
+  {
+    "name": "LITHOTHAMNION GRANULOMETRY 325 MESH",
+    "category": null
+  },
+  {
+    "name": "LITHOTHAMNION GRANULOMETRY 550 MESH",
+    "category": null
+  },
+  {
+    "name": "LITHOTHAMNION",
+    "category": null
+  },
+  {
+    "name": "MANGO",
+    "category": null
+  },
+  {
+    "name": "MELON JUICE CONCENTRATED CLARIFIED",
+    "category": null
+  },
+  {
+    "name": "MORINGA POWDER ORGANIC",
+    "category": null
+  },
+  {
+    "name": "MUIRAPUAMA CUT",
+    "category": null
+  },
+  {
+    "name": "MUIRAPUAMA EXTRACT POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "MUIRAPUAMA POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ORA PRO NOBIS (LEMON VINE) POWDER CONVENTIONAL",
+    "category": null
+  },
+  {
+    "name": "ORA PRO NOBIS (LEMON VINE) POWDER FIBER CONVENTIONAL",
+    "category": null
+  },
+  {
+    "name": "ORA PRO NOBIS (LEMON VINE) POWDER FREEZE DRIED",
+    "category": null
+  },
+  {
+    "name": "ORA PRO NOBIS (LEMON VINE) POWDER LEAVES CONVENTIONAL",
+    "category": null
+  },
+  {
+    "name": "PAPAYA PULP",
+    "category": null
+  },
+  {
+    "name": "PAPAYA PULP INTEGRAL ORGANIC",
+    "category": null
+  },
+  {
+    "name": "PASSION FRUIT PULP",
+    "category": null
+  },
+  {
+    "name": "PAU DA'ARCO CUT",
+    "category": null
+  },
+  {
+    "name": "PAU DA'ARCO POWDER",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "PFAFFIA PANICULATA (BRAZILIAN GINSENG)",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "PFAFFIA PANICULATA POWDER (BRAZILIAN GINSENG)",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "PINEAPPLE JUICE CONCENTRATED",
+    "category": null
+  },
+  {
+    "name": "PINEAPPLE JUICE INTEGRAL ORGANIC",
+    "category": null
+  },
+  {
+    "name": "PINEAPPLE PULP",
+    "category": null
+  },
+  {
+    "name": "ORGANIC ROASTED MATE",
+    "category": null
+  },
+  {
+    "name": "PITAYA (DRAGON FRUIT) INTEGRAL PULP ORGANIC",
+    "category": null
+  },
+  {
+    "name": "PITAYA PULP",
+    "category": null
+  },
+  {
+    "name": "PUPUNHA FREEZE DRIED POWDER",
+    "category": null
+  },
+  {
+    "name": "QUERCETIN ANHYDROUS 95%",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "QUERCETIN DEHIDRATED 95%",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "RUTIN 70%",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "SOURSOP PULP",
+    "category": null
+  },
+  {
+    "name": "STRAWBERRY PULP",
+    "category": null
+  },
+  {
+    "name": "TAIOBA POWDER FREEZE DRIED",
+    "category": null
+  },
+  {
+    "name": "TAMARINDO PULP",
+    "category": null
+  },
+  {
+    "name": "TANGERINE JUICE",
+    "category": null
+  },
+  {
+    "name": "TAPEREBÁ FREEZE DRIED POWDER",
+    "category": null
+  },
+  {
+    "name": "TONKA BEANS DEHYDRATED",
+    "category": null
+  },
+  {
+    "name": "TONKA BEANS POWDER",
+    "category": null
+  },
+  {
+    "name": "VINAGREIRA POWDER FREEZE DRIED",
+    "category": null
+  },
+  {
+    "name": "WATERMELON JUICE CONCENTRATED",
+    "category": null
+  },
+  {
+    "name": "WATERMELON JUICE INTEGRAL ORGANIC",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE (CANCHEADA)",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE 5/10 GREEN",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE 5/10 ROASTED",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE CUT GREEN",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE DRY EXTRACT 8 a 10%",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE DRY EXTRACT 8 a 10% ORGANIC",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE GREEN LEAVES AND STICKS",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE POWDER GREEN",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE ROASTED NATURAL A GRANEL (70/30)",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE SOLUBLE TEA GREEN",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE SOLUBLE TEA ROASTED",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE SOLUBLE TEA WITH MALTORDEXTRIN ROASTED",
+    "category": null
+  },
+  {
+    "name": "YERBA MATE TEA BAG",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE TEA BAG ROASTED",
+    "category": null
+  },
+  {
+    "name": "AÇAÍ SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ACEROLA EXTRACT POWDER 17%",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CAMU CAMU EXTRACT POWDER (Somente Mercado Americano)",
+    "category": "Superfruits"
+  },
+  {
+    "name": "CASHEW NUTS W3 (SW)",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WS (SPLITS)",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW180",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS W210",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW240",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW NUTS WW320",
+    "category": "Nuts and Seeds"
+  },
+  {
+    "name": "CASHEW SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT PULP",
+    "category": "Superfruits"
+  },
+  {
+    "name": "COCONUT WATER",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ORGANIC PASSION FRUIT SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ORGANIC PINEAPPLE SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ORGANIC PITAYA SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "ORGANIC WATERMELON SINGLE STRENGHT JUICE",
+    "category": "Superfruits"
+  },
+  {
+    "name": "YERBA MATE SOLUBLE TEA - ROASTED",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE SOLUBLE  - GREEN",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE TEA BAG - ROASTED",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE 5/10 - ROASTED",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE 5/10 - GREEN",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE PURE LEAF",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "YERBA MATE - ROASTED",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ROASTED YERBA MATE SOLUBLE TEA",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "GREEN MATE SOLUBLE TEA",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ROASTED YERBA MATE TEA BAG",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "MATE TOSTADO NATURAL A GRANEL (70/30)",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "ROASTED YERBA MATE 5/10",
+    "category": "Herbs and Roots"
+  },
+  {
+    "name": "GREEN YERBA MATE 5/10",
+    "category": "Herbs and Roots"
+  }
+]

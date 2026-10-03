@@ -25,9 +25,9 @@ const base = "http://127.0.0.1:8765";
     await page.addInitScript(token=>localStorage.setItem("token",token),access_token);
     await page.goto(base+"/prospects/catalog");
     await page.getByTestId("product-card-photo-0").waitFor();
-    // Every bundled photograph must decode in a real browser, including the
-    // ingredient fallback after a registered URL returns an invalid image.
-    for (const id of [...Array.from({length:15},(_,i)=>`photo-${i}`), "photo-broken"]) {
+    // Every form-compatible bundled photograph must decode in a real browser, including the
+    // product form fallback after a registered URL returns an invalid image.
+    for (const id of [...Array.from({length:14},(_,i)=>`photo-${i}`), "photo-broken"]) {
       const img=page.getByTestId(`product-card-${id}`).locator("img");
       await img.scrollIntoViewIfNeeded();
       await page.waitForFunction(cardId=>document.querySelector(`[data-testid="${cardId}"] img`)?.src.includes("/static/media/"),`product-card-${id}`);
@@ -35,7 +35,21 @@ const base = "http://127.0.0.1:8765";
       assert(await img.evaluate(el=>el.naturalWidth>0));
       assert((await img.getAttribute("src")).includes("/static/media/"));
     }
-    assert.equal(await page.getByTestId("product-card-photo-unknown").locator("img").count(),0);
+    for (const id of ["photo-14", "photo-15", "photo-16", "photo-17", "photo-unknown"])
+      assert.equal(await page.getByTestId(`product-card-${id}`).locator("img").count(),0);
+    assert((await page.getByTestId("product-card-photo-0").locator("img").getAttribute("alt")).includes("Extrato de açaí em pó"));
+    assert.notEqual(await page.getByTestId("product-card-photo-0").locator("img").getAttribute("src"),
+      await page.getByTestId("product-card-photo-6").locator("img").getAttribute("src"));
+    for (const [key, expected] of [["acai",4],["acerola",3],["coconut",1],["nuts",2],["juices",3]]) {
+      await page.getByTestId(`filter-${key}`).click();
+      assert.equal(await page.locator('[data-testid^="product-card-"]').count(),expected);
+      assert.equal(await page.getByTestId(`filter-${key}`).getAttribute("aria-pressed"),"true");
+    }
+    await page.getByTestId("ingredient-filter").selectOption("moringa");
+    assert.equal(await page.locator('[data-testid^="product-card-"]').count(),1);
+    await page.getByTestId("product-card-photo-10").waitFor();
+    await page.getByTestId("filter-all").click();
+    assert.equal(await page.locator('[data-testid^="product-card-"]').count(),20);
     await page.reload();
     const acaiPhoto=page.getByTestId("product-card-photo-0").locator("img");
     await acaiPhoto.scrollIntoViewIfNeeded();await acaiPhoto.evaluate(el=>el.decode());
