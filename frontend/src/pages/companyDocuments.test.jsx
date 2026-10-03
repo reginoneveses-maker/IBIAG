@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import TradeIntel from "./TradeIntel";
+import Specs from "./gestao/Specs";
 import Pipeline from "./Pipeline";
 import Documentos from "./gestao/Documentos";
 import { api } from "@/AuthContext";
@@ -216,4 +217,33 @@ test("a job created after clearing is cancelled instead of reopening its results
   expect(screen.getByLabelText("Região da pesquisa").value).toBe("");
   expect(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal").disabled).toBe(false);
   expect(screen.queryByText("Empresa alemã")).toBeNull();
+});
+
+const supplierFixtures=[{id:"s1",name:"Nossa Fruta"},{id:"s2",name:"Itaueira"}];
+const specFixtures={items:[{id:"document:d1",document_id:"d1",source_type:"document",supplier_id:"s1",supplier_name:"Nossa Fruta",product_name:"Acerola",title:"Ficha técnica Acerola",original_file_path:"shared/spec",original_file_name:"acerola.pdf"},{id:"document:d2",document_id:"d2",source_type:"document",supplier_id:"s2",supplier_name:"Itaueira",product_name:"Manga",original_file_path:"manga",original_file_name:"manga.pdf"}],unassigned:[{id:"document:u",document_id:"u",source_type:"document",product_name:"Guaraná",original_file_path:"guarana",original_file_name:"guarana.pdf",assignment_reason:"Fornecedor não identificado."}],counts:{s1:1,s2:1},total:2};
+test("supplier specs include central documents, stay scoped when switching and survive reload",async()=>{
+  api.get.mockImplementation(path=>response(path==="/suppliers"?supplierFixtures:path==="/specs/library"?specFixtures:[]));
+  mount(Specs,"/gestao/prospeccao?supplier=s1");
+  await screen.findByRole("button",{name:"Baixar acerola.pdf"});
+  expect(screen.queryByRole("button",{name:"Baixar manga.pdf"})).toBeNull();
+  fireEvent.click(screen.getByTestId("supplier-tab-s2"));
+  expect(screen.getByRole("button",{name:"Baixar manga.pdf"})).toBeTruthy();
+  expect(screen.queryByRole("button",{name:"Baixar acerola.pdf"})).toBeNull();
+  cleanup();mount(Specs,"/gestao/prospeccao?supplier=s2");
+  await screen.findByRole("button",{name:"Baixar manga.pdf"});
+  expect(screen.queryByRole("button",{name:"Baixar acerola.pdf"})).toBeNull();
+});
+test("unassigned technical document can be linked to its supplier without uploading again",async()=>{
+  let linked=false;
+  api.get.mockImplementation(path=>response(path==="/suppliers"?supplierFixtures:path==="/specs/library"?linked?{...specFixtures,items:[...specFixtures.items,{...specFixtures.unassigned[0],supplier_id:"s1",supplier_name:"Nossa Fruta"}],unassigned:[],counts:{s1:2,s2:1}}:specFixtures:[]));
+  api.patch.mockImplementation(()=>{linked=true;return response({supplier_id:"s1"});});
+  mount(Specs);await screen.findByRole("button",{name:"Sem fornecedor (1)"});
+  fireEvent.click(screen.getByRole("button",{name:"Sem fornecedor (1)"}));
+  fireEvent.change(screen.getByLabelText("Fornecedor de Guaraná"),{target:{value:"s1"}});
+  fireEvent.click(screen.getByRole("button",{name:"Vincular fornecedor"}));
+  await waitFor(()=>expect(api.patch).toHaveBeenCalledWith("/specs/documents/u/supplier",{supplier_id:"s1"}));
+  await waitFor(()=>expect(screen.queryByRole("button",{name:"Sem fornecedor (1)"})).toBeNull());
+  fireEvent.click(screen.getByTestId("supplier-tab-s1"));
+  expect(screen.getByRole("button",{name:"Baixar guarana.pdf"})).toBeTruthy();
+  expect(api.post).not.toHaveBeenCalled();
 });

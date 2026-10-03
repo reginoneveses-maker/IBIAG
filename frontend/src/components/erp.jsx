@@ -52,7 +52,7 @@ export const SubTabs = ({ tabs, param = "tab" }) => {
   );
 };
 
-export const SupplierTabs = ({ suppliers, active, onChange, onCreate, allLabel = "Todos" }) => {
+export const SupplierTabs = ({ suppliers, active, onChange, onCreate, allLabel = "Todos", counts }) => {
   const [name, setName] = useState("");
   const [adding, setAdding] = useState(false);
   const create = async () => {
@@ -66,7 +66,7 @@ export const SupplierTabs = ({ suppliers, active, onChange, onCreate, allLabel =
         className={`px-3 py-1.5 text-sm rounded-full border ${!active ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15"}`}>{allLabel}</button>
       {suppliers.map(s => (
         <button key={s.id} onClick={() => onChange(s.id)} data-testid={`supplier-tab-${s.id}`}
-          className={`px-3 py-1.5 text-sm rounded-full border ${active === s.id ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15 hover:border-amber-600/50"}`}>{s.name}</button>
+          className={`px-3 py-1.5 text-sm rounded-full border ${active === s.id ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15 hover:border-amber-600/50"}`}>{s.name}{counts && ` (${counts[s.id] || 0})`}</button>
       ))}
       {adding ? (
         <div className="flex gap-1 items-center">
