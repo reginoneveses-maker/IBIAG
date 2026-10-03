@@ -260,6 +260,7 @@ const Pipeline = () => {
               <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("deal_value")}</span><div className="text-[#104496] font-mono-alt">{fmtUSD(detailLead?.deal_value)}</div></div>
             </div>
             {detailLead?.validation_status!=="verified"&&<div className="p-3 rounded-lg bg-amber-50 text-sm text-amber-900">Empresa e contatos a validar. Um cadastro ou resultado de pesquisa não confirma atividade de compra.</div>}
+            {detailLead?.relationship_verified && <div className="p-3 rounded-lg bg-green-50 text-sm"><b>{detailLead.product_relationship === "seller" ? "Vende / fornece o ingrediente" : "Utiliza o ingrediente em seus produtos"}</b><p>Evidência no site: <q>{detailLead.product_evidence}</q></p></div>}
             {detailLead?.evidence_urls?.length>0&&<div className="text-xs">Fontes de pesquisa: {detailLead.evidence_urls.map(url=><a key={url} className="block underline" href={url.startsWith("https://")||url.startsWith("http://")?url:undefined} target="_blank" rel="noreferrer">{url}</a>)}</div>}
             <div className="flex flex-wrap gap-3 text-sm">
               {externalUrl(detailLead?.website) && <a className="underline" href={externalUrl(detailLead.website)} target="_blank" rel="noreferrer">Site da empresa</a>}

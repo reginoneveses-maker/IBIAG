@@ -6,6 +6,7 @@ from mongomock_motor import AsyncMongoMockClient
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import server
+import buyer_discovery
 
 server.db = AsyncMongoMockClient()["browser_test"]
 objects = {}
@@ -17,7 +18,19 @@ async def get(path):
     return objects[path]
 async def delete(path): objects.pop(path, None)
 server.put_object, server.get_object, server.delete_object = put, get, delete
-server.discover_buyers = lambda product, country, limit: [{"company": "ABC-Ingredients" if product == "Acerola" else "Manga Company", "country": country, "product_interest": product, "website": "https://example.com", "source_url": "https://example.com/company", "priority_score": 80}]
+def fixture_search(query, limit):
+    product = "Acerola" if "acerola" in query.lower() else "Manga"
+    return [{"url":"https://example.com/company", "title":f"Organic {product} Extract 32%", "description":f"We supply {product} ingredients."},
+            {"url":"https://books.google.com/books/fixture", "title":f"{product} research book"},
+            {"url":"https://health.test/article", "title":f"{product} health benefits"}]
+def fixture_business_page(url, product):
+    company = "ABC-Ingredients" if product == "Acerola" else "Manga Company"
+    identity = f"{company} is a food manufacturer."
+    evidence = f"We supply {product} ingredients."
+    return {"markdown":identity+"\n"+evidence, "json":{"company":company,"is_company":True,"is_directory":False,
+            "page_type":"other" if "health.test" in url else "company_product", "relationship":"seller",
+            "company_quote":identity,"product_quote":evidence}}
+buyer_discovery._search, buyer_discovery._scrape_business = fixture_search, fixture_business_page
 server.discover_decision_maker = lambda *args: {"decision_maker": "Ana Silva", "decision_maker_title": "Procurement Manager", "decision_maker_email": "ana@example.com", "decision_source_url": "https://example.com/team", "validation_status": "needs_validation"}
 server.enrich_company = lambda candidate: {"email":"info@example.com", "phone":"+351 210 123 456", "enrichment_status":"complete", "contact_source_urls":["https://example.com/contact"]}
 async def seed_fixture():

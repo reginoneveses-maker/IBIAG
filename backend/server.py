@@ -15,7 +15,7 @@ import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
-from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company
+from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company, DISCOVERY_VERSION
 from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
@@ -210,6 +210,9 @@ class Lead(BaseModel):
     stage: str = "new_lead"
     interested_products: List[str] = []
     product_interest: str = ""
+    product_relationship: str = ""
+    product_evidence: str = ""
+    relationship_verified: bool = False
     decision_maker: str = ""
     decision_maker_title: str = ""
     decision_maker_email: str = ""
@@ -2192,7 +2195,7 @@ async def create_buyer_search_job(body: BuyerDiscoveryRequest, tasks: Background
         raise HTTPException(409, "Há uma pesquisa em andamento. Aguarde ou interrompa antes de iniciar outra.")
     job = {"id": str(uuid.uuid4()), "owner_id": user["id"], "product": body.product.strip(), "targets": targets, "region": body.region,
            "label": next((r["name"] for key, r in REGIONS.items() if key == body.region), ", ".join(x["name"] for x in targets)),
-           "limit": body.limit, "status": "pending", "total": len(targets), "completed": 0, "failures": 0,
+           "limit": body.limit, "discovery_version": DISCOVERY_VERSION, "status": "pending", "total": len(targets), "completed": 0, "failures": 0,
            "results": [], "created_at": now_iso(), "updated_at": now_iso(), "cancel_requested": False,
            "progress": {x["code"]: {"country": x["name"], "status": "pending", "count": 0, "error": ""} for x in targets}}
     await db.buyer_search_jobs.insert_one(dict(job))
@@ -2209,7 +2212,10 @@ async def authorized_buyer_job(job_id, user):
 
 @api.get("/buyer-discovery/search-jobs/{job_id}")
 async def get_buyer_search_job(job_id: str, user=Depends(get_current_user)):
-    return await authorized_buyer_job(job_id, user)
+    job = await authorized_buyer_job(job_id, user)
+    if job.get("discovery_version", 0) < DISCOVERY_VERSION:
+        return {**job, "results": [], "status": "outdated", "validation_message": "Esta pesquisa usava o filtro anterior. Limpe a pesquisa e busque novamente para conferir empresas e sua relação com o produto."}
+    return job
 
 @api.post("/buyer-discovery/search-jobs/{job_id}/cancel")
 async def cancel_buyer_search_job(job_id: str, user=Depends(get_current_user)):
@@ -2278,11 +2284,15 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "contact_source_urls": payload.get("contact_source_urls", []),
         "linkedin": str(payload.get("linkedin", "")),
         "product_interest": str(payload.get("product_interest", "")),
+        "product_relationship": str(payload.get("product_relationship", "")),
+        "product_evidence": str(payload.get("product_evidence", "")),
+        "relationship_verified": payload.get("relationship_verified") is True,
         "source_url": str(payload.get("source_url", "")),
         "decision_source_url": str(payload.get("decision_source_url", "")),
         "source": "buyer_discovery",
         "priority": "high" if score >= 70 else "normal",
-        "notes": f"Candidato encontrado na web; empresa, atividade de compra e contatos exigem validação. Score de pesquisa: {payload.get('priority_score', 0)}",
+        "notes": (f"Relação publicada no site: {payload.get('product_evidence')}. Compra/importação e contatos ainda exigem validação."
+                  if payload.get("relationship_verified") is True else "Candidato encontrado na web; empresa, atividade de compra e contatos exigem validação.") + f" Score de pesquisa: {payload.get('priority_score', 0)}",
         "decision_maker": str(payload.get("decision_maker", "")),
         "decision_maker_title": str(payload.get("decision_maker_title", "")),
         "decision_maker_email": str(payload.get("decision_maker_email", "")),

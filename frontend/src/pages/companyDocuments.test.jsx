@@ -25,6 +25,15 @@ beforeEach(()=>{
   api.post.mockResolvedValue({data:{id:"lead1"}});
 });
 afterEach(cleanup);
+test("company results distinguish sellers from ingredient users and display their published evidence",async()=>{
+  api.post.mockResolvedValue({data:{results:[{...buyer,relationship_verified:true,product_relationship:"seller",product_evidence:"We supply Acerola ingredients."},
+    {...buyer,company:"Drink Company",website:"https://drink.test",relationship_verified:true,product_relationship:"user",product_evidence:"Our beverage contains Acerola."}]}});
+  mount(TradeIntel);await searchBuyers();
+  expect(screen.getByText("Vende / fornece o ingrediente")).toBeTruthy();
+  expect(screen.getByText("Utiliza o ingrediente em seus produtos")).toBeTruthy();
+  expect(screen.getByText("We supply Acerola ingredients.")).toBeTruthy();
+  expect(screen.getByText("Our beverage contains Acerola.")).toBeTruthy();
+});
 async function searchBuyers(){
   fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
   fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Portugal"}});

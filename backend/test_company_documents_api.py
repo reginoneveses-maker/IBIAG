@@ -137,6 +137,16 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post("/api/buyer-discovery/search-jobs",json={"product":"Acerola","countries":["Atlantis"]})
         self.assertEqual(response.status_code,400)
 
+    async def test_legacy_jobs_do_not_redisplay_unverified_titles_as_companies(self):
+        await self.db.buyer_search_jobs.insert_one({"id":"legacy","owner_id":"u","status":"complete",
+            "results":[{"company":"Acerola research book"}]})
+        response=await self.client.get("/api/buyer-discovery/search-jobs/legacy")
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.json()["status"],"outdated")
+        self.assertEqual(response.json()["results"],[])
+        self.assertIn("busque novamente",response.json()["validation_message"])
+        self.assertEqual((await self.db.buyer_search_jobs.find_one({"id":"legacy"}))["results"][0]["company"],"Acerola research book")
+
     async def test_crm_automatically_enriches_and_refreshes_existing_profile(self):
         facts={"company":"Acme Ingredients", "email":"info@acme.test", "phone":"+49 40 12345678", "website":"https://acme.test/", "country":"Germany", "enrichment_status":"complete", "contact_source_urls":["https://acme.test/contact"]}
         with patch.object(server,"enrich_company",return_value=facts):
@@ -208,7 +218,8 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         buyer = {"company": "ABC-Ingredients", "country": "Portugal", "priority_score": 80,
                  "website": "https://example.com", "source_url": "https://example.com/company",
                  "decision_source_url": "https://example.com/team", "decision_maker": "Ana Silva",
-                 "decision_maker_email": "ana@example.com", "evidence_urls": ["https://example.com/team"]}
+                 "decision_maker_email": "ana@example.com", "evidence_urls": ["https://example.com/team"],
+                 "product_relationship":"seller", "product_evidence":"We supply Acerola ingredients.", "relationship_verified":True}
         first = await self.client.post("/api/buyer-discovery/to-crm", json=buyer)
         self.assertEqual(first.status_code, 200, first.text)
         lead = first.json()
@@ -216,6 +227,9 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reloaded["decision_maker_email"], buyer["decision_maker_email"])
         self.assertEqual(reloaded["source_url"], buyer["source_url"])
         self.assertEqual(reloaded["decision_source_url"], buyer["decision_source_url"])
+        self.assertTrue(reloaded["relationship_verified"])
+        self.assertEqual(reloaded["product_evidence"],buyer["product_evidence"])
+        self.assertEqual(reloaded["product_relationship"],"seller")
         repeat = (await self.client.post("/api/buyer-discovery/to-crm", json=buyer)).json()
         self.assertEqual(repeat["id"], lead["id"])
         self.assertEqual(await self.db.leads.count_documents({}), 1)
