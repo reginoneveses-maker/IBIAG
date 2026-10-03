@@ -45,6 +45,66 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         return await self.client.post("/api/documents/upload", data={"metadata": json.dumps({"title": "Laudo", "category": "Produtos", **metadata})},
                                       files={"file": ("laudo.pdf", b"%PDF-1.4 test", "application/pdf")})
 
+    async def test_spec_library_collects_existing_documents_and_offers_per_supplier(self):
+        await self.db.suppliers.insert_many([{"id":"s1","name":"Nossa Fruta"},{"id":"s2","name":"Itaueira"}])
+        await self.db.documents.insert_many([
+            {"id":"d1","title":"Spec Acerola","file_name":"spec.pdf","file_path":"shared/spec.pdf","document_type":"Ficha Técnica","supplier_id":"s1","product_name":"Acerola"},
+            {"id":"d2","title":"Spec Manga","file_path":"manga","document_type":"Ficha Técnica","supplier_name":"ITAUEIRA"},
+            {"id":"d3","title":"Guarana","file_path":"guarana"},
+            {"id":"d4","title":"Ficha Técnica Abacaxi","file_path":"orphan"},
+            {"id":"d5","title":"Certificado","document_type":"Certificado","supplier_id":"s1","file_path":"cert"},
+            {"id":"d6","title":"Spec excluída","document_type":"Ficha Técnica","supplier_id":"s1","file_path":"trash","deleted_at":"2026-10-03"}])
+        await self.db.product_offers.insert_one({"id":"o","supplier_id":"s2","product_name":"Guaraná","spec_document_ids":["d3"]})
+        result=(await self.client.get("/api/specs/library")).json()
+        self.assertEqual(result["counts"],{"s1":1,"s2":2})
+        self.assertEqual({row["document_id"] for row in result["items"]},{"d1","d2","d3"})
+        self.assertEqual(result["unassigned"][0]["document_id"],"d4")
+        self.assertEqual(await self.db.specs.count_documents({}),0)
+        assigned=await self.client.patch("/api/specs/documents/d4/supplier",json={"supplier_id":"s1"})
+        self.assertEqual(assigned.status_code,200,assigned.text)
+        refreshed=(await self.client.get("/api/specs/library")).json()
+        self.assertEqual(refreshed["counts"]["s1"],2)
+        self.assertEqual(refreshed["unassigned_total"],0)
+        self.assertEqual((await self.db.documents.find_one({"id":"d4"}))["file_path"],"orphan")
+        conflict=await self.client.patch("/api/specs/documents/d1/supplier",json={"supplier_id":"s2"})
+        self.assertEqual(conflict.status_code,409)
+
+    async def test_spec_library_is_not_truncated_and_deduplicates_registered_paths(self):
+        await self.db.suppliers.insert_one({"id":"s","name":"Fornecedor"})
+        await self.db.documents.insert_many([{"id":str(i),"title":"Spec "+str(i),"supplier_id":"s","document_type":"Ficha Técnica","file_path":"path"+str(i)} for i in range(1001)])
+        await self.db.specs.insert_one({"id":"original","supplier_id":"s","supplier_name":"Fornecedor","product_name":"Original","original_file_path":"path0"})
+        result=(await self.client.get("/api/specs/library")).json()
+        self.assertEqual(result["total"],1001)
+        self.assertEqual(result["counts"]["s"],1001)
+        self.assertEqual(result["unassigned_total"],0)
+        self.assertEqual(await self.db.documents.count_documents({}),1001)
+
+    async def test_specs_require_valid_supplier_and_share_only_registered_files(self):
+        await self.db.suppliers.insert_one({"id":"s","name":"Fornecedor correto"})
+        invalid=await self.client.post("/api/specs",json={"supplier_id":"missing","product_name":"Acerola"})
+        self.assertEqual(invalid.status_code,400)
+        self.objects["shared/spec.pdf"]=(b"%PDF-test","application/pdf")
+        saved=await self.client.post("/api/specs",json={"supplier_id":"s","supplier_name":"errado","product_name":"Acerola","original_file_path":"shared/spec.pdf"})
+        self.assertEqual(saved.status_code,200,saved.text)
+        self.assertEqual(saved.json()["supplier_name"],"Fornecedor correto")
+        await self.db.users.insert_one({"id":"team","email":"team@example.com","role":"user"})
+        auth={"Authorization":"Bearer "+server.create_token("team","team@example.com")}
+        downloaded=await self.client.get("/api/files/shared/spec.pdf",headers=auth)
+        self.assertEqual(downloaded.status_code,200)
+        self.assertEqual(downloaded.content,b"%PDF-test")
+        denied=await self.client.post("/api/specs",json={"supplier_id":"s","product_name":"Outro","original_file_path":"unknown/private.pdf"},headers=auth)
+        self.assertEqual(denied.status_code,403)
+        manual=await self.client.patch("/api/specs/documents/missing/supplier",json={"supplier_id":"s"},headers=auth)
+        self.assertEqual(manual.status_code,403)
+
+    async def test_ambiguous_supplier_names_are_not_guessed(self):
+        await self.db.suppliers.insert_many([{"id":"s1","name":"ACME"},{"id":"s2","name":"Acme"}])
+        await self.db.documents.insert_one({"id":"d","title":"Spec Acerola","file_path":"d","supplier_name":"acme"})
+        result=(await self.client.get("/api/specs/library")).json()
+        self.assertEqual(result["total"],0)
+        self.assertEqual(result["unassigned_total"],1)
+        self.assertIn("ambíguo",result["unassigned"][0]["assignment_reason"])
+
     async def test_new_search_can_replace_own_active_job_without_blocking(self):
         await self.db.buyer_search_jobs.insert_many([
             {"id":"old","owner_id":"u","status":"running","cancel_requested":False},
@@ -91,7 +151,7 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.db.leads.count_documents({}),1)
 
     async def test_protected_endpoints_reject_missing_and_invalid_token(self):
-        for path in ["/interactions", "/templates", "/trade-data", "/dashboard/stats", "/documents", "/documents/page", "/document-folders", "/buyer-discovery/markets", "/buyer-discovery/search-jobs/missing"]:
+        for path in ["/interactions", "/templates", "/trade-data", "/dashboard/stats", "/documents", "/documents/page", "/document-folders", "/buyer-discovery/markets", "/buyer-discovery/search-jobs/missing", "/specs/library"]:
             for token in ["", "Bearer invalid"]:
                 response = await self.client.get("/api" + path, headers={"Authorization": token})
                 self.assertEqual(response.status_code, 401, (path, response.text))

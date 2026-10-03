@@ -17,6 +17,7 @@ from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company
 from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
+from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
@@ -574,6 +575,8 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
         # Published documents are shared with authenticated IBIAG team members;
         # unregistered uploads and trashed documents remain private.
         published = await db.documents.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
+        if not published:
+            published = await db.specs.find_one({"$or": [{"original_file_path": full_path}, {"ibiag_file_path": full_path}], "deleted_at": {"$in": [None, ""]}})
         if not published:
             raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)
@@ -1301,6 +1304,53 @@ async def del_pur(pid: str, user=Depends(get_current_user)):
         return {"deleted": 1, "restorable": True}
 
 # ============ SPECS (Prospecção IBIAG) ============
+@api.get("/specs/library")
+async def get_supplier_spec_library(user=Depends(get_current_user)):
+    return await supplier_spec_library(db)
+
+class SpecDocumentSupplier(BaseModel):
+    supplier_id: str
+
+@api.patch("/specs/documents/{did}/supplier")
+async def assign_spec_document_supplier(did: str, body: SpecDocumentSupplier, user=Depends(get_current_user)):
+    require_admin(user)
+    supplier = await db.suppliers.find_one({"id": body.supplier_id}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(404, "Fornecedor não encontrado")
+    doc = await db.documents.find_one({"id": did, "deleted_at": {"$in": [None, ""]}}, {"_id": 0})
+    if not doc:
+        raise HTTPException(404, "Documento não encontrado")
+    linked = await db.product_offers.find_one({"spec_document_ids": did})
+    if not is_spec_document(doc) and not linked:
+        raise HTTPException(400, "Documento não classificado como spec")
+    if doc.get("supplier_id") and doc["supplier_id"] != body.supplier_id and await db.suppliers.find_one({"id": doc["supplier_id"]}):
+        raise HTTPException(409, "Documento já vinculado a outro fornecedor")
+    updated = await db.documents.update_one({"id": did, "supplier_id": doc.get("supplier_id"), "deleted_at": {"$in": [None, ""]}}, {"$set": {"supplier_id": supplier["id"], "supplier_name": supplier["name"], "updated_at": now_iso()}})
+    if not updated.matched_count:
+        raise HTTPException(409, "Documento mudou durante a vinculação; atualize os specs")
+    await db.product_offers.update_many({"spec_document_ids": did, "supplier_id": {"$ne": supplier["id"]}}, {"$pull": {"spec_document_ids": did}})
+    if doc.get("product_id"):
+        await db.product_offers.update_many({"product_id": doc["product_id"], "supplier_id": supplier["id"]}, {"$addToSet": {"spec_document_ids": did}})
+    return {"document_id": did, "supplier_id": supplier["id"], "supplier_name": supplier["name"]}
+
+async def validate_spec_supplier(spec, user, existing=None):
+    supplier = await db.suppliers.find_one({"id": spec.supplier_id}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(400, "Selecione um fornecedor cadastrado")
+    if not spec.product_name.strip():
+        raise HTTPException(400, "Nome do produto obrigatório")
+    spec.supplier_name = supplier["name"]
+    spec.product_name = spec.product_name.strip()
+    for slot in ("original", "ibiag"):
+        path = getattr(spec, slot + "_file_path")
+        if not path or existing and path == existing.get(slot + "_file_path"):
+            continue
+        if user.get("role") != "admin" and not path.startswith(f"{APP_NAME}/uploads/{user['id']}/"):
+            published = await db.documents.find_one({"file_path": path, "deleted_at": {"$in": [None, ""]}})
+            if not published:
+                raise HTTPException(403, "Arquivo de spec não autorizado")
+        await get_object(path)
+
 @api.get("/specs", response_model=List[Spec])
 async def list_specs(supplier_id: Optional[str] = None, user=Depends(get_current_user)):
     q = {"supplier_id": supplier_id} if supplier_id else {}
@@ -1308,10 +1358,17 @@ async def list_specs(supplier_id: Optional[str] = None, user=Depends(get_current
 
 @api.post("/specs", response_model=Spec)
 async def create_spec(s: Spec, user=Depends(get_current_user)):
+    await validate_spec_supplier(s, user)
+    if await db.specs.find_one({"id": s.id}):
+        raise HTTPException(409, "Spec já cadastrada")
     await db.specs.insert_one(s.model_dump()); return s
 
 @api.put("/specs/{sid}", response_model=Spec)
 async def upd_spec(sid: str, s: Spec, user=Depends(get_current_user)):
+    existing = await db.specs.find_one({"id": sid}, {"_id": 0})
+    if not existing:
+        raise HTTPException(404, "Spec não encontrada")
+    await validate_spec_supplier(s, user, existing)
     s.id = sid; s.updated_at = now_iso()
     await db.specs.replace_one({"id": sid}, s.model_dump()); return s
 
