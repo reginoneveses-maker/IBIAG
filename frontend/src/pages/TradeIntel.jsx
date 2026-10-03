@@ -195,11 +195,11 @@ const TradeIntel = () => {
     const controller = new AbortController(); buyerAbort.current = controller;
     setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
     try {
-      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 }, {signal: controller.signal, timeout: 60000});
+      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 }, {signal: controller.signal, timeout: 240000});
       if (request !== buyerRequest.current) return;
       const results = (r.data?.results || []).map(b => ({...b, country: countryName, product_interest: product}));
       setBuyerResults(results);
-      if (!results.length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
+      if (!results.length) toast.info("Nenhuma empresa com venda ou uso do ingrediente comprovado nas páginas consultadas.");
     } catch (e) {
       if (request === buyerRequest.current) toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
     } finally { if (request === buyerRequest.current) setBuyerLoading(false); }
@@ -282,8 +282,9 @@ const TradeIntel = () => {
       <div className="rounded-xl border border-[#104496]/10 bg-white/95 p-5 space-y-4" data-testid="direct-buyer-search">
         <div>
           <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#104496]/60">PROSPECÇÃO WEB</div>
-          <h2 className="font-display text-xl font-bold text-[#104496]">Buscar compradores por produto e mercados</h2>
+          <h2 className="font-display text-xl font-bold text-[#104496]">Buscar empresas por produto e mercados</h2>
           <p className="text-sm text-[#104496]/60 mt-1">Pesquisa direta em fontes web atuais. Não exige NCM nem consulta prévia ao Comex Stat. Escolha Europa ou Ásia, ou informe vários países separados por vírgula.</p>
+          <p className="text-sm text-[#104496]/80 mt-2">Empresas que vendem o ingrediente ou o utilizam em seus próprios produtos. Cada resultado mostra a evidência publicada no site. Livros, pesquisas, artigos genéricos e diretórios são excluídos.</p>
         </div>
         <label className="text-sm block">Região da pesquisa
           <select aria-label="Região da pesquisa" value={directRegion} onChange={e => { editBuyerSearch(); setDirectRegion(e.target.value); setDirectCountry(""); }} className="block border rounded p-2 bg-white mt-1">
@@ -301,13 +302,15 @@ const TradeIntel = () => {
         <Button variant="outline" onClick={() => resetBuyerSearch(true)}>Limpar pesquisa</Button>
         <datalist id="buyer-markets">{marketCatalog.countries.map(m => <option key={m.code} value={m.name} />)}</datalist>
         {buyerJob && <div role="status" className="border rounded p-3 space-y-2">
-          <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países consultados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa"})[buyerJob.status]}</p>
+          <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países consultados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa",outdated:"Pesquisa antiga; refaça a busca"})[buyerJob.status]}</p>
+          {buyerJob.validation_message && <p>{buyerJob.validation_message}</p>}
           <progress value={buyerJob.completed} max={buyerJob.total} className="w-full" />
-          {buyerJob.status === "complete" && !buyerResults.length && <p>Nenhuma empresa encontrada.</p>}
+          {buyerJob.status === "complete" && !buyerResults.length && <p>Nenhuma empresa com venda ou uso do ingrediente comprovado nas páginas consultadas.</p>}
           {buyerLoading && <Button variant="outline" disabled={buyerJob.cancel_requested} onClick={async () => { try { await api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(jobId)}/cancel`); setBuyerJob(prev => ({...prev,cancel_requested:true})); } catch(e) { toast.error("Não foi possível interromper a pesquisa."); } }}>{buyerJob.cancel_requested ? "Interrupção solicitada" : "Interromper pesquisa"}</Button>}
           <details><summary>Progresso por país</summary>{Object.entries(buyerJob.progress || {}).map(([code,p]) => <p key={code}>{p.country}: {({pending:"Na fila",running:"Pesquisando",complete:`${p.count} empresas`,failed:"Falhou"})[p.status]} {p.error}</p>)}</details>
         </div>}
         {pollError && <p role="alert">{pollError} <Button variant="outline" onClick={() => setPollRetry(x => x+1)}>Atualizar progresso</Button></p>}
+        {buyerLoading && <p role="status" className="text-sm">Pesquisando e conferindo os sites das empresas. A verificação pode levar alguns minutos.</p>}
       </div>
 
       <div className="rounded-xl border border-[#104496]/10 bg-white/95 p-5 space-y-4" data-testid="comexstat-panel">
@@ -401,7 +404,7 @@ const TradeIntel = () => {
         {buyerResults.length > 0 && (
           <div className="rounded-lg border border-[#104496]/10 bg-[#EEF3FB] p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <div><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">BUSCA WEB · COMPRADORES</div><div className="font-display text-lg font-bold text-[#104496]">{buyerCountry}</div><div className="text-xs text-[#104496]/60">{buyerProduct}</div></div>
+              <div><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">BUSCA WEB · EMPRESAS DO INGREDIENTE</div><div className="font-display text-lg font-bold text-[#104496]">{buyerCountry}</div><div className="text-xs text-[#104496]/60">{buyerProduct}</div></div>
               <Badge variant="outline">{buyerResults.length} empresas</Badge>
             </div>
             <label className="block text-sm">Filtrar resultados por país <select aria-label="Filtrar resultados por país" value={resultCountry} onChange={e => setResultCountry(e.target.value)} className="border rounded p-2"><option value="">Todos os países</option>{[...new Set(buyerResults.map(b => b.country))].map(c => <option key={c} value={c}>{c}</option>)}</select></label>
@@ -423,7 +426,11 @@ const TradeIntel = () => {
                     {crmLinks[buyerKey(b)] && <Link className="text-sm underline self-center" to={`/prospects/pipeline?lead=${encodeURIComponent(crmLinks[buyerKey(b)])}`}>Ver empresa no CRM</Link>}
                   </div>
                 </div>
-                {b.source_description && <div className="text-xs mt-2 text-[#104496]/70">{b.source_description}</div>}
+                {b.relationship_verified && <div className="mt-2 text-sm rounded bg-green-50 p-3 text-[#104496]">
+                  <b>{b.product_relationship === "seller" ? "Vende / fornece o ingrediente" : "Utiliza o ingrediente em seus produtos"}</b>
+                  <div className="text-xs mt-1">Evidência no site: <q>{b.product_evidence}</q></div>
+                </div>}
+                {!b.relationship_verified && b.source_description && <div className="text-xs mt-2 text-[#104496]/70">{b.source_description}</div>}
                 <div className="text-xs mt-2 space-y-1">
                   {b.decision_maker_email && <div>E-mail: <a className="underline" href={`mailto:${b.decision_maker_email}`}>{b.decision_maker_email}</a></div>}
                   {b.decision_maker_phone && <div>Telefone: {b.decision_maker_phone}</div>}
