@@ -8,7 +8,7 @@ from starlette.background import BackgroundTask
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response, BackgroundTasks
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
@@ -16,6 +16,7 @@ import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company
+from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from document_categories import normalize_document, matches_document, validate_classification
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
@@ -203,6 +204,7 @@ class Lead(BaseModel):
     linkedin: str = ""
     country: str = ""
     country_code: str = ""
+    search_country: str = ""
     industry: str = "beverage"
     stage: str = "new_lead"
     interested_products: List[str] = []
@@ -2107,12 +2109,58 @@ async def trade_to_crm(tid: str, user=Depends(get_current_user)):
 # ============ BUYER DISCOVERY ============
 class BuyerDiscoveryRequest(BaseModel):
     product: str
-    country: str
+    country: str = ""
+    countries: List[str] = Field(default_factory=list)
+    region: str = ""
     country_code: str = ""
-    limit: int = 8
+    limit: int = Field(default=10, ge=1, le=20)
+
+@api.get("/buyer-discovery/markets")
+async def buyer_discovery_markets(user=Depends(get_current_user)):
+    return {"countries": MARKETS, "regions": [{"id": key, "name": value["name"], "countries": value["countries"]} for key, value in REGIONS.items()]}
+
+@api.post("/buyer-discovery/search-jobs")
+async def create_buyer_search_job(body: BuyerDiscoveryRequest, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    if not body.product.strip():
+        raise HTTPException(400, "Informe o produto.")
+    try:
+        targets = resolve_markets(body.country, body.countries, body.region)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if await db.buyer_search_jobs.count_documents({"owner_id": user["id"], "status": {"$in": ["pending", "running"]}}):
+        raise HTTPException(409, "Há uma pesquisa em andamento. Aguarde ou interrompa antes de iniciar outra.")
+    job = {"id": str(uuid.uuid4()), "owner_id": user["id"], "product": body.product.strip(), "targets": targets, "region": body.region,
+           "label": next((r["name"] for key, r in REGIONS.items() if key == body.region), ", ".join(x["name"] for x in targets)),
+           "limit": body.limit, "status": "pending", "total": len(targets), "completed": 0, "failures": 0,
+           "results": [], "created_at": now_iso(), "updated_at": now_iso(), "cancel_requested": False,
+           "progress": {x["code"]: {"country": x["name"], "status": "pending", "count": 0, "error": ""} for x in targets}}
+    await db.buyer_search_jobs.insert_one(dict(job))
+    tasks.add_task(run_discovery_job, db, job, discover_buyers)
+    return job
+
+async def authorized_buyer_job(job_id, user):
+    job = await db.buyer_search_jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(404, "Pesquisa não encontrada")
+    if job["owner_id"] != user["id"] and user.get("role") != "admin":
+        raise HTTPException(403, "Pesquisa pertence a outro usuário")
+    return job
+
+@api.get("/buyer-discovery/search-jobs/{job_id}")
+async def get_buyer_search_job(job_id: str, user=Depends(get_current_user)):
+    return await authorized_buyer_job(job_id, user)
+
+@api.post("/buyer-discovery/search-jobs/{job_id}/cancel")
+async def cancel_buyer_search_job(job_id: str, user=Depends(get_current_user)):
+    job = await authorized_buyer_job(job_id, user)
+    if job["status"] in ("pending", "running"):
+        await db.buyer_search_jobs.update_one({"id": job_id}, {"$set": {"cancel_requested": True}})
+    return {"cancel_requested": True}
 
 @api.post("/buyer-discovery/search")
 async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_current_user)):
+    if body.countries or body.region or any(separator in body.country for separator in [",", ";", "\n"]):
+        raise HTTPException(400, "Para vários países ou regiões, use a pesquisa por mercados.")
     product = body.product.strip()
     country = body.country.strip()
     if not product or not country:
@@ -2160,6 +2208,7 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "company": company,
         "country": country,
         "country_code": str(payload.get("country_code", "")),
+        "search_country": str(payload.get("search_country", "")),
         "website": str(payload.get("website", "")),
         "email": str(payload.get("email", "")),
         "phone": str(payload.get("phone", "")),
@@ -2410,6 +2459,7 @@ async def seed_all():
 
 @app.on_event("startup")
 async def startup():
+    await db.buyer_search_jobs.update_many({"status": {"$in": ["pending", "running"]}}, {"$set": {"status": "interrupted", "updated_at": now_iso()}})
     await db.leads.create_index("discovery_key", unique=True, sparse=True)
     await seed_all()
 

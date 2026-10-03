@@ -50,3 +50,11 @@ A busca externa ao vivo e o deployment de produção exigem validação no ambie
 - Criar pasta abre automaticamente o caminho criado. O caminho fica na URL, sobrevive à recarga e é mostrado como destino do upload. Mover documento abre o novo destino.
 - A prévia identifica a assinatura PDF/PNG/JPEG/GIF/WebP. PDF usa o leitor nativo, com abrir em nova aba e baixar; o iframe sandboxado que bloqueava plugins foi removido. HTML, SVG e arquivos de escritório não são executados na prévia e oferecem download. Políticas locais do navegador ainda podem impedir seu leitor PDF.
 - Novos testes cobrem extração com fonte, contatos não publicados, falha do provedor, enriquecimento de cadastro existente, criação de pasta e estrutura da prévia PDF. O percurso de navegador verifica a prévia e o destino após recarga.
+
+## Pesquisa em vários mercados
+
+Trade Intelligence permite selecionar Europa ou Ásia, ou digitar países separados por vírgula/ ponto e vírgula (Alemanha, Espanha, Portugal; códigos DE, ES, PT também aceitos). Regiões seguem o catálogo de países e territórios da ONU M49, consultado em 03/10/2026: https://unstats.un.org/unsd/methodology/m49/overview/ . Europa inclui 51 entradas e Ásia 50; não são contagens de Estados soberanos.
+
+GET /api/buyer-discovery/markets fornece o catálogo. POST /api/buyer-discovery/search-jobs inicia uma tarefa autenticada; GET /api/buyer-discovery/search-jobs/{id} informa resultados e progresso; POST /api/buyer-discovery/search-jobs/{id}/cancel interrompe consultas ainda na fila. Há até três consultas simultâneas, uma pesquisa ativa por usuário e dez resultados por país na interface. Cada país falha independentemente; os demais resultados são preservados. As consultas em andamento terminam após solicitar interrupção. O identificador na URL permite recuperar resultados ao recarregar; reinício do servidor marca pesquisas inacabadas como interrompidas, permitindo iniciar outra.
+
+Resultados identificam o mercado pesquisado e têm filtro por país. O CRM recebe o país individual, código e search_country, nunca o nome da região como país. O enriquecimento pode descobrir um país de endereço diferente do mercado pesquisado. Provedores externos são simulados nos testes; disponibilidade e qualidade dos contatos dependem das fontes reais.
