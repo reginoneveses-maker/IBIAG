@@ -1,0 +1,167 @@
+[
+  {
+    "key": "acai",
+    "file": "acai.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:A%C3%A7a%C3%AD_debulhado.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/5/5e/A%C3%A7a%C3%AD_debulhado.jpg",
+    "author": "Marajonida",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "description": "Açaí pronto para ser \"batido\" e transformado em suco. Principal alimento Marajoara.",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "acerola",
+    "file": "acerola.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Acerola.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/9/92/Acerola.jpg",
+    "author": "Bdieu",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "description": "Acerola (Malpighia glabra)is an edible  and widely consumed tropical fruit for its high vitamin C content.",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "coconut",
+    "file": "coconut.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Coconut_on_white_background.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/f/f2/Coconut_on_white_background.jpg",
+    "author": "Filo gèn'",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "description": "Cocos nucifera (Arecaceae)",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "cashew",
+    "file": "cashew.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:CASHEW_NUTS.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/b/b9/CASHEW_NUTS.jpg",
+    "author": "Ranjithkumar Murugesan",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "description": "CASHEW NUTS",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "brazil-nut",
+    "file": "brazil-nut.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Brazil_nuts.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/de/Brazil_nuts.jpg",
+    "author": "Quadell",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "description": "Brazil nuts",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "guarana-powder",
+    "file": "guarana-powder.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Guarana.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/b/ba/Guarana.jpg",
+    "author": "User:Wesley2048",
+    "license": "Public domain",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "description": "powder of guarana seeds",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "pineapple",
+    "file": "pineapple.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Pineapple.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/a/a1/Pineapple.jpg",
+    "author": "Renee Comet (Photographer)",
+    "license": "Public domain",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "description": "Title Pineapple\nDescription A whole pineapple with top.\nTopics/Categories  Food and Drink\nType Color, Photo\nSource National Cancer Institute",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "orange",
+    "file": "orange.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Orange-Fruit-Pieces.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Orange-Fruit-Pieces.jpg",
+    "author": "Evan-Amos",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "description": "Two navel oranges, one whole and the other cut it pieces.",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "passion-fruit",
+    "file": "passion-fruit.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Passion_fruits_-_whole_and_halved.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/2/21/Passion_fruits_-_whole_and_halved.jpg",
+    "author": "Ivar Leidus",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "description": "Passion fruits (Passiflora edulis) – whole and halved. Grown in Colombia",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "guava",
+    "file": "guava.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Guava_fruit.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/d/d6/Guava_fruit.jpg",
+    "author": "Amada44",
+    "license": "CC BY 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/3.0",
+    "description": "Guava fruit on white background",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "lime",
+    "file": "lime.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Lime-Whole-Split.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/6/68/Lime-Whole-Split.jpg",
+    "author": "Evan-Amos",
+    "license": "CC0",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "description": "A whole lime and a lime that has been cut in half.",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "banana",
+    "file": "banana.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Bananas.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Bananas.jpg",
+    "author": "Steve Hopson, www.stevehopson.com",
+    "license": "CC BY-SA 2.5",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
+    "description": "Bananas",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "cupuacu",
+    "file": "cupuacu.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Cupuassu.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/3/3c/Cupuassu.jpg",
+    "author": "CiXeL at English Wikipedia",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "description": "Picture taken by Christopher Hind",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "mango",
+    "file": "mango.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Mangos_-_single_and_halved.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/7/74/Mangos_-_single_and_halved.jpg",
+    "author": "Ivar Leidus",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "description": "Mango fruits – single and halved. Grown in Brazil",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  },
+  {
+    "key": "lemon",
+    "file": "lemon.jpg",
+    "source": "https://commons.wikimedia.org/wiki/File:Lemon.jpg",
+    "original": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Lemon.jpg",
+    "author": "André Karwath aka Aka",
+    "license": "CC BY-SA 2.5",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.5",
+    "description": "This image shows a whole and a cut lemon.",
+    "changes": "Thumbnail supplied by Wikimedia Commons; displayed with CSS object-fit: cover."
+  }
+]
