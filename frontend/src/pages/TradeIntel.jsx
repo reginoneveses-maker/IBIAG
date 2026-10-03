@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, flag, fmtUSD, INDUSTRIES, externalUrl } from "@/lib/api";
 import { useLang } from "@/i18n";
 import { Input } from "@/components/ui/input";
@@ -95,6 +95,17 @@ const TradeIntel = () => {
     // A job keeps its own product and markets when the page is reloaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, pollRetry]);
+  const displayBuyerResults = useMemo(() => {
+    const unique = new Map();
+    buyerResults.forEach(row => {
+      const key = `${row.company}|${row.domain || row.website}`;
+      const market = row.search_country || row.country;
+      const previous = unique.get(key);
+      if (previous) previous.search_countries = [...new Set([...previous.search_countries, market].filter(Boolean))];
+      else unique.set(key, {...row, search_countries: [market].filter(Boolean)});
+    });
+    return [...unique.values()];
+  }, [buyerResults]);
   const buyerKey = b => `${b.company}|${b.country}|${b.website}`;
   useEffect(() => () => { buyerRequest.current += 1; tradeRequest.current += 1; buyerAbort.current?.abort(); pollAbort.current?.abort(); }, []);
 
@@ -195,10 +206,11 @@ const TradeIntel = () => {
     const controller = new AbortController(); buyerAbort.current = controller;
     setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
     try {
-      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 }, {signal: controller.signal, timeout: 240000});
+      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 }, {signal: controller.signal, timeout: 360000});
       if (request !== buyerRequest.current) return;
-      const results = (r.data?.results || []).map(b => ({...b, country: countryName, product_interest: product}));
+      const results = (r.data?.results || []).map(b => ({...b, search_country: b.search_country || countryName, product_interest: product}));
       setBuyerResults(results);
+      if (r.data?.warnings?.length) toast.info(r.data.warnings.join(" "));
       if (!results.length) toast.info("Nenhuma empresa com venda ou uso do ingrediente comprovado nas páginas consultadas.");
     } catch (e) {
       if (request === buyerRequest.current) toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
@@ -302,12 +314,27 @@ const TradeIntel = () => {
         <Button variant="outline" onClick={() => resetBuyerSearch(true)}>Limpar pesquisa</Button>
         <datalist id="buyer-markets">{marketCatalog.countries.map(m => <option key={m.code} value={m.name} />)}</datalist>
         {buyerJob && <div role="status" className="border rounded p-3 space-y-2">
-          <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países consultados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa",outdated:"Pesquisa antiga; refaça a busca"})[buyerJob.status]}</p>
+          <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países finalizados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa",outdated:"Pesquisa antiga; refaça a busca"})[buyerJob.status]}</p>
+          {buyerJob.failures > 0 && <div role="alert" className="rounded bg-amber-50 p-3 text-amber-900">
+            <p>{buyerJob.failures} países com falha ou consulta incompleta. O total de empresas ainda não representa toda a região.</p>
+            {buyerJob.service_error && <p>{buyerJob.service_error}</p>}
+            {!buyerLoading && <Button variant="outline" onClick={async () => {
+              const failed = Object.entries(buyerJob.progress || {}).filter(([,p]) => ["failed","partial","blocked"].includes(p.status)).map(([code]) => code);
+              if (!failed.length) return;
+              const request = ++buyerRequest.current;
+              try {
+                setBuyerLoading(true);
+                const response = await api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(buyerJob.id)}/retry`);
+                if (request !== buyerRequest.current) { api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(response.data.id)}/cancel`).catch(() => {}); return; }
+                setBuyerJob(response.data); changeJob(response.data.id); setPollRetry(n => n + 1);
+              } catch (e) { if (request === buyerRequest.current) { setBuyerLoading(false); toast.error(e?.response?.data?.detail || "Não foi possível repetir os países com falha."); } }
+            }}>Tentar novamente países com falha</Button>}
+          </div>}
           {buyerJob.validation_message && <p>{buyerJob.validation_message}</p>}
           <progress value={buyerJob.completed} max={buyerJob.total} className="w-full" />
           {buyerJob.status === "complete" && !buyerResults.length && <p>Nenhuma empresa com venda ou uso do ingrediente comprovado nas páginas consultadas.</p>}
           {buyerLoading && <Button variant="outline" disabled={buyerJob.cancel_requested} onClick={async () => { try { await api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(jobId)}/cancel`); setBuyerJob(prev => ({...prev,cancel_requested:true})); } catch(e) { toast.error("Não foi possível interromper a pesquisa."); } }}>{buyerJob.cancel_requested ? "Interrupção solicitada" : "Interromper pesquisa"}</Button>}
-          <details><summary>Progresso por país</summary>{Object.entries(buyerJob.progress || {}).map(([code,p]) => <p key={code}>{p.country}: {({pending:"Na fila",running:"Pesquisando",complete:`${p.count} empresas`,failed:"Falhou"})[p.status]} {p.error}</p>)}</details>
+          <details><summary>Progresso por país</summary>{Object.entries(buyerJob.progress || {}).map(([code,p]) => <p key={code}>{p.country}: {({pending:"Na fila",running:"Pesquisando",complete:`${p.count} empresas`,failed:"Falhou",partial:`${p.count} empresas; conferência incompleta`,blocked:"Não consultado; serviço bloqueado"})[p.status]} {p.error}</p>)}</details>
         </div>}
         {pollError && <p role="alert">{pollError} <Button variant="outline" onClick={() => setPollRetry(x => x+1)}>Atualizar progresso</Button></p>}
         {buyerLoading && <p role="status" className="text-sm">Pesquisando e conferindo os sites das empresas. A verificação pode levar alguns minutos.</p>}
@@ -405,14 +432,14 @@ const TradeIntel = () => {
           <div className="rounded-lg border border-[#104496]/10 bg-[#EEF3FB] p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div><div className="text-[10px] uppercase tracking-widest text-[#104496]/50">BUSCA WEB · EMPRESAS DO INGREDIENTE</div><div className="font-display text-lg font-bold text-[#104496]">{buyerCountry}</div><div className="text-xs text-[#104496]/60">{buyerProduct}</div></div>
-              <Badge variant="outline">{buyerResults.length} empresas</Badge>
+              <Badge variant="outline">{displayBuyerResults.length} {displayBuyerResults.length === 1 ? "empresa" : "empresas"}</Badge>
             </div>
-            <label className="block text-sm">Filtrar resultados por país <select aria-label="Filtrar resultados por país" value={resultCountry} onChange={e => setResultCountry(e.target.value)} className="border rounded p-2"><option value="">Todos os países</option>{[...new Set(buyerResults.map(b => b.country))].map(c => <option key={c} value={c}>{c}</option>)}</select></label>
-            <div className="space-y-2">{buyerResults.filter(b => !resultCountry || b.country === resultCountry).map((b) => (
+            <label className="block text-sm">Filtrar resultados por país <select aria-label="Filtrar resultados por país" value={resultCountry} onChange={e => setResultCountry(e.target.value)} className="border rounded p-2"><option value="">Todos os países</option>{[...new Set(displayBuyerResults.flatMap(b => b.search_countries))].map(c => <option key={c} value={c}>{c}</option>)}</select></label>
+            <div className="space-y-2">{displayBuyerResults.filter(b => !resultCountry || b.search_countries.includes(resultCountry)).map((b) => (
               <div key={buyerKey(b)} className="rounded-lg border bg-white p-3">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-semibold text-[#104496]">{b.company}</div><div className="text-xs">{flag(b.country_code)} Mercado pesquisado: {b.search_country || b.country}</div>
+                    <div className="font-semibold text-[#104496]">{b.company}</div><div className="text-xs">{flag(b.country_code)} Mercados pesquisados: {b.search_countries.join(", ")}</div><div className="text-xs">País da empresa: {b.company_country || "não confirmado"}</div>
                     <div className="flex flex-wrap gap-3 text-xs mt-1">{externalUrl(b.website) && <a href={externalUrl(b.website)} target="_blank" rel="noreferrer" className="underline">{b.is_directory ? "Abrir fonte no diretório" : "Abrir site da empresa"}</a>}{externalUrl(b.source_url) && <a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer" className="underline">Fonte da empresa</a>}</div>
                     <div className="text-xs text-[#104496]/60">{b.domain || b.website} · Score {b.priority_score}</div>{b.is_directory && <div className="text-xs text-amber-800">Fonte em diretório; site oficial da empresa ainda não confirmado.</div>}
                     {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}

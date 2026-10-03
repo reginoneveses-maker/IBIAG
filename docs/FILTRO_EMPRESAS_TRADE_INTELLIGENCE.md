@@ -28,3 +28,18 @@ Resultados são candidatos sustentados pelas páginas consultadas, não uma list
 ## Verificação
 
 Testes cobrem livros, pesquisas, diretórios, artigos no site de uma empresa, empresa extraída de página com título de produto, venda e uso em produtos próprios, citações inexistentes, ingrediente errado, limites de leitura, deduplicação, preservação no CRM e pesquisas antigas. O teste Chromium usa o classificador real com respostas controladas do provedor, rejeita livros/artigos e confirma a evidência na pesquisa e no CRM. A resposta do provedor ao pesquisar com a conta real do usuário ainda precisa ser conferida no uso da interface.
+
+
+## Correção da busca regional (3 de outubro de 2026)
+
+A pesquisa de acerola na Europa retornou uma empresa e falhas em países. Os logs disponíveis mostram a execução e as consultas de progresso, mas a versão anterior não registrava os códigos HTTP das falhas do provedor; não foi possível atribuir retrospectivamente essas falhas a saldo, limites ou timeout.
+
+A conferência com páginas reais reproduziu falsos negativos: AMAZONAS Naturprodukte, Abbott Blackstone International e KoRo Handels GmbH eram rejeitadas pelo filtro anterior apesar de suas páginas comerciais. A versão 3 valida o nome no texto visível, remove URLs de links Markdown dessa conferência e seleciona evidência curta literal da própria página quando a sugestão da extração é incompleta, longa ou imprecisa. A identidade inventada, o ingrediente errado e páginas classificadas como artigos continuam rejeitados.
+
+Agora as chamadas de busca e verificação compartilham um limite de duas requisições simultâneas. Falhas temporárias recebem tentativas limitadas; erros 402, 401, 403 e 429 geram mensagens distintas, e os logs registram apenas operação, categoria e status HTTP. Saldo/chave bloqueados interrompem chamadas dos países ainda na fila. Páginas repetidas são consultadas uma vez por produto e URL durante o mesmo job, sem cache entre usuários. Nomes usuais como United Kingdom e Russia substituem nomes legais longos nas consultas.
+
+A interface informa falhas e consultas incompletas mesmo quando há resultados, diferencia mercado pesquisado de país comprovado da empresa e agrupa empresas repetidas nos mercados. Um endereço publicado de outro país, quando reconhecido, exclui a empresa daquela busca. País ausente ou não fundamentado fica vazio e não é substituído pelo alvo da pesquisa. A classificação e a geografia extraídas ainda exigem validação humana das fontes.
+
+`POST /api/buyer-discovery/search-jobs/{job_id}/retry` exige autenticação e autorização sobre o job, cria uma nova pesquisa só dos países com falha, preserva resultados já encontrados e não altera o histórico original. Pesquisas anteriores à versão 3 devem ser refeitas para aplicar o novo filtro.
+
+Validação: regressões de identidade/evidência, endereço estrangeiro, 429 e 402, cache por job, falha parcial, preservação de resultados e autorização do retry; testes React de aviso/retry e deduplicação; fluxo Chromium atualizado. Páginas reais foram recuperadas via conexão Firecrawl de auditoria: https://www.amazonas-products.com/en/products/acerola/, https://abbottblackstone.eu/organic-products/organic-acerola-powder/ e https://www.korodrogerie.de/en/organic-acerola-powder-250g. O classificador anterior rejeitou as três e o novo aceitou as três. Isso não confirma o saldo da chave de produção nem uma execução autenticada completa dos 51 países; o próximo teste da interface deve verificar os novos diagnósticos e a cobertura.

@@ -2217,6 +2217,29 @@ async def get_buyer_search_job(job_id: str, user=Depends(get_current_user)):
         return {**job, "results": [], "status": "outdated", "validation_message": "Esta pesquisa usava o filtro anterior. Limpe a pesquisa e busque novamente para conferir empresas e sua relação com o produto."}
     return job
 
+@api.post("/buyer-discovery/search-jobs/{job_id}/retry")
+async def retry_buyer_search_job(job_id: str, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    previous = await authorized_buyer_job(job_id, user)
+    if previous.get("discovery_version", 0) < DISCOVERY_VERSION:
+        raise HTTPException(400, "Esta pesquisa usa o filtro anterior. Inicie uma nova pesquisa.")
+    if previous["status"] in ("pending", "running"):
+        raise HTTPException(409, "A pesquisa ainda está em andamento.")
+    failed = {code for code, progress in previous.get("progress", {}).items() if progress.get("status") in ("failed", "partial", "blocked")}
+    targets = [market for market in previous["targets"] if market["code"] in failed]
+    if not targets:
+        raise HTTPException(400, "Não há países com falha para repetir.")
+    if await db.buyer_search_jobs.count_documents({"owner_id":user["id"], "status":{"$in":["pending","running"]}, "cancel_requested":{"$ne":True}}):
+        raise HTTPException(409, "Há outra pesquisa em andamento. Aguarde ou interrompa antes de repetir.")
+    job = {**previous, "id":str(uuid.uuid4()), "owner_id":user["id"], "targets":targets,
+           "result_targets":previous.get("result_targets", previous["targets"]),
+           "base_results":previous.get("results", []), "retry_of":job_id,
+           "status":"pending", "total":len(targets), "completed":0, "failures":0, "cancel_requested":False,
+           "service_error":"", "service_error_code":"", "created_at":now_iso(), "updated_at":now_iso(),
+           "progress":{x["code"]:{"country":x["name"], "status":"pending", "count":0, "error":""} for x in targets}}
+    await db.buyer_search_jobs.insert_one(dict(job))
+    tasks.add_task(run_discovery_job, db, job, discover_buyers)
+    return job
+
 @api.post("/buyer-discovery/search-jobs/{job_id}/cancel")
 async def cancel_buyer_search_job(job_id: str, user=Depends(get_current_user)):
     job = await authorized_buyer_job(job_id, user)
@@ -2239,7 +2262,7 @@ async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_c
     except requests.RequestException as e:
         logging.exception("Buyer discovery provider error")
         raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
-    return {"product": product, "country": country, "results": buyers, "source": "web_discovery"}
+    return {"product": product, "country": country, "results": buyers, "warnings": getattr(buyers, "warnings", []), "source": "web_discovery"}
 
 @api.post("/buyer-discovery/{company}/decision-maker")
 async def buyer_discovery_decision_maker(company: str, product: str = "", country: str = "", user=Depends(get_current_user)):
