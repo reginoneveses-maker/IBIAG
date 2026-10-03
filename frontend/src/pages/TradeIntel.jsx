@@ -315,7 +315,7 @@ const TradeIntel = () => {
         <datalist id="buyer-markets">{marketCatalog.countries.map(m => <option key={m.code} value={m.name} />)}</datalist>
         {buyerJob && <div role="status" className="border rounded p-3 space-y-2">
           <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países finalizados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa",outdated:"Pesquisa antiga; refaça a busca"})[buyerJob.status]}</p>
-          {buyerJob.failures > 0 && <div role="alert" className="rounded bg-amber-50 p-3 text-amber-900">
+          {buyerJob.failures > 0 && buyerJob.status !== "outdated" && <div role="alert" className="rounded bg-amber-50 p-3 text-amber-900">
             <p>{buyerJob.failures} países com falha ou consulta incompleta. O total de empresas ainda não representa toda a região.</p>
             {buyerJob.service_error && <p>{buyerJob.service_error}</p>}
             {!buyerLoading && <Button variant="outline" onClick={async () => {
@@ -330,6 +330,7 @@ const TradeIntel = () => {
               } catch (e) { if (request === buyerRequest.current) { setBuyerLoading(false); toast.error(e?.response?.data?.detail || "Não foi possível repetir os países com falha."); } }
             }}>Tentar novamente países com falha</Button>}
           </div>}
+          {buyerJob.retry_of && <p>Nova tentativa dos países com falha; os resultados anteriores foram preservados.</p>}
           {buyerJob.validation_message && <p>{buyerJob.validation_message}</p>}
           <progress value={buyerJob.completed} max={buyerJob.total} className="w-full" />
           {buyerJob.status === "complete" && !buyerResults.length && <p>Nenhuma empresa com venda ou uso do ingrediente comprovado nas páginas consultadas.</p>}
