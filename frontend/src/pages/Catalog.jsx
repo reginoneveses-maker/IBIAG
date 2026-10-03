@@ -73,8 +73,8 @@ const Catalog = () => {
             value={primaryFilters.some(([key]) => key === filter) ? "" : filter}
             onChange={e => setFilter(e.target.value || "all")} className="rounded-full border border-[#0F382C]/20 bg-white px-3 py-2 max-w-[230px]">
             <option value="">{lang === "pt" ? "Selecione um ingrediente" : "Select an ingredient"}</option>
-            {extraIngredients.map(([key, pt, en]) => <option key={key} value={key}>{lang === "pt" ? pt : en} ({products.filter(p => matchesCatalogFilter(p, key)).length})</option>)}
-            {availableIngredients.has("other") && <option value="other">{lang === "pt" ? "Outros" : "Other"} ({products.filter(p => matchesCatalogFilter(p, "other")).length})</option>}
+            {extraIngredients.map(([key, pt, en]) => <option key={key} value={key} children={`${lang === "pt" ? pt : en} (${products.filter(p => matchesCatalogFilter(p, key)).length})`} />)}
+            {availableIngredients.has("other") && <option value="other" children={`${lang === "pt" ? "Outros" : "Other"} (${products.filter(p => matchesCatalogFilter(p, "other")).length})`} />}
           </select>
         </label>}
         <div className="ml-auto text-xs font-mono-alt uppercase tracking-widest text-[#0F382C]/50 self-center">
