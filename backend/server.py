@@ -667,9 +667,9 @@ async def update_document_metadata_batch(file: UploadFile = File(...), user=Depe
 @api.post("/documents/import-batch")
 async def import_document_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
     require_admin(user)
-    raw = await file.read(40 * 1024 * 1024 + 1)
-    if len(raw) > 40 * 1024 * 1024:
-        raise HTTPException(413, "Lote excede 40 MB")
+    raw = await file.read(50 * 1024 * 1024 + 1)
+    if len(raw) > 50 * 1024 * 1024:
+        raise HTTPException(413, "Lote excede 50 MB")
     categories = {"Produtos", "Fornecedores", "Qualidade & Compliance", "Clientes & Comercial", "Financeiro & Fiscal", "Societário", "Exportação & Logística"}
     try:
         archive = zipfile.ZipFile(io.BytesIO(raw))
