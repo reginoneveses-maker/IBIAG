@@ -676,7 +676,7 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
         entries = archive.infolist()
         if len(entries) > 101 or len({x.filename for x in entries}) != len(entries):
             raise ValueError("Lote inválido ou com entradas duplicadas")
-        if any(x.file_size > 30 * 1024 * 1024 for x in entries) or sum(x.file_size for x in entries) > 80 * 1024 * 1024:
+        if any(x.file_size > 48 * 1024 * 1024 for x in entries) or sum(x.file_size for x in entries) > 80 * 1024 * 1024:
             raise ValueError("Arquivos excedem o limite")
         manifest = json.loads(archive.read("manifest.json"))
         if not isinstance(manifest, list) or not 1 <= len(manifest) <= 100:
