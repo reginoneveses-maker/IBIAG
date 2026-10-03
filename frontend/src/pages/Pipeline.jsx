@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, STAGES, INDUSTRIES, stageColor, flag, fmtUSD } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { api, STAGES, INDUSTRIES, stageColor, flag, fmtUSD, externalUrl, downloadDocument } from "@/lib/api";
 import { useLang } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Card } from "@/components/ui/card";
 import { Plus, MoreVertical, Trash2, Edit3, MessageSquarePlus } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams, Link } from "react-router-dom";
 
 const emptyLead = { company: "", contact_name: "", email: "", phone: "", website: "", linkedin: "", country: "", country_code: "", industry: "beverage", stage: "new_lead", product_interest: "", decision_maker: "", decision_maker_title: "", decision_maker_email: "", decision_maker_phone: "", current_supplier: "", priority: "normal", source_url: "", deal_value: 0, notes: "" };
 
@@ -21,6 +22,12 @@ const Pipeline = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(emptyLead);
   const [detailLead, setDetailLead] = useState(null);
+  const [detailDocs, setDetailDocs] = useState([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const detailRequest = useRef(0);
+  const [params] = useSearchParams();
+  const requestedLead = params.get("lead");
   const [interactions, setInteractions] = useState([]);
   const [newInter, setNewInter] = useState({ type: "email", subject: "", content: "" });
 
@@ -79,18 +86,37 @@ const Pipeline = () => {
   };
 
   const openDetail = async (l) => {
-    setDetailLead(l);
-    const r = await api.get("/interactions", { params: { lead_id: l.id } });
-    setInteractions(r.data);
+    const request = ++detailRequest.current;
+    setDetailLead(l); setInteractions([]); setDetailDocs([]); setDetailError(""); setDetailLoading(true);
+    const results = await Promise.allSettled([
+      api.get("/interactions", {params: {lead_id: l.id}}),
+      api.get("/documents", {params: {lead_id: l.id}})
+    ]);
+    if (request !== detailRequest.current) return;
+    if (results[0].status === "fulfilled") setInteractions(results[0].value.data);
+    if (results[1].status === "fulfilled") setDetailDocs(results[1].value.data);
+    if (results.some(r => r.status === "rejected")) setDetailError("Não foi possível carregar todo o histórico e a documentação. Feche e abra novamente para tentar.");
+    setDetailLoading(false);
   };
+  useEffect(() => {
+    let active = true;
+    if (requestedLead) api.get(`/leads/${encodeURIComponent(requestedLead)}`)
+      .then(r => { if (active) openDetail(r.data); })
+      .catch(e => { if (active) toast.error(e.response?.data?.detail || "Não foi possível abrir a empresa."); });
+    return () => { active = false; detailRequest.current += 1; };
+  }, [requestedLead]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addInteraction = async () => {
-    if (!newInter.content.trim()) return;
-    await api.post("/interactions", { ...newInter, lead_id: detailLead.id });
-    setNewInter({ type: "email", subject: "", content: "" });
-    toast.success(t("interaction_logged"));
-    const r = await api.get("/interactions", { params: { lead_id: detailLead.id } });
-    setInteractions(r.data);
+    if (!newInter.content.trim() || !detailLead || detailLoading) return;
+    const id = detailLead.id, request = detailRequest.current;
+    try {
+      await api.post("/interactions", {...newInter, lead_id: id});
+      if (request !== detailRequest.current) return;
+      setNewInter({type: "email", subject: "", content: ""});
+      toast.success(t("interaction_logged"));
+      const r = await api.get("/interactions", {params: {lead_id: id}});
+      if (request === detailRequest.current) setInteractions(r.data);
+    } catch (e) { toast.error(e.response?.data?.detail || "Não foi possível registrar a interação."); }
   };
 
   return (
@@ -217,7 +243,7 @@ const Pipeline = () => {
       </Dialog>
 
       {/* Detail dialog */}
-      <Dialog open={!!detailLead} onOpenChange={(o) => !o && setDetailLead(null)}>
+      <Dialog open={!!detailLead} onOpenChange={(o) => { if (!o) { detailRequest.current += 1; setDetailLead(null); } }}>
         <DialogContent className="max-w-2xl bg-white max-h-[90vh] overflow-y-auto" data-testid="lead-detail-dialog">
           <DialogHeader>
             <DialogTitle className="font-display text-[#104496] flex items-center gap-2">
@@ -235,6 +261,20 @@ const Pipeline = () => {
             </div>
             {detailLead?.validation_status!=="verified"&&<div className="p-3 rounded-lg bg-amber-50 text-sm text-amber-900">Empresa e contatos a validar. Um cadastro ou resultado de pesquisa não confirma atividade de compra.</div>}
             {detailLead?.evidence_urls?.length>0&&<div className="text-xs">Fontes de pesquisa: {detailLead.evidence_urls.map(url=><a key={url} className="block underline" href={url.startsWith("https://")||url.startsWith("http://")?url:undefined} target="_blank" rel="noreferrer">{url}</a>)}</div>}
+            <div className="flex flex-wrap gap-3 text-sm">
+              {externalUrl(detailLead?.website) && <a className="underline" href={externalUrl(detailLead.website)} target="_blank" rel="noreferrer">Site da empresa</a>}
+              {externalUrl(detailLead?.linkedin) && <a className="underline" href={externalUrl(detailLead.linkedin)} target="_blank" rel="noreferrer">LinkedIn</a>}
+              {externalUrl(detailLead?.source_url) && <a className="underline" href={externalUrl(detailLead.source_url)} target="_blank" rel="noreferrer">Fonte da empresa</a>}
+              {externalUrl(detailLead?.decision_source_url) && <a className="underline" href={externalUrl(detailLead.decision_source_url)} target="_blank" rel="noreferrer">Fonte do decisor</a>}
+            </div>
+            <div className="text-sm">E-mail do decisor: {detailLead?.decision_maker_email || "—"} · Telefone: {detailLead?.decision_maker_phone || "—"}</div>
+            {detailLoading && <p role="status">Carregando histórico e documentos...</p>}
+            {detailError && <p role="alert" className="text-red-700">{detailError}</p>}
+            <div className="border rounded-lg p-3 space-y-2"><b>Documentos da empresa</b>
+              <Link className="block underline text-sm" to={`/gestao/documentos?lead=${encodeURIComponent(detailLead?.id || "")}`}>Gerenciar documentos desta empresa</Link>
+              {detailDocs.map(d => <button key={d.id} className="block underline text-sm" onClick={() => downloadDocument(d).catch(() => toast.error("Não foi possível baixar o documento."))}>Baixar {d.title}</button>)}
+              {!detailLoading && !detailDocs.length && <p className="text-sm">Nenhum documento vinculado.</p>}
+            </div>
             {detailLead?.notes && <div className="p-3 bg-[#F7F9FC] rounded-lg text-sm border border-[#104496]/10">{detailLead.notes}</div>}
 
             <div className="border-t border-[#104496]/10 pt-4">
@@ -253,7 +293,7 @@ const Pipeline = () => {
                 <Input placeholder={t("subject")} value={newInter.subject} onChange={(e) => setNewInter({ ...newInter, subject: e.target.value })} className="col-span-2" />
               </div>
               <Textarea placeholder={t("body")} value={newInter.content} onChange={(e) => setNewInter({ ...newInter, content: e.target.value })} rows={2} data-testid="interaction-content-input" />
-              <Button onClick={addInteraction} size="sm" className="mt-2 bg-[#104496] hover:bg-[#0B3274] text-white" data-testid="add-interaction-button">{t("log_interaction")}</Button>
+              <Button onClick={addInteraction} disabled={detailLoading} size="sm" className="mt-2 bg-[#104496] hover:bg-[#0B3274] text-white" data-testid="add-interaction-button">{t("log_interaction")}</Button>
             </div>
 
             <div>

@@ -1,3 +1,4 @@
+import { api } from "@/AuthContext";
 export { api, API } from "@/AuthContext";
 
 export const STAGES = ["new_lead", "qualified", "initial_contact", "negotiation", "sample_quote", "closed_won", "closed_lost"];
@@ -22,3 +23,18 @@ export const flag = (code) => {
 
 export const fmtUSD = (v) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(v || 0);
 export const fmtBRL = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 2 }).format(v || 0);
+
+// URLs from discovery are external data; only HTTP(S) links are rendered.
+export const externalUrl = (value) => {
+  try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) ? url.href : ""; }
+  catch { return ""; }
+};
+
+export const downloadDocument = async (doc) => {
+  const r = await api.get("/files/" + doc.file_path, { responseType: "blob" });
+  const url = URL.createObjectURL(r.data);
+  const a = document.createElement("a");
+  a.href = url; a.download = doc.file_name || "documento";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};

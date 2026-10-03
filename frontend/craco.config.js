@@ -95,6 +95,7 @@ if (isDevServer && process.env.DISABLE_EMERGENT_OVERLAY !== "true") {
 }
 
 let webpackConfig = {
+  jest: { configure: { moduleNameMapper: { "^@/(.*)$": "<rootDir>/src/$1", "^react-router-dom$": path.join(path.dirname(require.resolve("react-router-dom/package.json")), "dist/index.js"), "^react-router/dom$": path.join(path.dirname(require.resolve("react-router/package.json")), "dist/development/dom-export.js"), "^react-router$": path.join(path.dirname(require.resolve("react-router/package.json")), "dist/development/index.js") } } },
   eslint: {
     configure: {
       extends: ["plugin:react-hooks/recommended"],

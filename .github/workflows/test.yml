@@ -47,5 +47,19 @@ jobs:
           cache-dependency-path: frontend/package.json
       - name: Install frontend dependencies
         run: npm install --legacy-peer-deps
+      - name: Frontend interaction tests
+        env:
+          CI: "true"
+          DISABLE_EMERGENT_OVERLAY: "true"
+        run: npm test -- --watchAll=false --runInBand
       - name: Build frontend
         run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install browser test backend
+        run: pip install -r ../backend/requirements.txt
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - name: Browser workflow test
+        run: npm run test:e2e
