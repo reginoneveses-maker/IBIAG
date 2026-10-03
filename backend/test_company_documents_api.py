@@ -137,6 +137,30 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post("/api/buyer-discovery/search-jobs",json={"product":"Acerola","countries":["Atlantis"]})
         self.assertEqual(response.status_code,400)
 
+    async def test_retry_only_failed_markets_preserves_results_and_checks_owner(self):
+        targets=discovery_jobs.resolve_markets("DE,ES,PT")
+        original={"id":"retry-original", "owner_id":"u", "product":"Acerola", "limit":10,
+                  "targets":targets, "label":"Europa", "discovery_version":server.DISCOVERY_VERSION,
+                  "status":"partial", "progress":{"DE":{"status":"complete"},"ES":{"status":"failed"},"PT":{"status":"complete"}},
+                  "results":[{"company":"German Company", "website":"https://de.test", "country_code":"DE"}]}
+        await self.db.buyer_search_jobs.insert_one(original)
+        calls=[]
+        def discover(product,country,limit):
+            calls.append(country)
+            return [{"company":"Spanish Company", "website":"https://es.test"}]
+        with patch.object(server,"discover_buyers",discover),patch.object(discovery_jobs,"SLOTS",asyncio.Semaphore(1)):
+            response=await self.client.post("/api/buyer-discovery/search-jobs/retry-original/retry")
+        self.assertEqual(response.status_code,200,response.text)
+        retry=(await self.client.get("/api/buyer-discovery/search-jobs/"+response.json()["id"])).json()
+        self.assertEqual(calls,["Spain"])
+        self.assertEqual(retry["total"],1)
+        self.assertEqual(retry["status"],"complete")
+        self.assertEqual([r["company"] for r in retry["results"]],["German Company","Spanish Company"])
+        self.assertEqual((await self.db.buyer_search_jobs.find_one({"id":"retry-original"}))["status"],"partial")
+        await self.db.users.insert_one({"id":"other","email":"other@example.com","role":"user"})
+        denied=await self.client.post("/api/buyer-discovery/search-jobs/retry-original/retry",headers={"Authorization":"Bearer "+server.create_token("other","other@example.com")})
+        self.assertEqual(denied.status_code,403)
+
     async def test_legacy_jobs_do_not_redisplay_unverified_titles_as_companies(self):
         await self.db.buyer_search_jobs.insert_one({"id":"legacy","owner_id":"u","status":"complete",
             "results":[{"company":"Acerola research book"}]})

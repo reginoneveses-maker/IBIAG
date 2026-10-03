@@ -256,3 +256,31 @@ test("unassigned technical document can be linked to its supplier without upload
   expect(screen.getByRole("button",{name:"Baixar guarana.pdf"})).toBeTruthy();
   expect(api.post).not.toHaveBeenCalled();
 });
+
+
+test("partial region results display the failure and retry only failed countries",async()=>{
+  const partial={...multiJob,status:"partial",failures:1,progress:{ES:{country:"Espanha",status:"failed",count:0,error:"Limite de requisições"}}};
+  const retried={...multiJob,id:"job2",total:1,completed:1,failures:0};
+  api.get.mockImplementation(path=>response(path.includes("job2")?retried:path.includes("search-jobs")?partial:[]));
+  api.post.mockImplementation(path=>response(path.endsWith("/retry")?retried:{}));
+  mount(TradeIntel,"/?buyer_job=job1");
+  expect((await screen.findByRole("alert")).textContent).toContain("1 países com falha ou consulta incompleta");
+  fireEvent.click(screen.getByRole("button",{name:"Tentar novamente países com falha"}));
+  await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs/job1/retry"));
+  await waitFor(()=>expect(screen.queryByRole("alert")).toBeNull());
+  expect(screen.getByText("Empresa alemã")).toBeTruthy();
+});
+
+test("the same business found in several countries appears once with all searched markets",async()=>{
+  const job={...multiJob,results:[{...buyer,country:"",search_country:"Alemanha",company_country:""},{...buyer,country:"",search_country:"Portugal",company_country:""}]};
+  let polls=0;
+  api.get.mockImplementation(path=>response(path.includes("search-jobs")?{...job,status:++polls === 1 ? "running" : "complete"}:[]));
+  mount(TradeIntel,"/?buyer_job=job1");
+  await screen.findByText("ABC-Ingredients");
+  await waitFor(()=>expect(polls).toBeGreaterThan(1),{timeout:4000});
+  expect(screen.getAllByText("ABC-Ingredients")).toHaveLength(1);
+  expect(screen.getByText("Alemanha, Portugal")).toBeTruthy();
+  expect(screen.getByText("não confirmado")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Filtrar resultados por país"),{target:{value:"Portugal"}});
+  expect(screen.getByText("ABC-Ingredients")).toBeTruthy();
+});

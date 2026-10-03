@@ -96,7 +96,7 @@ class BuyerDiscoveryTests(unittest.TestCase):
 
     def test_hallucinated_identity_or_relationship_and_product_title_are_rejected(self):
         item={"url":"https://acme.test/acerola","title":"Acerola"}
-        for field,value in [("company","Fake Company"),("product_quote","We supply Acerola but this text does not exist."),("company_quote","Fake Company is a supplier.")]:
+        for field,value in [("company","Fake Company")]:
             page=business_page();page["json"][field]=value
             self.assertIsNone(discovery._verified_business(item,page,"Acerola","Portugal"))
         self.assertIsNone(discovery._verified_business(item,business_page(company="Acerola"),"Acerola","Portugal"))
@@ -121,7 +121,9 @@ class BuyerDiscoveryTests(unittest.TestCase):
         page["json"]["page_type"]="other"
         self.assertIsNone(discovery._verified_business(item,page,"Acerola","Portugal"))
         page["json"].update(page_type="company_product",business_quote="Buy now")
-        self.assertIsNone(discovery._verified_business(item,page,"Acerola","Portugal"))
+        verified=discovery._verified_business(item,page,"Acerola","Portugal")
+        self.assertIn("Request a quote",verified["product_evidence"])
+        self.assertNotIn("Buy now",verified["product_evidence"])
 
     def test_provider_verification_failure_never_falls_back_to_search_titles(self):
         rows=[{"url":"https://acme.test/acerola","title":"Acme sells Acerola"}]
@@ -150,11 +152,81 @@ class BuyerDiscoveryTests(unittest.TestCase):
 
     def test_scrape_extraction_uses_product_specific_schema_and_preserves_v1_compatibility(self):
         for base in ["https://api.firecrawl.dev/v1","https://api.firecrawl.dev/v2"]:
-            with patch.object(discovery,"FIRECRAWL_URL",base),patch.object(discovery.requests,"post",return_value=Mock(json=lambda:{"success":True,"data":business_page()},raise_for_status=lambda:None)) as post:
+            with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"FIRECRAWL_URL",base),patch.object(discovery.requests,"post",return_value=Mock(json=lambda:{"success":True,"data":business_page()},raise_for_status=lambda:None)) as post:
                 self.assertEqual(discovery._scrape_business("https://acme.test/acerola","Acerola"),business_page())
             body=post.call_args.kwargs["json"]
             prompt=body["jsonOptions"]["prompt"] if base.endswith("v1") else body["formats"][1]["prompt"]
             self.assertIn("Acerola",prompt);self.assertIn("verbatim",prompt)
+
+    def test_identity_and_long_ai_quote_can_be_recovered_from_literal_page_content(self):
+        page=business_page("ABC Ingredients")
+        page["json"].update(company_quote="We are an expert.", product_quote="Invented offer not on the page")
+        page["markdown"]="ABC Ingredients\nOur B2B distribution supplies Acerola fruit powder and Acerola lozenges to retailers, wholesalers, and bulk customers for resale in industrial food quality tested and certified."
+        row=discovery._verified_business({"url":"https://abc.test/acerola"},page,"Acerola","Germany")
+        self.assertTrue(row)
+        self.assertLessEqual(len(row["product_evidence"].split()),25)
+        self.assertIn(row["product_evidence"],page["markdown"])
+        self.assertNotIn("Invented",row["product_evidence"])
+        page["json"]["page_type"]="other"
+        self.assertIsNone(discovery._verified_business({"url":"https://abc.test/article"},page,"Acerola","Germany"))
+
+    def test_markdown_link_urls_do_not_break_literal_evidence_or_supply_identity(self):
+        page=business_page("ABC Ingredients")
+        page["markdown"]="[ABC Ingredients](https://abc.test)\nWe supply [Acerola](https://abc.test/acerola) ingredients."
+        self.assertTrue(discovery._verified_business({"url":"https://abc.test/acerola"},page,"Acerola","Germany"))
+        page["json"]["company"]="inventedcompany"
+        page["markdown"] += " https://inventedcompany.test"
+        self.assertIsNone(discovery._verified_business({"url":"https://abc.test/acerola"},page,"Acerola","Germany"))
+
+    def test_company_country_is_not_the_query_and_verified_foreign_address_is_excluded(self):
+        page=business_page();item={"url":"https://acme.test/acerola"}
+        row=discovery._verified_business(item,page,"Acerola","Bulgaria")
+        self.assertEqual(row["country"],"")
+        self.assertEqual(row["search_country"],"Bulgaria")
+        page["markdown"] += "\nContact address: New York, United States."
+        page["json"].update(country="United States",country_quote="Contact address: New York, United States.")
+        self.assertIsNone(discovery._verified_business(item,page,"Acerola","Bulgaria"))
+        row=discovery._verified_business(item,page,"Acerola","United States")
+        self.assertTrue(row["country_verified"])
+        self.assertEqual(row["company_country"],"United States")
+
+    def test_provider_rate_limit_retries_and_credit_failure_is_typed_terminal(self):
+        import requests
+        limited=Mock(status_code=429,headers={"Retry-After":"1"})
+        limited.raise_for_status.side_effect=requests.HTTPError(response=limited)
+        okay=Mock(json=lambda:{"success":True,"data":{"web":[]}},raise_for_status=lambda:None)
+        clock=[100.0]
+        with patch.object(discovery,"PROVIDER_PAUSE_UNTIL",0),patch.object(discovery.time,"monotonic",side_effect=lambda:clock[0]),patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery.requests,"post",side_effect=[limited,okay]) as post,patch.object(discovery.time,"sleep",side_effect=lambda delay:clock.__setitem__(0,clock[0]+delay)) as sleep:
+            self.assertEqual(discovery._search("Acerola"),[])
+            self.assertEqual(post.call_count,2)
+            sleep.assert_called_once_with(1)
+        empty=Mock(status_code=402,headers={})
+        empty.raise_for_status.side_effect=requests.HTTPError(response=empty)
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery.requests,"post",return_value=empty) as post:
+            with self.assertRaises(discovery.ProviderError) as error: discovery._search("Acerola")
+        self.assertTrue(error.exception.terminal)
+        self.assertEqual(error.exception.code,"credits")
+        self.assertEqual(post.call_count,1)
+
+    def test_job_page_cache_checks_one_url_once_across_markets(self):
+        context=discovery.DiscoveryContext();token=discovery.JOB_CONTEXT.set(context)
+        rows=[{"url":"https://acme.test/acerola","title":"Acerola powder supplier"}]
+        try:
+            with patch.object(discovery,"_search",return_value=rows),patch.object(discovery,"_scrape_business",return_value=business_page()) as scrape:
+                self.assertTrue(discovery.discover_buyers("Acerola","Germany"))
+                self.assertTrue(discovery.discover_buyers("Acerola","Spain"))
+                self.assertEqual(scrape.call_count,1)
+        finally: discovery.JOB_CONTEXT.reset(token)
+
+    def test_partial_page_failures_are_reported_alongside_verified_results(self):
+        rows=[{"url":"https://acme.test/acerola","title":"Acerola powder supplier"},{"url":"https://other.test/acerola","title":"Acerola powder supplier"}]
+        def page(url, product):
+            if "other.test" in url: raise RuntimeError("Site indisponível")
+            return business_page()
+        with patch.object(discovery,"_search",return_value=rows),patch.object(discovery,"_scrape_business",side_effect=page):
+            result=discovery.discover_buyers("Acerola","Germany")
+        self.assertEqual(len(result),1)
+        self.assertIn("Site indisponível",result.warnings)
 
 
 class CompanyEnrichmentTests(unittest.TestCase):
