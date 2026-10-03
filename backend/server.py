@@ -217,6 +217,7 @@ class Lead(BaseModel):
     contact_candidates: dict = Field(default_factory=dict)
     priority: str = "normal"
     source_url: str = ""
+    decision_source_url: str = ""
     deal_value: float = 0.0
     notes: str = ""
     source: str = "manual"
@@ -355,6 +356,9 @@ class Document(BaseModel):
     document_type: str = ""
     certificate_type: str = ""
     folder_path: str = ""
+    lead_id: str = ""
+    lead_name: str = ""
+    owner_id: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 class Certification(BaseModel):
@@ -545,11 +549,15 @@ async def logout(): return {"ok": True}
 
 # Deployment sync: document storage cleanup enabled.
 # ============ FILES / STORAGE ============
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
 @api.post("/upload")
 async def upload_file(file: UploadFile = File(...), user=Depends(get_current_user)):
     ext = (file.filename.rsplit(".", 1)[-1] if "." in file.filename else "bin").lower()
     path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.{ext}"
-    data = await file.read()
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not data or len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Arquivo vazio ou acima do limite de 50 MB")
     ct = file.content_type or "application/octet-stream"
     result = await put_object(path, data, ct)
     return {"path": result["path"], "name": file.filename, "size": result.get("size", len(data)), "content_type": ct}
@@ -558,7 +566,11 @@ async def upload_file(file: UploadFile = File(...), user=Depends(get_current_use
 async def download_file(full_path: str, user=Depends(get_current_user)):
     allowed_prefix = f"{APP_NAME}/uploads/{user['id']}/"
     if user.get("role") != "admin" and not full_path.startswith(allowed_prefix):
-        raise HTTPException(403, "Sem permissão para acessar este arquivo")
+        # Published documents are shared with authenticated IBIAG team members;
+        # unregistered uploads and trashed documents remain private.
+        published = await db.documents.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
+        if not published:
+            raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)
     return Response(content=data, media_type=ct)
 
@@ -695,6 +707,7 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
             category = item["category"]
             if category not in categories or not name.lower().endswith(".pdf"):
                 raise ValueError("Nome ou categoria inválidos")
+            item["folder_path"] = normalize_folder_path(item.get("folder_path"))
             plan.append((item, name, category, data, hashlib.sha256(data).hexdigest()))
     except (ValueError, KeyError, TypeError, zipfile.BadZipFile, RuntimeError) as exc:
         raise HTTPException(400, f"Lote inválido: {exc}")
@@ -707,9 +720,7 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
             continue
         path = f"{APP_NAME}/uploads/{user['id']}/{uuid.uuid4()}.pdf"
         await put_object(path, data, "application/pdf")
-        folder_path = "/".join(p.strip() for p in str(item.get("folder_path") or "").replace("\\", "/").split("/") if p.strip())
-        if ".." in folder_path.split("/"):
-            raise HTTPException(400, "Lote inválido: caminho de pasta inválido")
+        folder_path = item["folder_path"]
         document = Document(title=str(item.get("title") or name), category=category,
                             file_path=path, file_name=name, content_type="application/pdf", size=len(data),
                             tags=["importado", "arquivo original"], notes=str(item.get("notes") or ""),
@@ -719,24 +730,137 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
                             folder_path=folder_path[:500])
         record = document.model_dump()
         record.update(source_sha256=digest, owner_id=user["id"])
-        await db.documents.insert_one(record)
+        try:
+            await register_folder_path(folder_path)
+            await db.documents.insert_one(record)
+        except Exception:
+            await delete_object(path)
+            raise
         imported += 1
     return {"imported": imported, "skipped": skipped, "total": len(plan)}
 
+def normalize_folder_path(value):
+    parts = str(value or "").replace("\\", "/").split("/")
+    if any(p.strip() in {".", ".."} or any(ord(c) < 32 for c in p) for p in parts):
+        raise HTTPException(400, "Caminho de pasta inválido")
+    path = "/".join(p.strip() for p in parts if p.strip())
+    if len(path) > 500:
+        raise HTTPException(400, "Caminho de pasta acima de 500 caracteres")
+    return path
+
+async def register_folder_path(path):
+    parts = path.split("/") if path else []
+    for i in range(1, len(parts) + 1):
+        parent = "/".join(parts[:i])
+        await db.document_folders.update_one({"_id": parent}, {"$setOnInsert": {"path": parent}}, upsert=True)
+
+class DocumentFolderBody(BaseModel):
+    path: str
+
+@api.get("/document-folders")
+async def list_document_folders(user=Depends(get_current_user)):
+    paths = set()
+    async for record in db.document_folders.find({}, {"_id": 0}):
+        paths.add(record["path"])
+    async for record in db.documents.find({"deleted_at": {"$in": [None, ""]}}, {"folder_path": 1}):
+        path = record.get("folder_path", "")
+        parts = path.split("/") if path else []
+        paths.update("/".join(parts[:i]) for i in range(1, len(parts) + 1))
+    return sorted(paths)
+
+@api.post("/document-folders")
+async def create_document_folder(body: DocumentFolderBody, user=Depends(get_current_user)):
+    path = normalize_folder_path(body.path)
+    if not path:
+        raise HTTPException(400, "Informe o nome da pasta")
+    await register_folder_path(path)
+    return {"path": path}
+
+async def document_records(category=None, section=None, search="", lead_id=None, trash=False):
+    query = {"deleted_at": {"$exists": True, "$nin": [None, ""]}} if trash else {"deleted_at": {"$in": [None, ""]}}
+    if lead_id:
+        query["lead_id"] = lead_id
+    async for raw in db.documents.find(query, {"_id": 0}).sort([("created_at", -1), ("id", 1)]):
+        record = normalize_document(raw)
+        if not trash and not matches_document(record, category, section):
+            continue
+        text = " ".join(str(record.get(k, "")) for k in ("title", "file_name", "category", "notes", "tags", "folder_path", "product_name", "supplier_name", "lead_name"))
+        if search and search.casefold() not in text.casefold():
+            continue
+        yield record
+
+@api.get("/documents/page")
+async def documents_page(category: Optional[str] = None, section: Optional[str] = None,
+                         search: str = "", lead_id: Optional[str] = None, trash: bool = False,
+                         skip: int = 0, limit: int = 250, user=Depends(get_current_user)):
+    if trash:
+        require_admin(user)
+    skip, limit = max(0, skip), min(500, max(1, limit))
+    items, total = [], 0
+    async for record in document_records(category, section, search, lead_id, trash):
+        if skip <= total < skip + limit:
+            items.append(record)
+        total += 1
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
+
 @api.get("/documents", response_model=List[Document])
 async def list_docs(category: Optional[str] = None, section: Optional[str] = None,
-                    user=Depends(get_current_user)):
-    records = await db.documents.find({"deleted_at": {"$in": [None, ""]}}, {"_id": 0}).sort("created_at", -1).to_list(10000)
-    return [normalize_document(d) for d in records if matches_document(d, category, section)]
+                    lead_id: Optional[str] = None, user=Depends(get_current_user)):
+    # Retain the list contract used by portfolio and legacy panels without silently truncating.
+    return [d async for d in document_records(category, section, lead_id=lead_id)]
 
-@api.post("/documents", response_model=Document)
-async def create_doc(d: Document, user=Depends(get_current_user)):
+async def validate_document_metadata(d, user):
     try:
         d.category, d.section = validate_classification(d.category, d.section)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    if not d.title.strip():
+        raise HTTPException(400, "Título obrigatório")
+    d.title = d.title.strip()
+    d.folder_path = normalize_folder_path(d.folder_path)
+    for field, name, collection in [("product_id", "product_name", db.products), ("supplier_id", "supplier_name", db.suppliers), ("lead_id", "lead_name", db.leads)]:
+        value = getattr(d, field)
+        if value:
+            record = await collection.find_one({"id": value})
+            if not record:
+                raise HTTPException(400, "Vínculo não encontrado: " + field)
+            setattr(d, name, record.get("company", record.get("name", "")))
+        else:
+            setattr(d, name, "")
+    d.owner_id = user["id"]
     d.deleted_at = ""
+
+@api.post("/documents", response_model=Document)
+async def create_doc(d: Document, user=Depends(get_current_user)):
+    await validate_document_metadata(d, user)
+    if not d.file_path.startswith(f"{APP_NAME}/uploads/{user['id']}/"):
+        raise HTTPException(403, "O arquivo deve pertencer ao usuário que o enviou")
+    _, d.content_type = await get_object(d.file_path)
+    if await db.documents.find_one({"id": d.id}):
+        raise HTTPException(409, "Documento já cadastrado")
+    await register_folder_path(d.folder_path)
     await db.documents.insert_one(d.model_dump())
+    return d
+
+@api.post("/documents/upload", response_model=Document)
+async def upload_document(file: UploadFile = File(...), metadata: str = Form(...), user=Depends(get_current_user)):
+    import json
+    try:
+        values = json.loads(metadata)
+        if not isinstance(values, dict):
+            raise ValueError("Metadados inválidos")
+        d = Document(**{**values, "id": str(uuid.uuid4()), "file_path": "pending", "file_name": file.filename or "arquivo"})
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Metadados do documento inválidos")
+    await validate_document_metadata(d, user)
+    upload = await upload_file(file, user)
+    d.file_path, d.content_type, d.size = upload["path"], upload["content_type"], upload["size"]
+    try:
+        await register_folder_path(d.folder_path)
+        await db.documents.insert_one(d.model_dump())
+    except Exception:
+        await delete_object(d.file_path)
+        raise
     return d
 
 class DocumentClassification(BaseModel):
@@ -773,10 +897,8 @@ async def classify_document(did: str, body: DocumentClassification, user=Depends
     if body.certificate_type is not None:
         changes["certificate_type"] = body.certificate_type.strip()
     if body.folder_path is not None:
-        folder_path = "/".join(p.strip() for p in body.folder_path.replace("\\", "/").split("/") if p.strip())
-        if ".." in folder_path.split("/"):
-            raise HTTPException(400, "Caminho de pasta inválido")
-        changes["folder_path"] = folder_path[:500]
+        changes["folder_path"] = normalize_folder_path(body.folder_path)
+        await register_folder_path(changes["folder_path"])
     result = await db.documents.update_one({"id": did}, {"$set": changes})
     if not result.matched_count:
         raise HTTPException(404, "Documento não encontrado")
@@ -1314,8 +1436,17 @@ async def list_product_offers(product_id: Optional[str] = None, supplier_id: Opt
     if active is not None: q["active"] = active
     return await db.product_offers.find(q, {"_id": 0}).sort("created_at", -1).to_list(2000)
 
+async def validate_offer_documents(o):
+    document_ids = set(o.spec_document_ids + o.certificate_document_ids + o.other_document_ids)
+    for collection, ids in [(db.documents, document_ids), (db.specs, set(o.spec_ids)), (db.certifications, set(o.certification_ids))]:
+        for identifier in ids:
+            record = await collection.find_one({"id": identifier})
+            if not record or record.get("deleted_at"):
+                raise HTTPException(400, "Documento, especificação ou certificado não disponível: " + identifier)
+
 @api.post("/product-offers", response_model=ProductOffer)
 async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
+    await validate_offer_documents(o)
     async with business_write_lock() as ensure_owned:
         if not await db.products.find_one({"id": o.product_id}):
             raise HTTPException(404, "Produto não encontrado")
@@ -1332,6 +1463,7 @@ async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
 
 @api.put("/product-offers/{oid}", response_model=ProductOffer)
 async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_current_user)):
+    await validate_offer_documents(o)
     async with business_write_lock() as ensure_owned:
         existing = await db.product_offers.find_one({"id": oid}, {"_id": 0})
         if not existing: raise HTTPException(404, "Oferta não encontrada")
@@ -1368,7 +1500,7 @@ async def product_offer_documents(oid: str, user=Depends(get_current_user)):
     ids = list(dict.fromkeys(offer.get("spec_document_ids", []) + offer.get("certificate_document_ids", []) + offer.get("other_document_ids", [])))
     result = []
     if ids:
-        docs = await db.documents.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+        docs = await db.documents.find({"id": {"$in": ids}, "deleted_at": {"$in": [None, ""]}}, {"_id": 0}).to_list(200)
         result.extend([{**d, "link_type": "document"} for d in docs])
     spec_ids = offer.get("spec_ids", [])
     if spec_ids:
@@ -1778,6 +1910,13 @@ async def count_leads(stage: Optional[str] = None, industry: Optional[str] = Non
         q["industry"] = industry
     return {"total": await db.leads.count_documents(q)}
 
+@api.get("/leads/{lid}", response_model=Lead)
+async def get_lead(lid: str, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"id": lid}, {"_id": 0})
+    if not lead:
+        raise HTTPException(404, "Empresa não encontrada")
+    return lead
+
 @api.post("/leads", response_model=Lead)
 async def create_lead(lead: Lead, user=Depends(get_current_user)):
     await db.leads.insert_one(lead.model_dump()); return lead
@@ -2003,6 +2142,12 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
     if not company:
         raise HTTPException(400, "Empresa obrigatória.")
     country = str(payload.get("country", ""))
+    try:
+        score = float(payload.get("priority_score", 0) or 0)
+        if not 0 <= score <= 100:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Score deve ser um número entre 0 e 100")
     data = {
         "company": company,
         "country": country,
@@ -2011,30 +2156,35 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "linkedin": str(payload.get("linkedin", "")),
         "product_interest": str(payload.get("product_interest", "")),
         "source_url": str(payload.get("source_url", "")),
+        "decision_source_url": str(payload.get("decision_source_url", "")),
         "source": "buyer_discovery",
-        "priority": "high" if float(payload.get("priority_score", 0) or 0) >= 70 else "normal",
+        "priority": "high" if score >= 70 else "normal",
         "notes": f"Candidato encontrado na web; empresa, atividade de compra e contatos exigem validação. Score de pesquisa: {payload.get('priority_score', 0)}",
         "decision_maker": str(payload.get("decision_maker", "")),
         "decision_maker_title": str(payload.get("decision_maker_title", "")),
         "decision_maker_email": str(payload.get("decision_maker_email", "")),
         "decision_maker_phone": str(payload.get("decision_maker_phone", "")),
         "validation_status": "needs_validation",
-        "evidence_urls": [str(url) for url in payload.get("evidence_urls", []) if isinstance(url, str)][:20],
+        "evidence_urls": [url for url in (payload.get("evidence_urls") if isinstance(payload.get("evidence_urls"), list) else []) if isinstance(url, str)][:20],
         "contact_candidates": payload.get("contact_candidates") if isinstance(payload.get("contact_candidates"), dict) else {},
         "updated_at": now_iso(),
     }
     existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(country)}$", "$options": "i"}}, {"_id": 0})
     if existing:
-        merged = dict(existing)
-        for k, v in data.items():
-            if v and not merged.get(k):
-                merged[k] = v
-        merged["updated_at"] = now_iso()
-        await db.leads.replace_one({"id": existing["id"]}, merged)
-        return merged
+        changes = {k: v for k, v in data.items() if v and not existing.get(k) and k != "evidence_urls"}
+        changes["updated_at"] = now_iso()
+        update = {"$set": changes}
+        if data["evidence_urls"]:
+            update["$addToSet"] = {"evidence_urls": {"$each": data["evidence_urls"]}}
+        await db.leads.update_one({"id": existing["id"]}, update)
+        return await db.leads.find_one({"id": existing["id"]}, {"_id": 0})
     lead = Lead(**data)
-    await db.leads.insert_one(lead.model_dump())
-    return lead
+    key = hashlib.sha256((company.casefold() + "\0" + country.strip().casefold()).encode()).hexdigest()
+    record = {**lead.model_dump(), "discovery_key": key}
+    try:
+        return await db.leads.find_one_and_update({"discovery_key": key}, {"$setOnInsert": record}, upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0})
+    except DuplicateKeyError:
+        return await db.leads.find_one({"discovery_key": key}, {"_id": 0})
 
 # ============ DASHBOARD ============
 @api.get("/dashboard/stats")
@@ -2234,6 +2384,7 @@ async def seed_all():
 
 @app.on_event("startup")
 async def startup():
+    await db.leads.create_index("discovery_key", unique=True, sparse=True)
     await seed_all()
 
 @app.on_event("shutdown")

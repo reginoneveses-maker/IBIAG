@@ -23,7 +23,10 @@ def _search(query: str, limit: int = 8) -> List[Dict]:
         r.raise_for_status()
     except requests.RequestException:
         raise RuntimeError("O serviço de pesquisa não respondeu. Confira a configuração e o saldo do serviço.") from None
-    payload = r.json()
+    try:
+        payload = r.json()
+    except ValueError:
+        raise RuntimeError("O serviço de pesquisa retornou JSON inválido.") from None
     if not isinstance(payload, dict) or payload.get("success") is False:
         raise RuntimeError("O serviço de pesquisa não retornou uma resposta válida.")
     data = payload.get("data")
@@ -79,11 +82,12 @@ def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
     for item in results:
         url, domain = item.get("url", ""), _extract_domain(item.get("url", ""))
         title, desc = item.get("title", "") or "", item.get("description", "") or ""
-        key = domain or title.lower()
+        company = re.split(r"\s+(?:[|–—-])\s+|\s*\|\s*", title, maxsplit=1)[0].strip() or domain.split(".")[0].title()
+        key = (domain, _normalize(company))
         if not key or key in seen or not _is_product_relevant(item, product): continue
         seen.add(key)
-        buyers.append({"company": re.sub(r"\s*[|–—-]\s*.*$", "", title).strip() or domain.split(".")[0].title(), "website": url, "domain": domain, "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item), product), "source": "firecrawl_web"})
-    return sorted(buyers, key=lambda x: x["priority_score"], reverse=True)
+        buyers.append({"company": company, "website": url, "domain": domain, "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item), product), "source": "firecrawl_web"})
+    return sorted(buyers, key=lambda x: x["priority_score"], reverse=True)[:max(1, min(limit, 20))]
 
 def discover_decision_maker(company: str, country: str, product: str) -> Dict:
     queries = [f'"{company}" procurement purchasing buyer ingredients {product} {country}', f'"{company}" "purchasing manager" OR "procurement manager" {country}', f'"{company}" site:linkedin.com/in procurement purchasing buyer {country}']
@@ -102,4 +106,4 @@ def discover_decision_maker(company: str, country: str, product: str) -> Dict:
             if any(w in a.lower() for w in ("procurement","purchasing","sourcing","buying")): title,name=a,b
             else: name,title=a,b
             break
-    return {"decision_maker":name,"decision_maker_title":title,"decision_maker_email":emails[0] if emails else "","decision_maker_phone":phones[0] if phones else "","linkedin":linkedin,"source_url":best.get("url",""),"source":"firecrawl_web","evidence_urls":list(dict.fromkeys(x.get("url","") for x in results if x.get("url")))[:10],"contact_candidates":{"emails":emails[:10],"phones":phones[:10]},"validation_status":"needs_validation" if (name or emails or phones or linkedin) else "not_found"}
+    return {"decision_maker":name,"decision_maker_title":title,"decision_maker_email":emails[0] if emails else "","decision_maker_phone":phones[0] if phones else "","linkedin":linkedin,"decision_source_url":best.get("url",""),"source":"firecrawl_web","evidence_urls":list(dict.fromkeys(x.get("url","") for x in results if x.get("url")))[:10],"contact_candidates":{"emails":emails[:10],"phones":phones[:10]},"validation_status":"needs_validation" if (name or emails or phones or linkedin) else "not_found"}

@@ -1,0 +1,43 @@
+# CRM, documentos e pastas — correção dos fluxos auditados
+
+As mudanças complementam a versão main 1fe5bb7; preservam a lixeira e a classificação existentes.
+
+## Comportamento
+
+- Trade Intelligence mostra site, fonte da empresa, contatos do decisor e fonte do decisor separadamente. Após incluir um candidato, “Ver empresa no CRM” abre a ficha pelo ID retornado. Pesquisas antigas não substituem resultados da pesquisa ativa.
+- O CRM abre a empresa indicada por `?lead=ID`, mostra links e documentos e mantém o contexto ao recarregar. Interações e documentos carregam independentemente sem mostrar histórico da empresa anterior.
+- A Central permite criar pastas vazias e subpastas, navegar, escolher o destino do upload e mover documentos por “Mover / classificar”. Classificações por área, produto, documento e certificado continuam disponíveis. Os vínculos com empresa são preservados em `lead_id`.
+- `POST /api/documents/upload` recebe arquivo e metadados juntos, valida os vínculos antes de armazenar e remove o objeto se o cadastro falhar. Upload individual limitado a 50 MB. A lixeira continua recuperável e não apaga o arquivo.
+- Documentos publicados são compartilhados com a equipe autenticada IBIAG; uploads sem cadastro e documentos na lixeira só são acessíveis ao remetente ou administrador. Não é um sistema multiorganização.
+- Ofertas rejeitam referências inexistentes ou documentos na lixeira. Restaurar o documento preserva os vínculos existentes. O agregador de documentos da oferta omite documentos na lixeira.
+- Paginação e busca documental no backend não dependem do antigo limite de 10 mil arquivos. A Central carrega as páginas para manter sua navegação por classificação.
+
+## Endpoints adicionais
+
+- `GET /api/leads/{id}`
+- `GET /api/documents/page`: `category`, `section`, `search`, `lead_id`, `trash`, `skip`, `limit`
+- `GET /api/document-folders`
+- `POST /api/document-folders`: `{ "path": "Produtos/Acerola/COA" }`
+- `POST /api/documents/upload`: multipart `file` e `metadata` JSON
+
+Pastas são organização lógica persistida; os arquivos não precisam mudar de chave em GridFS/S3.
+Os caminhos importados anteriormente aparecem na navegação, sem migração destrutiva.
+Na inicialização é criado um índice único esparso para a chave de descoberta de novos leads.
+
+## Validação reproduzível
+
+```
+TEST_MONGO_URL=mongodb://localhost:27017 python -m pytest -q backend
+cd frontend
+CI=true DISABLE_EMERGENT_OVERLAY=true npm test -- --watchAll=false --runInBand
+CI=true npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+O teste de navegador inicia um servidor local isolado com banco/armazenamento em memória e respostas fixas de descoberta; não usa credenciais de produção, não consome o provedor e não altera o acervo real.
+O teste HTTP com MongoDB real usa banco descartável e GridFS real, verifica os bytes após download e a pasta após nova consulta.
+Os testes de browser e componentes entram no workflow, além dos testes Python e build.
+
+Resultado local: 60 testes Python aprovados com MongoDB real, 6 testes de interação React aprovados e percurso Chromium completo aprovado.
+A busca externa ao vivo e o deployment de produção exigem validação no ambiente publicado; estes testes não comprovam credenciais, saldo ou disponibilidade do provedor.

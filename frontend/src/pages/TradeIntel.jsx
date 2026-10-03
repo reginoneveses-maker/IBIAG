@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, flag, fmtUSD, INDUSTRIES } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, flag, fmtUSD, INDUSTRIES, externalUrl } from "@/lib/api";
 import { useLang } from "@/i18n";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, Search, Globe2, Users } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 const previousMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1);
 const initialEnd = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth()+1).padStart(2,"0")}`;
@@ -36,19 +37,27 @@ const TradeIntel = () => {
   const [directProduct, setDirectProduct] = useState("");
   const [buyerLoading, setBuyerLoading] = useState(false);
   const [decisionLoading, setDecisionLoading] = useState({});
+  const [crmLoading, setCrmLoading] = useState({});
+  const [crmLinks, setCrmLinks] = useState({});
+  const buyerRequest = useRef(0);
+  const tradeRequest = useRef(0);
+  const buyerKey = b => `${b.company}|${b.country}|${b.website}`;
+  useEffect(() => () => { buyerRequest.current += 1; tradeRequest.current += 1; }, []);
 
   const load = useCallback(() => {
     const params = {};
     if (search) params.search = search;
     if (country !== "all") params.country = country;
     if (industry !== "all") params.industry = industry;
+    const request = ++tradeRequest.current;
     api.get("/trade-data", { params }).then(r => {
+      if (request !== tradeRequest.current) return;
       setRecords(r.data);
       if (countries.length === 0 && r.data.length > 0) {
         const uniq = [...new Set(r.data.map(x => `${x.country_code}|${x.importer_country}`))];
         setCountries(uniq);
       }
-    }).catch(() => {});
+    }).catch(() => { if (request === tradeRequest.current) { setRecords([]); toast.error("Não foi possível carregar os registros comerciais."); } });
   }, [search, country, industry, countries.length]);
 
   useEffect(() => { load(); }, [load]);
@@ -78,6 +87,9 @@ const TradeIntel = () => {
 
   const queryComex = async () => {
     setComexLoading(true);
+    setComexRows([]); setMarketRows([]); setProspectSummary(null);
+    setMarketTotals({volume_kg: 0, fob_usd: 0});
+    buyerRequest.current += 1; setBuyerResults([]); setBuyerLoading(false);
     try {
       const r = await api.post("/comexstat/prospect", {
         flow: comexFlow,
@@ -122,56 +134,61 @@ const TradeIntel = () => {
     }
   };
 
-  const directDiscoverBuyers = async () => {
-    const product = directProduct.trim();
-    const countryName = directCountry.trim();
-    if (!product || !countryName) return toast.error("Informe o produto e o país.");
+  const searchBuyers = async (product, countryName) => {
+    if (!product.trim() || !countryName.trim()) return toast.error("Informe o produto e o país.");
+    const request = ++buyerRequest.current;
+    setBuyerResults([]); setDecisionLoading({}); setCrmLinks({});
     setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
     try {
       const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 });
-      setBuyerResults(r.data?.results || []);
-      if (!(r.data?.results || []).length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
+      if (request !== buyerRequest.current) return;
+      const results = (r.data?.results || []).map(b => ({...b, country: countryName, product_interest: product}));
+      setBuyerResults(results);
+      if (!results.length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
-      setBuyerResults([]);
-    } finally { setBuyerLoading(false); }
+      if (request === buyerRequest.current) toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
+    } finally { if (request === buyerRequest.current) setBuyerLoading(false); }
   };
-
-  const discoverBuyers = async (market) => {
+  const directDiscoverBuyers = () => searchBuyers(directProduct.trim(), directCountry.trim());
+  const discoverBuyers = (market) => {
     const opt = ncmOptions.find(x => String(x.coNcm ?? x.co_ncm ?? x.code ?? x.codigo ?? "") === String(selectedNcm));
     const product = selectedNcm ? (opt?.noNcm || opt?.no_ncm || opt?.description || selectedNcm) : (comexSearch || "Brazilian tropical ingredients");
-    const countryName = market.country || "";
-    setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
-    try {
-      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 });
-      setBuyerResults(r.data?.results || []);
-      if (!(r.data?.results || []).length) toast.info("Nenhuma empresa encontrada nesta pesquisa.");
-    } catch (e) {
-      toast.error(e?.response?.data?.detail || "Não foi possível pesquisar compradores.");
-      setBuyerResults([]);
-    } finally { setBuyerLoading(false); }
+    return searchBuyers(product, market.country || "");
   };
 
   const findDecisionMaker = async (buyer) => {
-    setDecisionLoading(prev => ({...prev, [buyer.company]: true}));
+    const key = buyerKey(buyer), request = buyerRequest.current;
+    setDecisionLoading(prev => ({...prev, [key]: true}));
     try {
-      const r = await api.post("/buyer-discovery/" + encodeURIComponent(buyer.company) + "/decision-maker", null, { params: { product: buyerProduct, country: buyerCountry } });
-      setBuyerResults(prev => prev.map(x => x.company === buyer.company ? {...x, ...r.data} : x));
-      toast.success("Pesquisa de decisor concluída.");
-    } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível pesquisar o decisor."); }
-    finally { setDecisionLoading(prev => ({...prev, [buyer.company]: false})); }
+      const r = await api.post("/buyer-discovery/" + encodeURIComponent(buyer.company) + "/decision-maker", null, {params: {product: buyer.product_interest, country: buyer.country}});
+      if (request !== buyerRequest.current) return;
+      const {source_url, source, ...decision} = r.data;
+      setBuyerResults(prev => prev.map(x => buyerKey(x) === key ? {...x, ...decision, decision_source_url: decision.decision_source_url || source_url || ""} : x));
+      if (decision.validation_status === "not_found") toast.info("Nenhum decisor encontrado.");
+      else toast.info("Contatos encontrados; confira as fontes antes de abordar.");
+    } catch (e) { if (request === buyerRequest.current) toast.error(e?.response?.data?.detail || "Não foi possível pesquisar o decisor."); }
+    finally { if (request === buyerRequest.current) setDecisionLoading(prev => ({...prev, [key]: false})); }
   };
-
   const addBuyerToCrm = async (buyer) => {
+    const key = buyerKey(buyer), request = buyerRequest.current;
+    setCrmLoading(prev => ({...prev, [key]: true}));
     try {
-      await api.post("/buyer-discovery/to-crm", {...buyer, country: buyerCountry, product_interest: buyerProduct});
-      toast.success(buyer.company + " enviado para o CRM.");
+      const r = await api.post("/buyer-discovery/to-crm", buyer);
+      if (request === buyerRequest.current) {
+        setCrmLinks(prev => ({...prev, [key]: r.data.id}));
+        toast.success(buyer.company + " disponível no CRM.");
+      }
     } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível enviar para o CRM."); }
+    finally { setCrmLoading(prev => ({...prev, [key]: false})); }
   };
-
   const addToCrm = async (id) => {
-    await api.post(`/trade-data/${id}/add-to-crm`);
-    toast.success(t("added_to_crm"));
+    setCrmLoading(prev => ({...prev, [id]: true}));
+    try {
+      const r = await api.post(`/trade-data/${id}/add-to-crm`);
+      setCrmLinks(prev => ({...prev, [id]: r.data.id}));
+      toast.success(t("added_to_crm"));
+    } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível adicionar ao CRM."); }
+    finally { setCrmLoading(prev => ({...prev, [id]: false})); }
   };
 
   return (
@@ -282,7 +299,7 @@ const TradeIntel = () => {
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.fob_usd || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</TableCell>
                   <TableCell className="text-right font-mono-alt text-xs">USD {Number(m.avg_usd_kg || 0).toFixed(2)}</TableCell>
                   <TableCell className="text-right text-xs">{Number(m.share_pct || 0).toFixed(2)}%</TableCell>
-                  <TableCell className="text-right"><Button size="sm" variant="outline" onClick={() => discoverBuyers(m)}><Users className="w-3 h-3 mr-1" />{buyerLoading ? "Pesquisando..." : "Buscar compradores"}</Button></TableCell>
+                  <TableCell className="text-right"><Button size="sm" variant="outline" disabled={buyerLoading || comexLoading} onClick={() => discoverBuyers(m)}><Users className="w-3 h-3 mr-1" />{buyerLoading ? "Pesquisando..." : "Buscar compradores"}</Button></TableCell>
                 </TableRow>
               ))}</TableBody></Table>
             </div>
@@ -296,23 +313,30 @@ const TradeIntel = () => {
               <Badge variant="outline">{buyerResults.length} empresas</Badge>
             </div>
             <div className="space-y-2">{buyerResults.map((b) => (
-              <div key={b.domain || b.company} className="rounded-lg border bg-white p-3">
+              <div key={buyerKey(b)} className="rounded-lg border bg-white p-3">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-[#104496]">{b.company}</div>
+                    <div className="flex flex-wrap gap-3 text-xs mt-1">{externalUrl(b.website) && <a href={externalUrl(b.website)} target="_blank" rel="noreferrer" className="underline">Abrir site da empresa</a>}{externalUrl(b.source_url) && <a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer" className="underline">Fonte da empresa</a>}</div>
                     <div className="text-xs text-[#104496]/60">{b.domain || b.website} · Score {b.priority_score}</div>
                     {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}
-                    {b.linkedin && <a className="text-xs underline text-[#104496]" href={b.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
+                    {externalUrl(b.linkedin) && <a className="text-xs underline text-[#104496]" href={externalUrl(b.linkedin)} target="_blank" rel="noreferrer">LinkedIn</a>}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
-                    {(b.website || b.source_url) && <Button size="sm" variant="outline" asChild><a href={b.website || b.source_url} target="_blank" rel="noreferrer">Ver empresa</a></Button>}
-                    {b.source_url && b.source_url !== b.website && <Button size="sm" variant="outline" asChild><a href={b.source_url} target="_blank" rel="noreferrer">Ver fonte</a></Button>}
-                    <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[b.company]}>{decisionLoading[b.company] ? "Pesquisando..." : "Buscar decisor"}</Button>
-                    <Button size="sm" onClick={() => addBuyerToCrm(b)} className="bg-[#104496] hover:bg-[#0B3274] text-white">Adicionar ao CRM</Button>
+                    {externalUrl(b.website || b.source_url) && <Button size="sm" variant="outline" asChild><a href={externalUrl(b.website || b.source_url)} target="_blank" rel="noreferrer">Ver empresa</a></Button>}
+                    {externalUrl(b.source_url) && b.source_url !== b.website && <Button size="sm" variant="outline" asChild><a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer">Ver fonte</a></Button>}
+                    <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[buyerKey(b)] || crmLoading[buyerKey(b)]}>{decisionLoading[buyerKey(b)] ? "Pesquisando..." : "Buscar decisor"}</Button>
+                    <Button size="sm" disabled={crmLoading[buyerKey(b)] || decisionLoading[buyerKey(b)]} onClick={() => addBuyerToCrm(b)} className="bg-[#104496] hover:bg-[#0B3274] text-white">{crmLoading[buyerKey(b)] ? "Salvando..." : "Adicionar ao CRM"}</Button>
+                    {crmLinks[buyerKey(b)] && <Link className="text-sm underline self-center" to={`/prospects/pipeline?lead=${encodeURIComponent(crmLinks[buyerKey(b)])}`}>Ver empresa no CRM</Link>}
                   </div>
                 </div>
                 {b.source_description && <div className="text-xs mt-2 text-[#104496]/70">{b.source_description}</div>}
-                {b.source_url && <div className="text-[10px] mt-2 text-[#104496]/50 truncate">Fonte: {b.source_url}</div>}
+                <div className="text-xs mt-2 space-y-1">
+                  {b.decision_maker_email && <div>E-mail: <a className="underline" href={`mailto:${b.decision_maker_email}`}>{b.decision_maker_email}</a></div>}
+                  {b.decision_maker_phone && <div>Telefone: {b.decision_maker_phone}</div>}
+                  <div>{b.validation_status === "not_found" ? "Decisor não encontrado" : "Candidato à prospecção · requer validação"}</div>
+                  {externalUrl(b.decision_source_url) && <a className="underline" href={externalUrl(b.decision_source_url)} target="_blank" rel="noreferrer">Fonte do decisor</a>}
+                </div>
               </div>
             ))}</div>
           </div>
@@ -408,10 +432,11 @@ const TradeIntel = () => {
                   <TableCell className="text-right">
                     <Button
                       size="sm"
-                      onClick={() => addToCrm(r.id)}
+                      disabled={crmLoading[r.id]} onClick={() => addToCrm(r.id)}
                       data-testid={`add-crm-${r.id}`}
                       className="bg-[#104496] hover:bg-[#0B3274] text-white text-xs"
                     ><Plus className="w-3 h-3 mr-1" />{t("add_to_crm")}</Button>
+                    {crmLinks[r.id] && <Link className="block text-xs underline mt-2" to={`/prospects/pipeline?lead=${encodeURIComponent(crmLinks[r.id])}`}>Ver empresa no CRM</Link>}
                   </TableCell>
                 </TableRow>
               ))}
