@@ -22,7 +22,7 @@ export default function Documentos({defaultSection="",title="Central de Document
  useEffect(()=>{api.get("/products").then(r=>setProducts(r.data)).catch(()=>setProducts([])); api.get("/suppliers").then(r=>setSuppliers(r.data)).catch(()=>setSuppliers([]));},[]);
  const productFolders=useMemo(()=>Array.from(new Set(docs.filter(d=>d.category==="Produtos"&&d.product_name).map(d=>d.product_name))).sort((a,b)=>a.localeCompare(b)),[docs]);
  const folderCount=(cat)=>docs.filter(d=>d.category===cat).length;
- const filtered=useMemo(()=>docs.filter(d=>(!area||d.category===area)&&(!sectionFilter||d.section===sectionFilter)&&(!productFolder||d.product_name===productFolder)&&[d.title,d.category,d.file_name,d.supplier_name,d.product_name,d.document_type,d.certificate_type,d.folder_path,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q,area,sectionFilter,productFolder,docTypeFolder,certTypeFolder]);
+ const filtered=useMemo(()=>docs.filter(d=>(!area||d.category===area)&&(!sectionFilter||d.section===sectionFilter)&&(!productFolder||d.product_name===productFolder)&&[d.title,d.category,d.file_name,d.supplier_name,d.product_name,d.document_type,d.certificate_type,d.folder_path,(d.tags||[]).join(" "),d.notes].join(" ").toLowerCase().includes(q.toLowerCase())),[docs,q,area,sectionFilter,productFolder]);
  async function submit(e){e.preventDefault(); if(!form.file)return; setBusy(true); try{
    const fd=new FormData(); fd.append("file",form.file); const up=(await api.post("/upload",fd,{headers:{"Content-Type":"multipart/form-data"}})).data;
    const product=products.find(x=>x.id===form.product_id), supplier=suppliers.find(x=>x.id===form.supplier_id);
