@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import ProductPhoto from "@/components/ProductPhoto";
 
 const Catalog = () => {
   const { t, lang } = useLang();
@@ -67,9 +68,7 @@ const Catalog = () => {
             data-testid={`product-card-${p.id}`}
             className="overflow-hidden border-[#0F382C]/10 bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-[#0F382C]/30 transition-all group"
           >
-            <div className="aspect-[4/3] overflow-hidden bg-[#EFECE6]">
-              <img src={p.image_url} alt={p.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-            </div>
+            <ProductPhoto key={`${p.id}:${p.image_url || ""}`} product={p} lang={lang} />
             <CardContent className="p-5 space-y-3">
               <div>
                 <div className="text-[10px] font-mono-alt uppercase tracking-widest text-amber-700">HS {p.hs_code}</div>

@@ -23,6 +23,23 @@ const base = "http://127.0.0.1:8765";
     assert.equal(login.status(),200);
     const {access_token}=await login.json();
     await page.addInitScript(token=>localStorage.setItem("token",token),access_token);
+    await page.goto(base+"/prospects/catalog");
+    await page.getByTestId("product-card-photo-0").waitFor();
+    // Every bundled photograph must decode in a real browser, including the
+    // ingredient fallback after a registered URL returns an invalid image.
+    for (const id of [...Array.from({length:15},(_,i)=>`photo-${i}`), "photo-broken"]) {
+      const img=page.getByTestId(`product-card-${id}`).locator("img");
+      await img.scrollIntoViewIfNeeded();
+      await page.waitForFunction(cardId=>document.querySelector(`[data-testid="${cardId}"] img`)?.src.includes("/static/media/"),`product-card-${id}`);
+      await img.evaluate(el=>el.decode());
+      assert(await img.evaluate(el=>el.naturalWidth>0));
+      assert((await img.getAttribute("src")).includes("/static/media/"));
+    }
+    assert.equal(await page.getByTestId("product-card-photo-unknown").locator("img").count(),0);
+    await page.reload();
+    const acaiPhoto=page.getByTestId("product-card-photo-0").locator("img");
+    await acaiPhoto.scrollIntoViewIfNeeded();await acaiPhoto.evaluate(el=>el.decode());
+    assert(await acaiPhoto.evaluate(el=>el.naturalWidth>0));
     await page.goto(base+"/prospects/trade");
     await page.getByPlaceholder("Produto, ex.: Acerola Powder").fill("Acerola");
     await page.getByPlaceholder("Países, ex.: Alemanha, Espanha, Portugal").fill("Portugal");

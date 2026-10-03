@@ -22,6 +22,12 @@ server.discover_decision_maker = lambda *args: {"decision_maker": "Ana Silva", "
 server.enrich_company = lambda candidate: {"email":"info@example.com", "phone":"+351 210 123 456", "enrichment_status":"complete", "contact_source_urls":["https://example.com/contact"]}
 async def seed_fixture():
     await server.db.users.insert_one({"id":"u", "email":"test@example.com", "name":"Teste", "role":"admin", "password_hash":server.hash_pw("browser-test")})
+    photo_names = ["AÇAÍ EXTRACT POWDER", "ACEROLA POWDER", "COCONUT WATER", "CASTANHA DE CAJU W320",
+                   "CASTANHA-DO-PARÁ", "GUARANÁ EM PÓ", "ABACAXI POLPA", "LARANJA SUCO", "MARACUJÁ POLPA",
+                   "GOIABA POLPA", "LIMÃO TAHITI", "BANANA", "CUPUAÇU POLPA", "MANGA POLPA", "LEMON JUICE"]
+    await server.db.products.insert_many([server.Product(id=f"photo-{i}", name=name, category="portfolio").model_dump() for i, name in enumerate(photo_names)])
+    await server.db.products.insert_one(server.Product(id="photo-broken",name="AÇAÍ FREEZE DRIED - ORGANIC",image_url="/missing-photo.jpg").model_dump())
+    await server.db.products.insert_one(server.Product(id="photo-unknown",name="Produto sem ingrediente identificado").model_dump())
     await server.db.suppliers.insert_many([{"id":"s1","name":"Nossa Fruta"},{"id":"s2","name":"Itaueira"}])
     await server.db.documents.insert_many([
         {"id":"spec-a","title":"Ficha técnica Acerola","category":"Produtos","supplier_id":"s1","supplier_name":"Nossa Fruta","product_name":"Acerola","document_type":"Ficha Técnica","file_path":"fixture/spec-a.pdf","file_name":"spec-acerola.pdf"},
