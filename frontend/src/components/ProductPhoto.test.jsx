@@ -21,7 +21,7 @@ test.each([
   expect(screen.getByText(/foto de referência da apresentação/)).toBeTruthy();
 });
 test.each(["COCONUT WATER", "ACEROLA CLARIFIED CONCENTRATE", "ACEROLA EXTRACT POWDER", "GUARANA FLUID EXTRACT",
-  "GUARANA EXTRACT POWDER", "AÇAÍ SINGLE STRENGTH JUICE", "MANGO", "Açaí com banana", "Caju juice"])("%s cannot inherit fruit or another form's photo", name => {
+  "GUARANA EXTRACT POWDER", "AÇAÍ SINGLE STRENGTH JUICE", "AÇAÍ EXTRACT LIQUID", "AÇAÍ EXTRACT", "MANGO", "Açaí com banana", "Caju juice"])("%s cannot inherit fruit or another form's photo", name => {
   expect(productPhoto({name,category:"acai"})).toBeNull();
 });
 test("different nuts and ordinary guarana powder keep their licensed photographs", () => {

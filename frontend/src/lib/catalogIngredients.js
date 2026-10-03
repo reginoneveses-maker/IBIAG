@@ -67,15 +67,15 @@ export function ingredientKeys(product) {
 export function productForm(product) {
   const name = normalizeProductText(product.name);
   if (/\b(?:freeze dried|freeze powder|liofilizad[oa])\b/.test(name)) return "freeze-dried";
-  if (/\b(?:liquid|fluid|liquido) extract\b|\bextrato (?:liquido|fluido)\b/.test(name)) return "liquid-extract";
-  if (/\b(?:extract|extrato)\b/.test(name)) return "extract-powder";
+  if (/\b(?:liquid|fluid|liquido|fluido)\b.*\b(?:extract|extrato)\b|\b(?:extract|extrato)\b.*\b(?:liquid|fluid|liquido|fluido)\b/.test(name)) return "liquid-extract";
+  if (/\b(?:extract|extrato)\b/.test(name)) return /\b(?:dry|seco|powder|po)\b/.test(name) ? "extract-powder" : "unknown";
   if (/\b(?:flour|farinha)\b/.test(name)) return "flour";
   if (/\b(?:powder|po|ground)\b/.test(name)) return "powder";
   if (/\b(?:pulp|polpa|puree)\b/.test(name)) return "pulp";
+  if (/\b(?:milk|leite)\b/.test(name)) return /\b(?:concentrat\w*|concentrad\w*)\b/.test(name) ? "milk-concentrate" : "milk";
   if (/\b(?:concentrat\w*|concentrad\w*)\b/.test(name)) return "concentrate";
   if (/\b(?:juice|suco)\b/.test(name)) return "juice";
   if (/\b(?:water|agua)\b/.test(name)) return "water";
-  if (/\b(?:milk|leite)\b/.test(name)) return "milk";
   if (/\b(?:oil|oleo)\b/.test(name)) return "oil";
   if (/\b(?:nuts?|castanha)\b/.test(name)) return "nuts";
   if (/\b(?:seed|seeds|semente|sementes)\b/.test(name)) return "seeds";
