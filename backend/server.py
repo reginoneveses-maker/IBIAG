@@ -15,7 +15,7 @@ import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
 import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
-from buyer_discovery import discover_buyers, discover_decision_maker
+from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company
 from document_categories import normalize_document, matches_document, validate_classification
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
@@ -215,6 +215,9 @@ class Lead(BaseModel):
     validation_status: str = "needs_validation"
     evidence_urls: List[str] = []
     contact_candidates: dict = Field(default_factory=dict)
+    enrichment_status: str = ""
+    enrichment_message: str = ""
+    contact_source_urls: List[str] = []
     priority: str = "normal"
     source_url: str = ""
     decision_source_url: str = ""
@@ -2141,18 +2144,28 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
     company = str(payload.get("company", "")).strip()
     if not company:
         raise HTTPException(400, "Empresa obrigatória.")
-    country = str(payload.get("country", ""))
+    original_company = company
+    original_country = str(payload.get("country", ""))
     try:
         score = float(payload.get("priority_score", 0) or 0)
         if not 0 <= score <= 100:
             raise ValueError()
     except (ValueError, TypeError):
         raise HTTPException(400, "Score deve ser um número entre 0 e 100")
+    enriched = await asyncio.to_thread(enrich_company, payload)
+    payload = {**payload, **{k: v for k, v in enriched.items() if v}}
+    company = str(payload.get("company", company)).strip()
+    country = str(payload.get("country", ""))
     data = {
         "company": company,
         "country": country,
         "country_code": str(payload.get("country_code", "")),
         "website": str(payload.get("website", "")),
+        "email": str(payload.get("email", "")),
+        "phone": str(payload.get("phone", "")),
+        "enrichment_status": payload.get("enrichment_status", ""),
+        "enrichment_message": payload.get("enrichment_message", ""),
+        "contact_source_urls": payload.get("contact_source_urls", []),
         "linkedin": str(payload.get("linkedin", "")),
         "product_interest": str(payload.get("product_interest", "")),
         "source_url": str(payload.get("source_url", "")),
@@ -2169,9 +2182,15 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "contact_candidates": payload.get("contact_candidates") if isinstance(payload.get("contact_candidates"), dict) else {},
         "updated_at": now_iso(),
     }
-    existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(country)}$", "$options": "i"}}, {"_id": 0})
+    existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(original_company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(original_country)}$", "$options": "i"}}, {"_id": 0})
+    if not existing:
+        existing = await db.leads.find_one({"company": company, "country": country}, {"_id": 0})
     if existing:
         changes = {k: v for k, v in data.items() if v and not existing.get(k) and k != "evidence_urls"}
+        if existing.get("source") == "buyer_discovery":
+            for field in ("company", "country", "website", "enrichment_status", "enrichment_message", "contact_source_urls"):
+                if data.get(field):
+                    changes[field] = data[field]
         changes["updated_at"] = now_iso()
         update = {"$set": changes}
         if data["evidence_urls"]:
@@ -2185,6 +2204,13 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         return await db.leads.find_one_and_update({"discovery_key": key}, {"$setOnInsert": record}, upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0})
     except DuplicateKeyError:
         return await db.leads.find_one({"discovery_key": key}, {"_id": 0})
+
+@api.post("/leads/{lid}/enrich")
+async def enrich_existing_lead(lid: str, user=Depends(get_current_user)):
+    lead = await db.leads.find_one({"id": lid}, {"_id": 0})
+    if not lead:
+        raise HTTPException(404, "Empresa não encontrada")
+    return await buyer_discovery_to_crm(lead, user)
 
 # ============ DASHBOARD ============
 @api.get("/dashboard/stats")

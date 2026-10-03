@@ -5,6 +5,7 @@ import TradeIntel from "./TradeIntel";
 import Pipeline from "./Pipeline";
 import Documentos from "./gestao/Documentos";
 import { api } from "@/AuthContext";
+import { previewMime } from "@/lib/api";
 
 jest.mock("@/AuthContext", () => ({api: {get: jest.fn(), post: jest.fn(), patch: jest.fn(), delete: jest.fn()}, useAuth: () => ({user: {id: "u", role: "admin"}})}));
 jest.mock("@/i18n", () => ({useLang: () => ({t: key => key})}));
@@ -37,7 +38,7 @@ test("buyer has visible site/source links and CRM deep link after saving",async(
   fireEvent.click(screen.getByRole("button",{name:"Adicionar ao CRM"}));
   const link=await screen.findByRole("link",{name:"Ver empresa no CRM"});
   expect(link.getAttribute("href")).toBe("/prospects/pipeline?lead=lead1");
-  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/to-crm",expect.objectContaining({country:"Portugal",product_interest:"Acerola"}));
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/to-crm",expect.objectContaining({country:"Portugal",product_interest:"Acerola"}),{timeout:90000});
 });
 
 test("decision search preserves company source and displays not found",async()=>{
@@ -94,4 +95,34 @@ test("CRM URL opens requested company with document actions",async()=>{
   await screen.findByRole("heading",{name:/ABC-Ingredients/});
   await screen.findByRole("button",{name:"Baixar Laudo"});
   expect(screen.getByRole("link",{name:"Gerenciar documentos desta empresa"}).getAttribute("href")).toBe("/gestao/documentos?lead=lead1");
+});
+
+
+test("creating a folder opens it and makes upload destination clear",async()=>{
+  api.post.mockResolvedValue({data:{path:"Clientes/Acme"}});
+  mount(Documentos);await screen.findByRole("button",{name:"Criar pasta"});
+  fireEvent.change(screen.getByLabelText("Nome da nova subpasta"),{target:{value:"Clientes/Acme"}});
+  fireEvent.click(screen.getByRole("button",{name:"Criar pasta"}));
+  await screen.findByText("Pasta atual: Raiz / Clientes/Acme");
+  fireEvent.click(screen.getByRole("button",{name:"Novo documento"}));
+  expect(screen.getByLabelText("Pasta de destino").value).toBe("Clientes/Acme");
+});
+
+test("PDF preview uses native object with open/download fallback, not sandboxed iframe",async()=>{
+  const doc={id:"pdf",title:"Laudo PDF",file_name:"laudo.pdf",file_path:"u/pdf",category:"Produtos"};
+  URL.createObjectURL=jest.fn(()=>"blob:test-pdf");URL.revokeObjectURL=jest.fn();
+  api.get.mockImplementation(path=>response(path==="/documents/page"?{items:[doc],total:1}:path.startsWith("/files/")?new Blob(["%PDF-1.4 test"],{type:"application/pdf"}):[]));
+  mount(Documentos);await screen.findByRole("button",{name:"Visualizar Laudo PDF"});
+  fireEvent.click(screen.getByRole("button",{name:"Visualizar Laudo PDF"}));
+  await screen.findByRole("link",{name:"Abrir em nova aba"});
+  expect(document.querySelector('object[type="application/pdf"]').getAttribute("data")).toBe("blob:test-pdf");
+  expect(document.querySelector("iframe")).toBeNull();
+  expect(screen.getByRole("button",{name:"Baixar arquivo"})).toBeTruthy();
+});
+
+test("preview checks file signature and rejects HTML and SVG regardless of filename",()=>{
+  expect(previewMime(new Uint8Array([37,80,68,70,45]))).toBe("application/pdf");
+  expect(previewMime(new Uint8Array([137,80,78,71,13,10,26,10]))).toBe("image/png");
+  expect(previewMime(new TextEncoder().encode("<html><script>test</script>"))).toBe("");
+  expect(previewMime(new TextEncoder().encode("<svg onload='test'>"))).toBe("");
 });

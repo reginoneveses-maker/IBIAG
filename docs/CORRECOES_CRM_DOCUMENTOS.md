@@ -41,3 +41,12 @@ Os testes de browser e componentes entram no workflow, além dos testes Python e
 
 Resultado local: 60 testes Python aprovados com MongoDB real, 6 testes de interação React aprovados e percurso Chromium completo aprovado.
 A busca externa ao vivo e o deployment de produção exigem validação no ambiente publicado; estes testes não comprovam credenciais, saldo ou disponibilidade do provedor.
+
+## Retorno de uso real — 3 de outubro
+
+- Adicionar ao CRM consulta automaticamente a página inicial e um link de contato publicado no mesmo domínio via Firecrawl. Nome da empresa, e-mail, telefone e país só são aceitos quando presentes no texto da fonte. Diretórios não são tratados como a empresa. A operação informa campos ausentes e indisponibilidade; não inventa contatos.
+- O país extraído da fonte é o endereço publicado da empresa, não uma prova de atividade de compra no país pesquisado. Contatos gerais não são apresentados como contatos pessoais do decisor.
+- A ficha mostra o telefone geral e fontes dos contatos; “Buscar / atualizar dados da empresa” completa cadastros anteriores. Contatos existentes são preservados.
+- Criar pasta abre automaticamente o caminho criado. O caminho fica na URL, sobrevive à recarga e é mostrado como destino do upload. Mover documento abre o novo destino.
+- A prévia identifica a assinatura PDF/PNG/JPEG/GIF/WebP. PDF usa o leitor nativo, com abrir em nova aba e baixar; o iframe sandboxado que bloqueava plugins foi removido. HTML, SVG e arquivos de escritório não são executados na prévia e oferecem download. Políticas locais do navegador ainda podem impedir seu leitor PDF.
+- Novos testes cobrem extração com fonte, contatos não publicados, falha do provedor, enriquecimento de cadastro existente, criação de pasta e estrutura da prévia PDF. O percurso de navegador verifica a prévia e o destino após recarga.

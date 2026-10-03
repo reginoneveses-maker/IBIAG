@@ -173,10 +173,11 @@ const TradeIntel = () => {
     const key = buyerKey(buyer), request = buyerRequest.current;
     setCrmLoading(prev => ({...prev, [key]: true}));
     try {
-      const r = await api.post("/buyer-discovery/to-crm", buyer);
+      const r = await api.post("/buyer-discovery/to-crm", buyer, {timeout:90000});
       if (request === buyerRequest.current) {
         setCrmLinks(prev => ({...prev, [key]: r.data.id}));
-        toast.success(buyer.company + " disponível no CRM.");
+        toast.success(r.data.company + " disponível no CRM.");
+        if(r.data.enrichment_message)toast.info(r.data.enrichment_message);
       }
     } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível enviar para o CRM."); }
     finally { setCrmLoading(prev => ({...prev, [key]: false})); }

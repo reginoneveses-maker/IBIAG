@@ -38,3 +38,20 @@ export const downloadDocument = async (doc) => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+// Only recognized PDF/raster signatures are displayed. Other formats use download.
+export const previewMime = (bytes) => {
+  const starts = (...values) => values.every((value,index) => bytes[index] === value);
+  if (starts(37,80,68,70,45)) return "application/pdf";
+  if (starts(137,80,78,71,13,10,26,10)) return "image/png";
+  if (starts(255,216,255)) return "image/jpeg";
+  if (starts(71,73,70,56) && [55,57].includes(bytes[4]) && bytes[5]===97) return "image/gif";
+  if (starts(82,73,70,70) && bytes[8]===87 && bytes[9]===69 && bytes[10]===66 && bytes[11]===80) return "image/webp";
+  return "";
+};
+export const documentPreview = async (blob) => {
+  const buffer = await new Promise((resolve,reject) => {const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error("Não foi possível ler o arquivo."));reader.readAsArrayBuffer(blob.slice(0,512));});
+  const mime=previewMime(new Uint8Array(buffer));
+  if(!mime)return {kind:"unsupported",url:""};
+  return {kind:mime==="application/pdf"?"pdf":"image",url:URL.createObjectURL(new Blob([blob],{type:mime}))};
+};

@@ -52,3 +52,39 @@ class BuyerDiscoveryTests(unittest.TestCase):
         self.assertNotIn("source_url", result)
         self.assertEqual(result["decision_source_url"], "https://example.com/team")
         self.assertEqual(result["validation_status"], "needs_validation")
+
+
+class CompanyEnrichmentTests(unittest.TestCase):
+    def test_company_identity_and_contacts_come_from_home_and_contact_page(self):
+        home = {"markdown": "Acme Ingredients GmbH Germany", "json": {"company":"Acme Ingredients GmbH","country":"Germany"},"links":["https://acme.test/kontakt"]}
+        contact = {"markdown":"Acme Ingredients GmbH Contact info@acme.test Phone +49 40 12345678 Germany", "json":{"email":"info@acme.test","phone":"+49 40 12345678"}}
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"_scrape_company",side_effect=[home,contact]):
+            result=discovery.enrich_company({"company":"Organic Acerola Extract 32%", "website":"https://acme.test/products/acerola", "country":"Alemanha"})
+        self.assertEqual(result["company"],"Acme Ingredients GmbH")
+        self.assertEqual(result["email"],"info@acme.test")
+        self.assertEqual(result["phone"],"+49 40 12345678")
+        self.assertEqual(result["website"],"https://acme.test/")
+        self.assertEqual(result["country"],"Germany")
+        self.assertEqual(result["enrichment_status"],"complete")
+
+    def test_unpublished_extracted_values_are_not_saved(self):
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"_scrape_company",return_value={"markdown":"Acerola powder 32% 2026-10-03", "json":{"email":"invented@acme.test","phone":"+49 12345678","company":"Fake Company","country":"Germany"}}):
+            result=discovery.enrich_company({"website":"https://acme.test"})
+        for field in ("company","email","phone","country"):self.assertNotIn(field,result)
+        self.assertEqual(result["enrichment_status"],"partial")
+
+    def test_private_and_malformed_urls_are_rejected(self):
+        for url in ("http://localhost/", "http://127.0.0.1/", "http://169.254.169.254/", "https://host.internal/", "https://user:secret@acme.test/", "https://acme.test:bad/"):
+            self.assertEqual(discovery._public_url(url),"")
+
+    def test_provider_failure_returns_explicit_status(self):
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"_scrape_company",side_effect=RuntimeError("Temporariamente indisponível")):
+            result=discovery.enrich_company({"website":"https://acme.test"})
+        self.assertEqual(result["enrichment_status"],"unavailable")
+
+    def test_directory_operator_is_not_saved_as_candidate_company(self):
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"_scrape_company",return_value={"markdown":"Directory Ltd sales@directory.test", "json":{"is_directory":True,"company":"Directory Ltd","email":"sales@directory.test"}}):
+            result=discovery.enrich_company({"website":"https://directory.test/products/acerola"})
+        self.assertNotIn("company",result)
+        self.assertNotIn("email",result)
+        self.assertIn("diretório",result["enrichment_message"])
