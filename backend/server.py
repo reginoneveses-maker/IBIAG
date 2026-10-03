@@ -20,12 +20,13 @@ from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
+from pricing import decimal_number, calculate_price
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
+from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 import xml.etree.ElementTree as ET
 
@@ -438,21 +439,48 @@ class PriceEntry(BaseModel):
     product_name: str
     supplier_id: str = ""
     supplier_name: str = ""
+    product_id: str = ""
+    offer_id: str = ""
+    quantity: float = Field(default=1, gt=0, allow_inf_nan=False)
     unit: str = "kg"
-    supplier_price: float = 0  # BRL por unidade
-    extra_costs: float = 0  # BRL por unidade (frete, embalagem, etc)
+    supplier_price: float = Field(default=0, allow_inf_nan=False)  # BRL por unidade
+    extra_costs: float = Field(default=0, allow_inf_nan=False)  # BRL por unidade (frete, embalagem, etc)
     extras: List[dict] = []
     taxes: List[dict] = []
-    taxes_pct: float = 0
-    margin_pct: float = 0
-    margin_mode: str = "margin"  # margin (sobre venda) ou markup (sobre custo)
-    currency: str = "BRL"
-    exchange_rate: float = 5.0
+    taxes_pct: float = Field(default=0, allow_inf_nan=False)
+    margin_pct: float = Field(default=0, allow_inf_nan=False)
+    margin_mode: Literal["margin", "markup"] = "margin"  # margin (sobre venda) ou markup (sobre custo)
+    currency: Literal["BRL", "USD"] = "BRL"
+    exchange_rate: float = Field(default=5.0, allow_inf_nan=False)
     sell_price_brl: float = 0
     sell_price_usd: float = 0
     notes: str = ""
     updated_at: str = Field(default_factory=now_iso)
     created_at: str = Field(default_factory=now_iso)
+
+    supplier_total: float = 0
+    extras_total: float = 0
+    cost_total: float = 0
+    sale_total_brl: float = 0
+    sale_total_usd: float = 0
+    tax_total: float = 0
+    profit_total: float = 0
+    calculation_error: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_quantity(cls, values):
+        values = dict(values)
+        match = re.fullmatch(r"(kg|l|un|t)\s*([\d.,]+)", str(values.get("unit", "")), re.I)
+        if match and "quantity" not in values:
+            values["unit"] = match[1].lower()
+            values["quantity"] = float(decimal_number(match[2], quantity=True))
+        return values
+
+    @field_validator("quantity", "supplier_price", "extra_costs", "taxes_pct", "margin_pct", "exchange_rate", mode="before")
+    @classmethod
+    def localized_numbers(cls, value, info):
+        return float(decimal_number(value, quantity=info.field_name == "quantity"))
 
 
 class ProductOffer(BaseModel):
@@ -1381,36 +1409,63 @@ async def del_spec(sid: str, user=Depends(get_current_user)):
 
 # ============ PRICES ============
 def compute_price(p: PriceEntry) -> PriceEntry:
-    extras_sum = sum(float(e.get("value", 0) or 0) for e in p.extras) if p.extras else p.extra_costs
-    p.extra_costs = round(extras_sum, 4)
-    taxes_pct = sum(float(t.get("pct", 0) or 0) for t in p.taxes) if p.taxes else p.taxes_pct
-    p.taxes_pct = round(taxes_pct, 4)
-    cost = p.supplier_price + p.extra_costs
-    if p.margin_mode == "markup":
-        base = cost * (1 + p.margin_pct / 100)
-        price = base / (1 - taxes_pct / 100) if taxes_pct < 100 else base
-    else:
-        divisor = 1 - (p.margin_pct + taxes_pct) / 100
-        price = cost / divisor if divisor > 0 else cost
-    p.sell_price_brl = round(price, 4)
-    p.sell_price_usd = round(price / p.exchange_rate, 4) if p.exchange_rate > 0 else 0
+    try:
+        for key, value in calculate_price(p).items():
+            setattr(p, key, value)
+        p.calculation_error = ""
+    except (ValueError, ArithmeticError) as exc:
+        raise HTTPException(400, str(exc))
     return p
+
+async def validate_price_offer(p):
+    if not p.offer_id:
+        return
+    offer = await db.product_offers.find_one({"id": p.offer_id})
+    if not offer or offer.get("active") is False or offer.get("supplier_id") != p.supplier_id:
+        raise HTTPException(400, "Produto não disponível para o fornecedor selecionado.")
+    if p.product_id and p.product_id != offer.get("product_id"):
+        raise HTTPException(400, "Produto não corresponde à oferta selecionada.")
+    supplier = await db.suppliers.find_one({"id": p.supplier_id})
+    product = await db.products.find_one({"id": offer.get("product_id")})
+    if not supplier or not product:
+        raise HTTPException(400, "Fornecedor ou produto não disponível.")
+    p.product_id = product["id"]
+    p.product_name = offer.get("product_name") or product.get("name", "")
+    p.supplier_name = supplier["name"]
+    p.unit = offer.get("unit") or product.get("unit") or "kg"
 
 @api.get("/prices", response_model=List[PriceEntry])
 async def list_prices(user=Depends(get_current_user)):
-    return await db.prices.find({}, {"_id": 0}).sort("product_name", 1).to_list(1000)
+    records = await db.prices.find({}, {"_id": 0}).sort("product_name", 1).to_list(1000)
+    result = []
+    for record in records:
+        p = PriceEntry(**record)
+        try:
+            result.append(compute_price(p))
+        except HTTPException as exc:
+            # Keep old saved calculations visible so the user can correct them.
+            p.calculation_error = str(exc.detail)
+            p.supplier_total = round(p.supplier_price * p.quantity, 2)
+            p.cost_total = round((p.supplier_price + p.extra_costs) * p.quantity, 2)
+            p.sale_total_brl = round(p.sell_price_brl * p.quantity, 2)
+            p.sale_total_usd = round(p.sell_price_usd * p.quantity, 2)
+            result.append(p)
+    return result
 
 @api.post("/prices/calculate", response_model=PriceEntry)
 async def calc_price(p: PriceEntry, user=Depends(get_current_user)):
+    await validate_price_offer(p)
     return compute_price(p)
 
 @api.post("/prices", response_model=PriceEntry)
 async def create_price(p: PriceEntry, user=Depends(get_current_user)):
+    await validate_price_offer(p)
     p = compute_price(p)
     await db.prices.insert_one(p.model_dump()); return p
 
 @api.put("/prices/{pid}", response_model=PriceEntry)
 async def upd_price(pid: str, p: PriceEntry, user=Depends(get_current_user)):
+    await validate_price_offer(p)
     p.id = pid; p.updated_at = now_iso(); p = compute_price(p)
     await db.prices.replace_one({"id": pid}, p.model_dump()); return p
 
