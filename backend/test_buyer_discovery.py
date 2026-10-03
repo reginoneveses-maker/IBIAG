@@ -16,6 +16,17 @@ class BuyerDiscoveryTests(unittest.TestCase):
     def test_linkedin_lookalike_domain_rejected(self):
         self.assertEqual(discovery._linkedin([{"url":"https://linkedin.com.attacker.test/in/person"}]),"")
         self.assertEqual(discovery._linkedin([{"url":"https://www.linkedin.com/in/person"}]),"https://www.linkedin.com/in/person")
+    def test_accented_product_normalization(self):
+        self.assertEqual(discovery._normalize("Açaí em pó"), "acai em po")
+        self.assertEqual(discovery._normalize("Guaraná"), "guarana")
+
+    def test_discovery_expands_raw_candidate_pool(self):
+        rows=[{"url":"https://example.com/acai","title":"Acai powder importer distributor"}]
+        with patch.object(discovery,"_search",return_value=rows) as search:
+            result=discovery.discover_buyers("Açaí Powder","United States",limit=5)
+        self.assertTrue(result)
+        self.assertEqual(search.call_args.args[1],15)
+
     def test_buyer_deduplication_by_domain(self):
         rows=[{"url":"https://example.com/a","title":"Example ingredient importer"},{"url":"https://www.example.com/b","title":"Example"}]
         with patch.object(discovery,"_search",return_value=rows):
