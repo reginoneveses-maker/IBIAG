@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import ProductPhoto from "@/components/ProductPhoto";
+import { INGREDIENTS, ingredientKeys, matchesCatalogFilter } from "@/lib/catalogIngredients";
 
 const Catalog = () => {
   const { t, lang } = useLang();
@@ -15,11 +16,20 @@ const Catalog = () => {
   const [filter, setFilter] = useState("all");
   const [offerProduct, setOfferProduct] = useState(null);
   const [offerText, setOfferText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
-  const load = () => api.get("/products").then(r => setProducts(r.data)).catch(() => {});
+  const load = () => {
+    setLoading(true); setLoadError(false);
+    return api.get("/products").then(r => setProducts(r.data))
+      .catch(() => setLoadError(true)).finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, []);
 
-  const filtered = filter === "all" ? products : products.filter(p => p.category === filter);
+  const filtered = products.filter(p => matchesCatalogFilter(p, filter));
+  const availableIngredients = new Set(products.flatMap(ingredientKeys));
+  const extraIngredients = INGREDIENTS.filter(([key]) => !CATEGORIES.includes(key) && availableIngredients.has(key));
+  const primaryFilters = [["all", "filter_all"], ...CATEGORIES.map(c => [c, `cat_${c}`])];
 
   const openOffer = (p) => {
     setOfferProduct(p);
@@ -44,22 +54,40 @@ const Catalog = () => {
       </div>
 
       <div className="flex flex-wrap gap-2" data-testid="category-filters">
-        {[["all", "filter_all"], ...CATEGORIES.map(c => [c, `cat_${c}`])].map(([key, label]) => (
+        {primaryFilters.map(([key, label]) => (
           <button
             key={key}
             onClick={() => setFilter(key)}
             data-testid={`filter-${key}`}
+            aria-pressed={filter === key}
             className={`px-4 py-2 rounded-full text-sm font-medium border transition-all ${
               filter === key
                 ? "bg-[#0F382C] text-white border-[#0F382C]"
                 : "bg-white text-[#0F382C] border-[#0F382C]/15 hover:border-[#0F382C]/40"
             }`}
-          >{t(label)}</button>
+          >{t(label)} <span className="opacity-70">({products.filter(p => matchesCatalogFilter(p, key)).length})</span></button>
         ))}
+        {(extraIngredients.length > 0 || availableIngredients.has("other")) && <label className="flex items-center gap-2 text-sm text-[#0F382C]">
+          <span>{lang === "pt" ? "Mais ingredientes" : "More ingredients"}</span>
+          <select data-testid="ingredient-filter" aria-label={lang === "pt" ? "Filtrar por ingrediente" : "Filter by ingredient"}
+            value={primaryFilters.some(([key]) => key === filter) ? "" : filter}
+            onChange={e => setFilter(e.target.value || "all")} className="rounded-full border border-[#0F382C]/20 bg-white px-3 py-2 max-w-[230px]">
+            <option value="">{lang === "pt" ? "Selecione um ingrediente" : "Select an ingredient"}</option>
+            {extraIngredients.map(([key, pt, en]) => <option key={key} value={key}>{lang === "pt" ? pt : en} ({products.filter(p => matchesCatalogFilter(p, key)).length})</option>)}
+            {availableIngredients.has("other") && <option value="other">{lang === "pt" ? "Outros" : "Other"} ({products.filter(p => matchesCatalogFilter(p, "other")).length})</option>}
+          </select>
+        </label>}
         <div className="ml-auto text-xs font-mono-alt uppercase tracking-widest text-[#0F382C]/50 self-center">
           {filtered.length} {t("products_short")}
         </div>
       </div>
+
+      {loading && <p role="status">{lang === "pt" ? "Carregando produtos…" : "Loading products…"}</p>}
+      {loadError && <div role="alert" className="flex items-center gap-3">
+        <span>{lang === "pt" ? "Não foi possível carregar o catálogo." : "Could not load the catalog."}</span>
+        <Button variant="outline" onClick={load}>{lang === "pt" ? "Tentar novamente" : "Try again"}</Button>
+      </div>}
+      {!loading && !loadError && !filtered.length && <p role="status">{lang === "pt" ? "Nenhum produto disponível para este ingrediente." : "No products available for this ingredient."}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map(p => (

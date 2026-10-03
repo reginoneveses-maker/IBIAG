@@ -1,55 +1,53 @@
 import credits from "@/assets/product-photos/credits.json";
-import acai from "@/assets/product-photos/acai.jpg";
-import acerola from "@/assets/product-photos/acerola.jpg";
-import coconut from "@/assets/product-photos/coconut.jpg";
+import formCredits from "@/assets/product-photos/form-credits.json";
+import acaiExtract from "@/assets/product-photos/acai-extract.jpg";
+import acaiFreezeDried from "@/assets/product-photos/acai-freeze-dried.jpg";
+import acaiPulp from "@/assets/product-photos/acai-pulp.jpg";
+import acerolaPowder from "@/assets/product-photos/acerola-powder.jpg";
+import camuCamuExtract from "@/assets/product-photos/camu-camu-extract.jpg";
+import guaranaSeeds from "@/assets/product-photos/guarana-seeds.jpg";
 import cashew from "@/assets/product-photos/cashew.jpg";
 import brazilNut from "@/assets/product-photos/brazil-nut.jpg";
 import guaranaPowder from "@/assets/product-photos/guarana-powder.jpg";
-import pineapple from "@/assets/product-photos/pineapple.jpg";
-import orange from "@/assets/product-photos/orange.jpg";
-import passionFruit from "@/assets/product-photos/passion-fruit.jpg";
-import guava from "@/assets/product-photos/guava.jpg";
-import lime from "@/assets/product-photos/lime.jpg";
-import banana from "@/assets/product-photos/banana.jpg";
-import cupuacu from "@/assets/product-photos/cupuacu.jpg";
-import mango from "@/assets/product-photos/mango.jpg";
-import lemon from "@/assets/product-photos/lemon.jpg";
+import muirapuamaPowder from "@/assets/product-photos/muirapuama-powder.jpg";
+import moringaPowder from "@/assets/product-photos/moringa-powder.jpg";
+import pauDarcoPowder from "@/assets/product-photos/pau-darco-powder.jpg";
+import catuabaPowder from "@/assets/product-photos/catuaba-powder.jpg";
+import pauDarcoCut from "@/assets/product-photos/pau-darco-cut.jpg";
+import {ingredientKeys, productForm} from "./catalogIngredients";
 
-const sources = {acai, acerola, coconut, cashew, "brazil-nut": brazilNut,
-  "guarana-powder": guaranaPowder, pineapple, orange, "passion-fruit": passionFruit,
-  guava, lime, banana, cupuacu, mango, lemon};
-const names = {
-  acai: ["Açaí", "Açaí"], acerola: ["Acerola", "Acerola"], coconut: ["Coco", "Coconut"],
-  cashew: ["Castanha de caju", "Cashew nuts"], "brazil-nut": ["Castanha-do-pará", "Brazil nuts"],
-  "guarana-powder": ["Guaraná em pó", "Guarana powder"], pineapple: ["Abacaxi", "Pineapple"],
-  orange: ["Laranja", "Orange"], "passion-fruit": ["Maracujá", "Passion fruit"],
-  guava: ["Goiaba", "Guava"], lime: ["Limão", "Lime"], banana: ["Banana", "Banana"],
-  cupuacu: ["Cupuaçu", "Cupuacu"],
-  mango: ["Manga", "Mango"], lemon: ["Limão-siciliano", "Lemon"],
+const photographs = {
+  "acai:extract-powder": ["acai-extract", acaiExtract],
+  "acai:freeze-dried": ["acai-freeze-dried", acaiFreezeDried],
+  "acai:pulp": ["acai-pulp", acaiPulp],
+  "acerola:powder": ["acerola-powder", acerolaPowder],
+  "camu-camu:extract-powder": ["camu-camu-extract", camuCamuExtract],
+  "guarana:seeds": ["guarana-seeds", guaranaSeeds],
+  "guarana:powder": ["guarana-powder", guaranaPowder],
+  "cashew:nuts": ["cashew", cashew],
+  "brazil-nut:nuts": ["brazil-nut", brazilNut],
+  "muirapuama:powder": ["muirapuama-powder", muirapuamaPowder],
+  "moringa:powder": ["moringa-powder", moringaPowder],
+  "pau-darco:powder": ["pau-darco-powder", pauDarcoPowder],
+  "catuaba:powder": ["catuaba-powder", catuabaPowder],
+  "pau-darco:cut": ["pau-darco-cut", pauDarcoCut],
 };
-const rules = [
-  ["acai", /\bacai\b/], ["acerola", /\bacerola\b/],
-  ["coconut", /\b(?:coco|coconut)\b/],
-  ["cashew", /\b(?:castanha (?:de )?caju|cashew)\b/],
-  ["brazil-nut", /\b(?:castanha (?:do |de )?(?:para|brasil)|brazil nuts?)\b/],
-  ["guarana-powder", /\bguarana\b.*\b(?:po|powder|ground)\b/],
-  ["pineapple", /\b(?:abacaxi|pineapple)\b/], ["orange", /\b(?:laranja|orange)\b/],
-  ["passion-fruit", /\b(?:maracuja|passion fruit)\b/], ["guava", /\b(?:goiaba|guava)\b/],
-  ["lime", /\b(?:limao tahiti|lime)\b/], ["banana", /\bbanana\b/],
-  ["cupuacu", /\b(?:cupuacu|cupuassu)\b/],
-  ["mango", /\b(?:manga|mango)\b/], ["lemon", /\b(?:limao siciliano|lemon)\b/],
-];
-const normalize = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-  .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const nutNames = {
+  cashew: ["Castanha de caju", "Cashew nuts"],
+  "brazil-nut": ["Castanha-do-pará", "Brazil nuts"],
+  "guarana-powder": ["Guaraná em pó", "Guarana powder"],
+};
 
-// Match the product name, never a broad category or a mention in its description.
-// Blends and unrecognized products must not inherit a photograph of another ingredient.
+// A photograph must match both ingredient AND sold form. Fruit pictures,
+// generic category defaults and photographs of another process are not fallbacks.
 export function productPhoto(product) {
-  const text = normalize(product.name);
-  const matches = rules.filter(([,pattern]) => pattern.test(text));
-  if (matches.length !== 1) return null;
-  const key = matches[0][0];
-  return {...credits.find(c => c.key === key), src: sources[key], names: names[key]};
+  const ingredients = ingredientKeys(product);
+  if (ingredients.length !== 1) return null;
+  const selected = photographs[`${ingredients[0]}:${productForm(product)}`];
+  if (!selected) return null;
+  const [key, src] = selected;
+  const credit = formCredits.find(c => c.key === key) || credits.find(c => c.key === key);
+  return {...credit, key, src, names: credit.names || nutNames[key]};
 }
 
 export function catalogImageUrl(value) {
