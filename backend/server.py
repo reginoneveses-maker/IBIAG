@@ -613,6 +613,57 @@ async def link_document_batch(file: UploadFile = File(...), user=Depends(get_cur
             linked_offers.add(offer["id"])
     return {"documents": len(plan), "offers": len(linked_offers)}
 
+@api.post("/documents/metadata-batch")
+async def update_document_metadata_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
+    require_admin(user)
+    raw = await file.read(2 * 1024 * 1024 + 1)
+    if len(raw) > 2 * 1024 * 1024:
+        raise HTTPException(413, "Plano de metadados excede 2 MB")
+    categories = {"Produtos", "Fornecedores", "Qualidade & Compliance", "Clientes & Comercial", "Financeiro & Fiscal", "Societário", "Exportação & Logística"}
+    try:
+        items = json.loads(raw)
+        if not isinstance(items, list) or not 1 <= len(items) <= 1000:
+            raise ValueError("Plano deve conter de 1 a 1000 documentos")
+        plan, not_found = [], []
+        for item in items:
+            digest = str(item["sha256"]).lower().strip()
+            if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("Hash inválido")
+            doc = await db.documents.find_one({"source_sha256": digest})
+            if not doc:
+                not_found.append(digest)
+                continue
+            fields = {}
+            if item.get("category"):
+                category = str(item["category"]).strip()
+                if category not in categories:
+                    raise ValueError(f"Categoria inválida: {category}")
+                fields["category"] = category
+            for key in ("title", "notes", "document_type", "certificate_type"):
+                if key in item:
+                    fields[key] = str(item.get(key) or "").strip()
+            if "folder_path" in item:
+                folder_path = "/".join(p.strip() for p in str(item.get("folder_path") or "").replace("\\", "/").split("/") if p.strip())
+                if ".." in folder_path.split("/"):
+                    raise ValueError("Caminho de pasta inválido")
+                fields["folder_path"] = folder_path[:500]
+            for entity, collection in (("supplier", db.suppliers), ("product", db.products)):
+                name_key, id_key = f"{entity}_name", f"{entity}_id"
+                if item.get(name_key):
+                    requested = str(item[name_key]).strip()
+                    found = await collection.find_one({"name": {"$regex": f"^{re.escape(requested)}$", "$options": "i"}})
+                    if found:
+                        fields[id_key], fields[name_key] = found["id"], found["name"]
+                    else:
+                        fields[name_key] = requested
+            plan.append((doc["id"], fields))
+    except (ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(400, f"Plano de metadados inválido: {exc}")
+    for doc_id, fields in plan:
+        if fields:
+            await db.documents.update_one({"id": doc_id}, {"$set": fields})
+    return {"updated": len(plan), "not_found": len(not_found), "not_found_sha256": not_found[:100]}
+
 @api.post("/documents/import-batch")
 async def import_document_batch(file: UploadFile = File(...), user=Depends(get_current_user)):
     require_admin(user)
