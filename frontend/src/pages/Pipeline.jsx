@@ -267,6 +267,10 @@ const Pipeline = () => {
               {externalUrl(detailLead?.source_url) && <a className="underline" href={externalUrl(detailLead.source_url)} target="_blank" rel="noreferrer">Fonte da empresa</a>}
               {externalUrl(detailLead?.decision_source_url) && <a className="underline" href={externalUrl(detailLead.decision_source_url)} target="_blank" rel="noreferrer">Fonte do decisor</a>}
             </div>
+            <div className="text-sm">Telefone da empresa: {detailLead?.phone || "Não encontrado"}</div>
+            <div className="text-xs">{detailLead?.enrichment_message}</div>
+            {detailLead?.contact_source_urls?.map(url=>externalUrl(url)&&<a key={url} className="block underline text-xs" href={externalUrl(url)} target="_blank" rel="noreferrer">Fonte dos contatos: {url}</a>)}
+            <button disabled={detailLoading} className="border rounded-lg px-3 py-2 text-sm" onClick={async()=>{const id=detailLead.id;setDetailLoading(true);try{const r=await api.post(`/leads/${id}/enrich`,null,{timeout:90000});setDetailLead(current=>current?.id===id?r.data:current);toast.info(r.data.enrichment_message||"Dados atualizados.");}catch(err){toast.error(err.response?.data?.detail||"Não foi possível atualizar os contatos.");}finally{setDetailLoading(false);}}}>Buscar / atualizar dados da empresa</button>
             <div className="text-sm">E-mail do decisor: {detailLead?.decision_maker_email || "—"} · Telefone: {detailLead?.decision_maker_phone || "—"}</div>
             {detailLoading && <p role="status">Carregando histórico e documentos...</p>}
             {detailError && <p role="alert" className="text-red-700">{detailError}</p>}

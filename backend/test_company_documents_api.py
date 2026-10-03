@@ -43,6 +43,19 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         return await self.client.post("/api/documents/upload", data={"metadata": json.dumps({"title": "Laudo", "category": "Produtos", **metadata})},
                                       files={"file": ("laudo.pdf", b"%PDF-1.4 test", "application/pdf")})
 
+    async def test_crm_automatically_enriches_and_refreshes_existing_profile(self):
+        facts={"company":"Acme Ingredients", "email":"info@acme.test", "phone":"+49 40 12345678", "website":"https://acme.test/", "country":"Germany", "enrichment_status":"complete", "contact_source_urls":["https://acme.test/contact"]}
+        with patch.object(server,"enrich_company",return_value=facts):
+            response=await self.client.post("/api/buyer-discovery/to-crm",json={"company":"Organic Acerola Extract", "country":"Germany", "website":"https://acme.test/products/acerola"})
+            lead=response.json()
+            self.assertEqual(response.status_code,200,response.text)
+            for key in ("company","email","phone","website","country"):self.assertEqual(lead[key],facts[key])
+            await self.db.leads.update_one({"id":lead["id"]},{"$set":{"email":"manual@acme.test"}})
+            refreshed=await self.client.post("/api/leads/"+lead["id"]+"/enrich")
+            self.assertEqual(refreshed.json()["id"],lead["id"])
+            self.assertEqual(refreshed.json()["email"],"manual@acme.test")
+            self.assertEqual(await self.db.leads.count_documents({}),1)
+
     async def test_protected_endpoints_reject_missing_and_invalid_token(self):
         for path in ["/interactions", "/templates", "/trade-data", "/dashboard/stats", "/documents", "/documents/page", "/document-folders"]:
             for token in ["", "Bearer invalid"]:
