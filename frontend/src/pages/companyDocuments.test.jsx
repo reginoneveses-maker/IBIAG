@@ -136,7 +136,7 @@ test("multi-country search preserves each market and filters results",async()=>{
   fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Alemanha, Espanha, Portugal"}});
   fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
   await screen.findByText("Empresa alemã");
-  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:["Alemanha","Espanha","Portugal"],region:"",limit:10});
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:["Alemanha","Espanha","Portugal"],region:"",limit:10,replace_previous:true});
   fireEvent.change(screen.getByLabelText("Filtrar resultados por país"),{target:{value:"Alemanha"}});
   expect(screen.queryByText("Empresa portuguesa")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"Adicionar ao CRM"}));
@@ -149,7 +149,71 @@ test("region search starts a job and completed job resumes on reload without ano
   fireEvent.change(screen.getByLabelText("Região da pesquisa"),{target:{value:"asia"}});
   fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
   await screen.findByText("Empresa alemã");
-  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:[],region:"asia",limit:10});
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:[],region:"asia",limit:10,replace_previous:true});
   cleanup();api.post.mockClear();mount(TradeIntel,"/?buyer_job=job1");
   await screen.findByText("Empresa portuguesa");expect(api.post).not.toHaveBeenCalled();
+});
+
+test("clear aborts pending single search and a late answer cannot overwrite the next search",async()=>{
+  let oldAnswer;
+  api.post.mockImplementationOnce(()=>new Promise(resolve=>{oldAnswer=resolve;})).mockImplementationOnce(()=>response({results:[{...buyer,company:"Nova empresa",product_interest:"Guarana"}]}));
+  mount(TradeIntel);
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Portugal"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  const signal=api.post.mock.calls[0][2].signal;
+  fireEvent.click(screen.getByRole("button",{name:"Limpar pesquisa"}));
+  expect(signal.aborted).toBe(true);
+  expect(screen.getByPlaceholderText("Produto, ex.: Acerola Powder").value).toBe("");
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Guarana"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Espanha"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  await screen.findByText("Nova empresa");
+  await act(async()=>oldAnswer({data:{results:[buyer]}}));
+  expect(screen.queryByText("ABC-Ingredients")).toBeNull();
+  expect(screen.getByText("Nova empresa")).toBeTruthy();
+  expect(api.post.mock.calls[1][1]).toEqual({product:"Guarana",country:"Espanha",limit:10});
+});
+test("editing the product removes completed results before the next search",async()=>{
+  api.post.mockResolvedValue({data:{results:[buyer]}});
+  mount(TradeIntel);await searchBuyers();
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Manga"}});
+  expect(screen.queryByText("ABC-Ingredients")).toBeNull();
+});
+test("clear removes a resumed job and rejects its late polling response",async()=>{
+  let oldPoll;
+  api.get.mockImplementation(path=>path.includes("search-jobs/old")?new Promise(resolve=>{oldPoll=resolve;}):response(path.includes("search-jobs/job1")?multiJob:[]));
+  api.post.mockImplementation(path=>response(path==="/buyer-discovery/search-jobs"?multiJob:{cancel_requested:true}));
+  mount(TradeIntel,"/?buyer_job=old");
+  await waitFor(()=>expect(oldPoll).toBeDefined());
+  fireEvent.click(screen.getByRole("button",{name:"Limpar pesquisa"}));
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs/old/cancel");
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"DE,PT"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  await screen.findByText("Empresa alemã");
+  await act(async()=>oldPoll({data:{...multiJob,id:"old",results:[{...buyer,company:"Empresa antiga"}]}}));
+  expect(screen.queryByText("Empresa antiga")).toBeNull();
+  expect(screen.getByText("Empresa alemã")).toBeTruthy();
+});
+test("known directory links are identified as sources instead of official company websites",async()=>{
+  api.post.mockResolvedValue({data:{results:[{...buyer,is_directory:true,website:"https://www.europages.com/company"}]}});
+  mount(TradeIntel);await searchBuyers();
+  expect(screen.getByRole("link",{name:"Abrir fonte no diretório"})).toBeTruthy();
+  expect(screen.queryByRole("link",{name:"Abrir site da empresa"})).toBeNull();
+});
+
+test("a job created after clearing is cancelled instead of reopening its results",async()=>{
+  let created;
+  api.post.mockImplementation(path=>path==="/buyer-discovery/search-jobs"?new Promise(resolve=>{created=resolve;}):response({cancel_requested:true}));
+  mount(TradeIntel);
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
+  fireEvent.change(screen.getByLabelText("Região da pesquisa"),{target:{value:"europe"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  fireEvent.click(screen.getByRole("button",{name:"Limpar pesquisa"}));
+  await act(async()=>created({data:multiJob}));
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs/job1/cancel");
+  expect(screen.getByLabelText("Região da pesquisa").value).toBe("");
+  expect(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal").disabled).toBe(false);
+  expect(screen.queryByText("Empresa alemã")).toBeNull();
 });

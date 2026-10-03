@@ -17,7 +17,7 @@ async def get(path):
     return objects[path]
 async def delete(path): objects.pop(path, None)
 server.put_object, server.get_object, server.delete_object = put, get, delete
-server.discover_buyers = lambda product, country, limit: [{"company": "ABC-Ingredients", "country": country, "product_interest": product, "website": "https://example.com", "source_url": "https://example.com/company", "priority_score": 80}]
+server.discover_buyers = lambda product, country, limit: [{"company": "ABC-Ingredients" if product == "Acerola" else "Manga Company", "country": country, "product_interest": product, "website": "https://example.com", "source_url": "https://example.com/company", "priority_score": 80}]
 server.discover_decision_maker = lambda *args: {"decision_maker": "Ana Silva", "decision_maker_title": "Procurement Manager", "decision_maker_email": "ana@example.com", "decision_source_url": "https://example.com/team", "validation_status": "needs_validation"}
 server.enrich_company = lambda candidate: {"email":"info@example.com", "phone":"+351 210 123 456", "enrichment_status":"complete", "contact_source_urls":["https://example.com/contact"]}
 async def seed_fixture():

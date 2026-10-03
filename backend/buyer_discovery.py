@@ -76,6 +76,11 @@ def _phones(text: str) -> List[str]:
 def _linkedin(results: List[Dict]) -> str:
     return next((x.get("url", "") for x in results if _extract_domain(x.get("url", "")) in {"linkedin.com", "br.linkedin.com"}), "")
 
+def _is_directory_domain(domain):
+    known = {"europages.com", "europages.co.uk", "europages.de", "europages.pt", "europages.es", "europages.fr", "europages.it", "europages.nl", "kompass.com", "alibaba.com", "wlw.de", "go4worldbusiness.com", "tradekey.com", "ensun.io"}
+    return any(domain == host or domain.endswith("." + host) for host in known)
+
+
 def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
     results = _search(f'"{product}" importer buyer distributor ingredient "{country}"', min(max(limit * 3, limit), 20))
     buyers, seen = [], set()
@@ -86,7 +91,7 @@ def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
         key = (domain, _normalize(company))
         if not key or key in seen or not _is_product_relevant(item, product): continue
         seen.add(key)
-        buyers.append({"company": company, "website": url, "domain": domain, "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item), product), "source": "firecrawl_web"})
+        buyers.append({"company": company, "website": url, "domain": domain, "is_directory": _is_directory_domain(domain), "country": country, "product_interest": product, "source_url": url, "source_title": title, "source_description": desc, "priority_score": _score(_text(item), product), "source": "firecrawl_web"})
     return sorted(buyers, key=lambda x: x["priority_score"], reverse=True)[:max(1, min(limit, 20))]
 
 def discover_decision_maker(company: str, country: str, product: str) -> Dict:
@@ -164,6 +169,8 @@ def enrich_company(candidate):
     source = _public_url(candidate.get("website") or candidate.get("source_url"))
     if not source:
         return {**result, "enrichment_message": "Site público válido não informado."}
+    if _is_directory_domain(_extract_domain(source)):
+        return {**result, "enrichment_status": "partial", "enrichment_message": "A fonte é um diretório. Informe o site oficial da empresa para pesquisar os contatos."}
     parsed = urlparse(source)
     root = f"{parsed.scheme}://{parsed.netloc}/"
     pages = []

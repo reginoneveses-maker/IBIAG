@@ -45,6 +45,19 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         return await self.client.post("/api/documents/upload", data={"metadata": json.dumps({"title": "Laudo", "category": "Produtos", **metadata})},
                                       files={"file": ("laudo.pdf", b"%PDF-1.4 test", "application/pdf")})
 
+    async def test_new_search_can_replace_own_active_job_without_blocking(self):
+        await self.db.buyer_search_jobs.insert_many([
+            {"id":"old","owner_id":"u","status":"running","cancel_requested":False},
+            {"id":"other","owner_id":"another-user","status":"running","cancel_requested":False}])
+        with patch.object(server,"discover_buyers",return_value=[]), patch.object(discovery_jobs,"SLOTS",asyncio.Semaphore(3)):
+            blocked=await self.client.post("/api/buyer-discovery/search-jobs",json={"product":"Manga","countries":["PT","ES"]})
+            self.assertEqual(blocked.status_code,409)
+            fresh=await self.client.post("/api/buyer-discovery/search-jobs",json={"product":"Manga","countries":["PT","ES"],"replace_previous":True})
+            self.assertEqual(fresh.status_code,200,fresh.text)
+        self.assertTrue((await self.db.buyer_search_jobs.find_one({"id":"old"}))["cancel_requested"])
+        self.assertFalse((await self.db.buyer_search_jobs.find_one({"id":"other"}))["cancel_requested"])
+        self.assertEqual(fresh.json()["product"],"Manga")
+
     async def test_multi_market_job_partial_results_and_owner_access(self):
         def discover(product, country, limit):
             if country == "Spain": raise RuntimeError("Provedor indisponível")

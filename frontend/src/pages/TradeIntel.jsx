@@ -49,16 +49,34 @@ const TradeIntel = () => {
   const [pollError, setPollError] = useState("");
   const changeJob = id => setParams(prev => { const next = new URLSearchParams(prev); id ? next.set("buyer_job", id) : next.delete("buyer_job"); return next; });
   const buyerRequest = useRef(0);
+  const buyerAbort = useRef(null);
+  const pollAbort = useRef(null);
+  const resetBuyerSearch = (clearFields = false) => {
+    const previousJob = buyerJob?.id || jobId;
+    buyerRequest.current += 1;
+    buyerAbort.current?.abort(); pollAbort.current?.abort();
+    changeJob(""); setBuyerJob(null); setBuyerResults([]); setBuyerLoading(false);
+    setBuyerCountry(""); setBuyerProduct(""); setResultCountry(""); setPollError("");
+    setDecisionLoading({}); setCrmLoading({}); setCrmLinks({});
+    if (clearFields) { setDirectProduct(""); setDirectCountry(""); setDirectRegion(""); }
+    if (previousJob && (!buyerJob || ["pending", "running"].includes(buyerJob.status))) {
+      api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(previousJob)}/cancel`).catch(() => toast.error("Os resultados foram limpos, mas não foi possível interromper a pesquisa anterior no servidor."));
+    }
+  };
+  const editBuyerSearch = () => {
+    if (buyerLoading || buyerResults.length || buyerJob || jobId || pollError) resetBuyerSearch();
+  };
   const tradeRequest = useRef(0);
   useEffect(() => { api.get("/buyer-discovery/markets").then(r => setMarketCatalog({countries: r.data?.countries || [], regions: r.data?.regions || []})).catch(() => {}); }, []);
   useEffect(() => {
     if (!jobId) return;
     let active = true, timer, errors = 0;
     const request = ++buyerRequest.current;
+    const controller = new AbortController(); pollAbort.current = controller;
     setBuyerLoading(true); setPollError("");
     const poll = async () => {
       try {
-        const r = await api.get(`/buyer-discovery/search-jobs/${encodeURIComponent(jobId)}`);
+        const r = await api.get(`/buyer-discovery/search-jobs/${encodeURIComponent(jobId)}`, {signal: controller.signal});
         if (!active || request !== buyerRequest.current) return;
         const job = r.data; errors = 0;
         setBuyerJob(job); setBuyerCountry(job.label); setBuyerProduct(job.product);
@@ -73,12 +91,12 @@ const TradeIntel = () => {
       }
     };
     poll();
-    return () => { active = false; clearTimeout(timer); };
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
     // A job keeps its own product and markets when the page is reloaded.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, pollRetry]);
   const buyerKey = b => `${b.company}|${b.country}|${b.website}`;
-  useEffect(() => () => { buyerRequest.current += 1; tradeRequest.current += 1; }, []);
+  useEffect(() => () => { buyerRequest.current += 1; tradeRequest.current += 1; buyerAbort.current?.abort(); pollAbort.current?.abort(); }, []);
 
   const load = useCallback(() => {
     const params = {};
@@ -125,7 +143,7 @@ const TradeIntel = () => {
     setComexLoading(true);
     setComexRows([]); setMarketRows([]); setProspectSummary(null);
     setMarketTotals({volume_kg: 0, fob_usd: 0});
-    changeJob(""); setBuyerJob(null); buyerRequest.current += 1; setBuyerResults([]); setBuyerLoading(false);
+    resetBuyerSearch();
     try {
       const r = await api.post("/comexstat/prospect", {
         flow: comexFlow,
@@ -172,12 +190,12 @@ const TradeIntel = () => {
 
   const searchBuyers = async (product, countryName) => {
     if (!product.trim() || !countryName.trim()) return toast.error("Informe o produto e o país.");
-    changeJob(""); setBuyerJob(null); setResultCountry("");
+    resetBuyerSearch();
     const request = ++buyerRequest.current;
-    setBuyerResults([]); setDecisionLoading({}); setCrmLinks({});
+    const controller = new AbortController(); buyerAbort.current = controller;
     setBuyerCountry(countryName); setBuyerProduct(product); setBuyerLoading(true);
     try {
-      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 });
+      const r = await api.post("/buyer-discovery/search", { product, country: countryName, limit: 10 }, {signal: controller.signal, timeout: 60000});
       if (request !== buyerRequest.current) return;
       const results = (r.data?.results || []).map(b => ({...b, country: countryName, product_interest: product}));
       setBuyerResults(results);
@@ -193,12 +211,15 @@ const TradeIntel = () => {
     const selected = entered.split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
     if (!region && selected.length <= 1) return searchBuyers(product, entered);
     if (!product) return toast.error("Informe o produto.");
-    changeJob(""); setBuyerJob(null); setResultCountry(""); setBuyerResults([]); setCrmLinks({}); setDecisionLoading({});
+    resetBuyerSearch();
     const request = ++buyerRequest.current;
     setBuyerLoading(true);
     try {
-      const r = await api.post("/buyer-discovery/search-jobs", {product, countries: region ? [] : selected, region, limit: 10});
-      if (request !== buyerRequest.current) return;
+      const r = await api.post("/buyer-discovery/search-jobs", {product, countries: region ? [] : selected, region, limit: 10, replace_previous: true});
+      if (request !== buyerRequest.current) {
+        if (r.data?.id) api.post(`/buyer-discovery/search-jobs/${encodeURIComponent(r.data.id)}/cancel`).catch(() => {});
+        return;
+      }
       setBuyerJob(r.data); changeJob(r.data.id);
     } catch (e) {
       if (request === buyerRequest.current) { setBuyerLoading(false); toast.error(e?.response?.data?.detail || "Não foi possível iniciar a pesquisa."); }
@@ -233,8 +254,8 @@ const TradeIntel = () => {
         toast.success(r.data.company + " disponível no CRM.");
         if(r.data.enrichment_message)toast.info(r.data.enrichment_message);
       }
-    } catch (e) { toast.error(e?.response?.data?.detail || "Não foi possível enviar para o CRM."); }
-    finally { setCrmLoading(prev => ({...prev, [key]: false})); }
+    } catch (e) { if (request === buyerRequest.current) toast.error(e?.response?.data?.detail || "Não foi possível enviar para o CRM."); }
+    finally { if (request === buyerRequest.current) setCrmLoading(prev => ({...prev, [key]: false})); }
   };
   const addToCrm = async (id) => {
     setCrmLoading(prev => ({...prev, [id]: true}));
@@ -265,18 +286,19 @@ const TradeIntel = () => {
           <p className="text-sm text-[#104496]/60 mt-1">Pesquisa direta em fontes web atuais. Não exige NCM nem consulta prévia ao Comex Stat. Escolha Europa ou Ásia, ou informe vários países separados por vírgula.</p>
         </div>
         <label className="text-sm block">Região da pesquisa
-          <select aria-label="Região da pesquisa" value={directRegion} disabled={buyerLoading} onChange={e => setDirectRegion(e.target.value)} className="block border rounded p-2 bg-white mt-1">
+          <select aria-label="Região da pesquisa" value={directRegion} onChange={e => { editBuyerSearch(); setDirectRegion(e.target.value); setDirectCountry(""); }} className="block border rounded p-2 bg-white mt-1">
             <option value="">Escolher países</option><option value="europe">Europa</option><option value="asia">Ásia</option>
           </select>
         </label>
         {directRegion && <p className="text-sm">{marketCatalog.regions.find(r => r.id === directRegion)?.countries?.length || (directRegion === "europe" ? 51 : 50)} países e territórios. A pesquisa será feita por país e pode levar alguns minutos.</p>}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <Input value={directProduct} onChange={e => setDirectProduct(e.target.value)} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Produto, ex.: Acerola Powder" className="bg-white md:col-span-2" />
-          <Input value={directCountry} onChange={e => setDirectCountry(e.target.value)} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Países, ex.: Alemanha, Espanha, Portugal" disabled={buyerLoading || !!directRegion} list="buyer-markets" className="bg-white md:col-span-2" />
+          <Input value={directProduct} onChange={e => { editBuyerSearch(); setDirectProduct(e.target.value); }} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Produto, ex.: Acerola Powder" className="bg-white md:col-span-2" />
+          <Input value={directCountry} onChange={e => { editBuyerSearch(); setDirectCountry(e.target.value); }} onKeyDown={e => e.key === "Enter" && directDiscoverBuyers()} placeholder="Países, ex.: Alemanha, Espanha, Portugal" disabled={!!directRegion} list="buyer-markets" className="bg-white md:col-span-2" />
           <Button onClick={directDiscoverBuyers} disabled={buyerLoading || !directProduct.trim() || (!directCountry.trim() && !directRegion)} className="bg-[#104496] hover:bg-[#0B3274] text-white">
             <Search className="w-4 h-4 mr-1" />{buyerLoading ? "Pesquisando..." : "Buscar compradores"}
           </Button>
         </div>
+        <Button variant="outline" onClick={() => resetBuyerSearch(true)}>Limpar pesquisa</Button>
         <datalist id="buyer-markets">{marketCatalog.countries.map(m => <option key={m.code} value={m.name} />)}</datalist>
         {buyerJob && <div role="status" className="border rounded p-3 space-y-2">
           <p>{buyerJob.label}: {buyerJob.completed}/{buyerJob.total} países consultados · {({pending:"Na fila",running:"Pesquisando",complete:"Concluída",partial:"Concluída com falhas em alguns países",failed:"Falhou",cancelled:"Interrompida pelo usuário",interrupted:"Interrompida; inicie uma nova pesquisa"})[buyerJob.status]}</p>
@@ -388,13 +410,13 @@ const TradeIntel = () => {
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-semibold text-[#104496]">{b.company}</div><div className="text-xs">{flag(b.country_code)} Mercado pesquisado: {b.search_country || b.country}</div>
-                    <div className="flex flex-wrap gap-3 text-xs mt-1">{externalUrl(b.website) && <a href={externalUrl(b.website)} target="_blank" rel="noreferrer" className="underline">Abrir site da empresa</a>}{externalUrl(b.source_url) && <a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer" className="underline">Fonte da empresa</a>}</div>
-                    <div className="text-xs text-[#104496]/60">{b.domain || b.website} · Score {b.priority_score}</div>
+                    <div className="flex flex-wrap gap-3 text-xs mt-1">{externalUrl(b.website) && <a href={externalUrl(b.website)} target="_blank" rel="noreferrer" className="underline">{b.is_directory ? "Abrir fonte no diretório" : "Abrir site da empresa"}</a>}{externalUrl(b.source_url) && <a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer" className="underline">Fonte da empresa</a>}</div>
+                    <div className="text-xs text-[#104496]/60">{b.domain || b.website} · Score {b.priority_score}</div>{b.is_directory && <div className="text-xs text-amber-800">Fonte em diretório; site oficial da empresa ainda não confirmado.</div>}
                     {b.decision_maker && <div className="text-xs mt-1">Decisor: <b>{b.decision_maker}</b>{b.decision_maker_title ? " · " + b.decision_maker_title : ""}</div>}
                     {externalUrl(b.linkedin) && <a className="text-xs underline text-[#104496]" href={externalUrl(b.linkedin)} target="_blank" rel="noreferrer">LinkedIn</a>}
                   </div>
                   <div className="flex flex-wrap gap-2 shrink-0">
-                    {externalUrl(b.website || b.source_url) && <Button size="sm" variant="outline" asChild><a href={externalUrl(b.website || b.source_url)} target="_blank" rel="noreferrer">Ver empresa</a></Button>}
+                    {externalUrl(b.website || b.source_url) && <Button size="sm" variant="outline" asChild><a href={externalUrl(b.website || b.source_url)} target="_blank" rel="noreferrer">{b.is_directory ? "Ver no diretório" : "Ver empresa"}</a></Button>}
                     {externalUrl(b.source_url) && b.source_url !== b.website && <Button size="sm" variant="outline" asChild><a href={externalUrl(b.source_url)} target="_blank" rel="noreferrer">Ver fonte</a></Button>}
                     <Button size="sm" variant="outline" onClick={() => findDecisionMaker(b)} disabled={decisionLoading[buyerKey(b)] || crmLoading[buyerKey(b)]}>{decisionLoading[buyerKey(b)] ? "Pesquisando..." : "Buscar decisor"}</Button>
                     <Button size="sm" disabled={crmLoading[buyerKey(b)] || decisionLoading[buyerKey(b)]} onClick={() => addBuyerToCrm(b)} className="bg-[#104496] hover:bg-[#0B3274] text-white">{crmLoading[buyerKey(b)] ? "Salvando..." : "Adicionar ao CRM"}</Button>
