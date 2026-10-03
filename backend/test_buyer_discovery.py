@@ -28,7 +28,7 @@ class BuyerDiscoveryTests(unittest.TestCase):
         self.assertEqual(search.call_args.args[1],15)
 
     def test_buyer_deduplication_by_domain(self):
-        rows=[{"url":"https://example.com/a","title":"Example ingredient importer"},{"url":"https://www.example.com/b","title":"Example"}]
+        rows=[{"url":"https://example.com/a","title":"Example Açaí ingredient importer"},{"url":"https://www.example.com/b","title":"Example Açaí"}]
         with patch.object(discovery,"_search",return_value=rows):
             result=discovery.discover_buyers("Açaí","Canada")
         self.assertEqual(len(result),1)
