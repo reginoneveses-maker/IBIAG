@@ -42,6 +42,17 @@ class BuyerDiscoveryTests(unittest.TestCase):
             results = discovery.discover_buyers("Acerola", "Portugal")
         self.assertEqual([x["company"] for x in results], ["ABC-Ingredients", "Other Company"])
 
+    def test_directory_sources_are_labelled_and_provider_query_changes_with_inputs(self):
+        rows=[{"url":"https://www.europages.co.uk/company/acme.html","title":"Acme | Acerola importer"}]
+        with patch.object(discovery,"_search",return_value=rows) as search:
+            result=discovery.discover_buyers("Acerola","Portugal")
+            discovery.discover_buyers("Mango","Spain")
+        self.assertTrue(result[0]["is_directory"])
+        self.assertIn('"Acerola"',search.call_args_list[0].args[0])
+        self.assertIn('"Mango"',search.call_args_list[1].args[0])
+        self.assertIn('"Spain"',search.call_args_list[1].args[0])
+        self.assertFalse(discovery._is_directory_domain("europages.co.uk.evil.test"))
+
     def test_invalid_json_is_a_provider_error(self):
         with patch.object(discovery, "FIRECRAWL_KEY", "test"), patch.object(discovery.requests, "post", return_value=Mock(json=Mock(side_effect=ValueError("invalid")), raise_for_status=lambda: None)):
             with self.assertRaisesRegex(RuntimeError, "JSON inválido"): discovery._search("test")
@@ -72,6 +83,13 @@ class CompanyEnrichmentTests(unittest.TestCase):
             result=discovery.enrich_company({"website":"https://acme.test"})
         for field in ("company","email","phone","country"):self.assertNotIn(field,result)
         self.assertEqual(result["enrichment_status"],"partial")
+
+    def test_known_directory_does_not_enrich_contacts_from_directory_operator(self):
+        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery,"_scrape_company") as scrape:
+            result=discovery.enrich_company({"website":"https://europages.com/company/acme"})
+        scrape.assert_not_called()
+        self.assertIn("diretório",result["enrichment_message"])
+        self.assertNotIn("email",result)
 
     def test_private_and_malformed_urls_are_rejected(self):
         for url in ("http://localhost/", "http://127.0.0.1/", "http://169.254.169.254/", "https://host.internal/", "https://user:secret@acme.test/", "https://acme.test:bad/"):

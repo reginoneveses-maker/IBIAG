@@ -2114,6 +2114,7 @@ class BuyerDiscoveryRequest(BaseModel):
     region: str = ""
     country_code: str = ""
     limit: int = Field(default=10, ge=1, le=20)
+    replace_previous: bool = False
 
 @api.get("/buyer-discovery/markets")
 async def buyer_discovery_markets(user=Depends(get_current_user)):
@@ -2127,7 +2128,10 @@ async def create_buyer_search_job(body: BuyerDiscoveryRequest, tasks: Background
         targets = resolve_markets(body.country, body.countries, body.region)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    if await db.buyer_search_jobs.count_documents({"owner_id": user["id"], "status": {"$in": ["pending", "running"]}}):
+    active_jobs = {"owner_id": user["id"], "status": {"$in": ["pending", "running"]}, "cancel_requested": {"$ne": True}}
+    if body.replace_previous:
+        await db.buyer_search_jobs.update_many(active_jobs, {"$set": {"cancel_requested": True, "updated_at": now_iso()}})
+    if await db.buyer_search_jobs.count_documents(active_jobs):
         raise HTTPException(409, "Há uma pesquisa em andamento. Aguarde ou interrompa antes de iniciar outra.")
     job = {"id": str(uuid.uuid4()), "owner_id": user["id"], "product": body.product.strip(), "targets": targets, "region": body.region,
            "label": next((r["name"] for key, r in REGIONS.items() if key == body.region), ", ".join(x["name"] for x in targets)),
