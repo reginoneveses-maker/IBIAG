@@ -3,6 +3,8 @@
 No production credentials, provider requests or application startup are used.
 """
 import json
+import asyncio
+import discovery_jobs
 import os
 import unittest
 from unittest.mock import patch
@@ -43,6 +45,25 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
         return await self.client.post("/api/documents/upload", data={"metadata": json.dumps({"title": "Laudo", "category": "Produtos", **metadata})},
                                       files={"file": ("laudo.pdf", b"%PDF-1.4 test", "application/pdf")})
 
+    async def test_multi_market_job_partial_results_and_owner_access(self):
+        def discover(product, country, limit):
+            if country == "Spain": raise RuntimeError("Provedor indisponível")
+            return [{"company": "Acme", "website": "https://example.com"}]
+        with patch.object(server, "discover_buyers", discover), patch.object(discovery_jobs, "SLOTS", asyncio.Semaphore(3)):
+            response = await self.client.post("/api/buyer-discovery/search-jobs", json={"product":"Acerola","countries":["Alemanha","Espanha","Portugal"]})
+        self.assertEqual(response.status_code, 200, response.text)
+        job_id = response.json()["id"]
+        job = (await self.client.get("/api/buyer-discovery/search-jobs/" + job_id)).json()
+        self.assertEqual(job["status"], "partial")
+        self.assertEqual(job["completed"], 3)
+        self.assertEqual([r["country_code"] for r in job["results"]], ["DE", "PT"])
+        self.assertEqual(job["progress"]["ES"]["status"], "failed")
+        await self.db.users.insert_one({"id":"other","email":"other@example.com","role":"user"})
+        response = await self.client.get("/api/buyer-discovery/search-jobs/"+job_id,headers={"Authorization":"Bearer "+server.create_token("other","other@example.com")})
+        self.assertEqual(response.status_code,403)
+        response = await self.client.post("/api/buyer-discovery/search-jobs",json={"product":"Acerola","countries":["Atlantis"]})
+        self.assertEqual(response.status_code,400)
+
     async def test_crm_automatically_enriches_and_refreshes_existing_profile(self):
         facts={"company":"Acme Ingredients", "email":"info@acme.test", "phone":"+49 40 12345678", "website":"https://acme.test/", "country":"Germany", "enrichment_status":"complete", "contact_source_urls":["https://acme.test/contact"]}
         with patch.object(server,"enrich_company",return_value=facts):
@@ -57,7 +78,7 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.db.leads.count_documents({}),1)
 
     async def test_protected_endpoints_reject_missing_and_invalid_token(self):
-        for path in ["/interactions", "/templates", "/trade-data", "/dashboard/stats", "/documents", "/documents/page", "/document-folders"]:
+        for path in ["/interactions", "/templates", "/trade-data", "/dashboard/stats", "/documents", "/documents/page", "/document-folders", "/buyer-discovery/markets", "/buyer-discovery/search-jobs/missing"]:
             for token in ["", "Bearer invalid"]:
                 response = await self.client.get("/api" + path, headers={"Authorization": token})
                 self.assertEqual(response.status_code, 401, (path, response.text))

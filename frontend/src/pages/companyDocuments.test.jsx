@@ -26,7 +26,7 @@ beforeEach(()=>{
 afterEach(cleanup);
 async function searchBuyers(){
   fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
-  fireEvent.change(screen.getByPlaceholderText("País, ex.: Estados Unidos"),{target:{value:"Portugal"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Portugal"}});
   fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
   await screen.findByText("ABC-Ingredients");
 }
@@ -54,7 +54,7 @@ test("new buyer search removes old actionable results while loading",async()=>{
   let finish;
   api.post.mockImplementationOnce(()=>response({results:[buyer]})).mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
   mount(TradeIntel);await searchBuyers();
-  fireEvent.change(screen.getByPlaceholderText("País, ex.: Estados Unidos"),{target:{value:"Canada"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Canada"}});
   fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
   expect(screen.queryByText("ABC-Ingredients")).toBeNull();
   await act(async()=>finish({data:{results:[]}}));
@@ -125,4 +125,31 @@ test("preview checks file signature and rejects HTML and SVG regardless of filen
   expect(previewMime(new Uint8Array([137,80,78,71,13,10,26,10]))).toBe("image/png");
   expect(previewMime(new TextEncoder().encode("<html><script>test</script>"))).toBe("");
   expect(previewMime(new TextEncoder().encode("<svg onload='test'>"))).toBe("");
+});
+
+const multiJob = {id:"job1",product:"Acerola",label:"Alemanha, Espanha, Portugal",status:"complete",completed:3,total:3,progress:{},results:[{...buyer,company:"Empresa alemã",country:"Alemanha",country_code:"DE"},{...buyer,company:"Empresa portuguesa"}]};
+test("multi-country search preserves each market and filters results",async()=>{
+  api.post.mockImplementation(path=>response(path==="/buyer-discovery/search-jobs"?multiJob:{id:"lead1"}));
+  api.get.mockImplementation(path=>response(path.includes("search-jobs")?multiJob:[]));
+  mount(TradeIntel);
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
+  fireEvent.change(screen.getByPlaceholderText("Países, ex.: Alemanha, Espanha, Portugal"),{target:{value:"Alemanha, Espanha, Portugal"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  await screen.findByText("Empresa alemã");
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:["Alemanha","Espanha","Portugal"],region:"",limit:10});
+  fireEvent.change(screen.getByLabelText("Filtrar resultados por país"),{target:{value:"Alemanha"}});
+  expect(screen.queryByText("Empresa portuguesa")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Adicionar ao CRM"}));
+  await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/buyer-discovery/to-crm",expect.objectContaining({country:"Alemanha",country_code:"DE"}),{timeout:90000}));
+});
+test("region search starts a job and completed job resumes on reload without another search",async()=>{
+  api.post.mockResolvedValue({data:multiJob});api.get.mockImplementation(path=>response(path.includes("search-jobs")?multiJob:[]));
+  mount(TradeIntel);
+  fireEvent.change(screen.getByPlaceholderText("Produto, ex.: Acerola Powder"),{target:{value:"Acerola"}});
+  fireEvent.change(screen.getByLabelText("Região da pesquisa"),{target:{value:"asia"}});
+  fireEvent.click(screen.getByRole("button",{name:"Buscar compradores"}));
+  await screen.findByText("Empresa alemã");
+  expect(api.post).toHaveBeenCalledWith("/buyer-discovery/search-jobs",{product:"Acerola",countries:[],region:"asia",limit:10});
+  cleanup();api.post.mockClear();mount(TradeIntel,"/?buyer_job=job1");
+  await screen.findByText("Empresa portuguesa");expect(api.post).not.toHaveBeenCalled();
 });
