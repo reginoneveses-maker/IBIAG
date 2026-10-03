@@ -1,0 +1,13 @@
+# Calculadora por fornecedor, produto e quantidade
+
+Em Gestão → Preços, escolha o fornecedor e depois uma oferta ativa desse fornecedor. O seletor consulta `/product-offers?supplier_id=...&active=true`. Trocar o fornecedor limpa produto, oferta e preço anterior; respostas atrasadas são descartadas. A unidade vem da oferta escolhida. O preço de aquisição continua sendo informado em BRL, evitando interpretar automaticamente preços FOB/exportação em outra moeda como reais.
+
+Quantidade é um campo numérico separado de unidade. Exemplo: **1000 kg × R$ 17,50/kg = R$ 17.500,00 de aquisição**. A tela mostra preço sugerido por unidade e totais de aquisição, custos adicionais, custo da operação, venda, impostos e lucro. Custos adicionais continuam sendo por unidade. Valores com vírgula decimal são aceitos; quantidade `1.000` significa 1000. Quantidades fracionárias são permitidas.
+
+Preço de venda por margem: `custo / (1 - (margem + impostos)/100)`. Por markup: `custo × (1 + markup/100) / (1 - impostos/100)`. Cada preço unitário de venda é arredondado a quatro casas antes de multiplicar a quantidade; os totais monetários têm duas casas. Preço por unidade exibe até quatro casas para não esconder o arredondamento usado nos totais. Resumo de custos, impostos e lucro usa BRL. O preço e o total sugeridos seguem a moeda selecionada. Câmbio é informado manualmente em BRL por USD.
+
+A API recalcula valores derivados em `/prices/calculate`, POST e PUT `/prices`. Não confia nos totais enviados pelo navegador. Quando há `offer_id`, verifica fornecedor, produto e oferta ativa, e resolve nomes/unidade da base. Quantidade, referências e totais são persistidos no cálculo salvo. Uma oferta de outro fornecedor é rejeitada. Os endpoints continuam exigindo autenticação.
+
+Cálculos antigos sem quantidade usam uma unidade. Um campo legado como `kg 1000` é interpretado como unidade kg e quantidade 1000 ao ler/editar, sem migração em massa da base. Extras/impostos antigos em campos planos são preservados na edição; remover a última linha salva zero e não restaura o campo antigo. Cálculos antigos com percentuais inválidos permanecem visíveis com aviso para correção. Novos cálculos inválidos não podem ser salvos.
+
+Verificações: testes HTTP em base isolada para multiplicação, ofertas por fornecedor, gravação/leitura/edição, quantidades fracionárias, markup, USD, autenticação e entradas inválidas; testes React para decimais, troca de fornecedor, resposta atrasada, falha/repetição de carregamento e remoção de custos/impostos legados. Fluxo Chromium salva 1000 kg a R$ 17,50, recarrega e edita para 500 kg. Nenhuma simulação desses testes é gravada em produção.

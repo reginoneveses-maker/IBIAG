@@ -48,7 +48,10 @@ async def seed_fixture():
         {"id":"spec-a","title":"Ficha técnica Acerola","category":"Produtos","supplier_id":"s1","supplier_name":"Nossa Fruta","product_name":"Acerola","document_type":"Ficha Técnica","file_path":"fixture/spec-a.pdf","file_name":"spec-acerola.pdf"},
         {"id":"spec-b","title":"Ficha técnica Manga","category":"Produtos","product_name":"Manga","document_type":"Ficha Técnica","file_path":"fixture/spec-b.pdf","file_name":"spec-manga.pdf"},
         {"id":"spec-u","title":"Ficha técnica Guaraná","category":"Produtos","product_name":"Guaraná","document_type":"Ficha Técnica","file_path":"fixture/spec-u.pdf","file_name":"spec-guarana.pdf"}])
-    await server.db.product_offers.insert_one({"id":"offer-b","supplier_id":"s2","product_name":"Manga","spec_document_ids":["spec-b"]})
+    await server.db.product_offers.insert_one({"id":"offer-b","product_id":"photo-unknown","supplier_id":"s2","product_name":"Manga","spec_document_ids":["spec-b"]})
+    await server.db.product_offers.insert_many([
+        {"id":"price-offer-a","product_id":"photo-0","product_name":"AÇAÍ EXTRACT POWDER","supplier_id":"s1","unit":"kg","active":True},
+        {"id":"price-offer-pulp","product_id":"photo-2","product_name":"AÇAÍ PULP ORGANIC","supplier_id":"s1","unit":"kg","active":True}])
     for path in ["fixture/spec-a.pdf","fixture/spec-b.pdf","fixture/spec-u.pdf"]:
         objects[path]=(b"%PDF-1.4 fixture spec","application/pdf")
 server.app.router.on_startup = [seed_fixture]
