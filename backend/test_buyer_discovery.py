@@ -111,6 +111,18 @@ class BuyerDiscoveryTests(unittest.TestCase):
         page["json"]["product_quote"]="Acerola is a source of vitamin C."
         self.assertIsNone(discovery._verified_business({"url":"https://acme.test/article"},page,"Acerola","Portugal"))
 
+    def test_company_product_heading_with_its_published_quote_action_is_accepted_but_an_article_is_not(self):
+        page=business_page();page["markdown"]="Acme Ingredients is a food manufacturer.\nAcerola powder\nRequest a quote"
+        page["json"].update(product_quote="Acerola powder",business_quote="Request a quote")
+        item={"url":"https://acme.test/acerola"}
+        verified=discovery._verified_business(item,page,"Acerola","Portugal")
+        self.assertTrue(verified["relationship_verified"])
+        self.assertIn("Request a quote",verified["product_evidence"])
+        page["json"]["page_type"]="other"
+        self.assertIsNone(discovery._verified_business(item,page,"Acerola","Portugal"))
+        page["json"].update(page_type="company_product",business_quote="Buy now")
+        self.assertIsNone(discovery._verified_business(item,page,"Acerola","Portugal"))
+
     def test_provider_verification_failure_never_falls_back_to_search_titles(self):
         rows=[{"url":"https://acme.test/acerola","title":"Acme sells Acerola"}]
         with patch.object(discovery,"_search",return_value=rows),patch.object(discovery,"_scrape_business",side_effect=RuntimeError("offline")):

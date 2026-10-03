@@ -10,7 +10,7 @@ A descoberta anterior aceitava qualquer resultado que mencionasse o produto. Um 
 
 - Página comercial da empresa, em vez de diretório, livro, notícia, pesquisa ou artigo genérico.
 - Nome da empresa identificado em um trecho literal da página; o título da busca não vira empresa automaticamente.
-- Trecho literal de até 25 palavras com o ingrediente e evidência de venda/fornecimento, ou declaração de composição/uso em um produto próprio.
+- Trecho literal com o ingrediente e evidência de venda/fornecimento, ou declaração de composição/uso em um produto próprio. Uma página comercial pode combinar o título do ingrediente com uma ação de pedido/cotação publicada em outro trecho; a soma das citações é limitada a 25 palavras.
 - Classificação `seller` ou `user`, com `relationship_verified`, `product_evidence` e a fonte publicada no resultado.
 
 O texto extraído deve existir na página consultada. Uma empresa apenas citada em um artigo, uma afirmação genérica sobre os usos do ingrediente e dados inventados pela extração não bastam. A busca exclui fontes acadêmicas e diretórios conhecidos antes da leitura. Não há preenchimento de vagas com resultados não conferidos. Há aliases português/inglês para ingredientes comuns e comparação por palavras inteiras (mango não corresponde a mangosteen).
