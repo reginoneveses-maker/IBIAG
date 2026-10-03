@@ -80,7 +80,11 @@ const TradeIntel = () => {
         if (!active || request !== buyerRequest.current) return;
         const job = r.data; errors = 0;
         setBuyerJob(job); setBuyerCountry(job.label); setBuyerProduct(job.product);
-        setBuyerResults(prev => (job.results || []).map(row => ({...row, ...prev.find(old => buyerKey(old) === buyerKey(row))})));
+        setBuyerResults(prev => (job.results || []).map(row => {
+          const previous = prev.find(old => buyerKey(old) === buyerKey(row));
+          const local = Object.fromEntries(Object.entries(previous || {}).filter(([key]) => key.startsWith("decision_") || ["linkedin","evidence_urls","contact_candidates","validation_status"].includes(key)));
+          return {...row, ...local};
+        }));
         const running = ["pending", "running"].includes(job.status);
         setBuyerLoading(running);
         if (running) timer = setTimeout(poll, 2000);

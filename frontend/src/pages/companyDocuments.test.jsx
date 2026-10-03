@@ -273,9 +273,11 @@ test("partial region results display the failure and retry only failed countries
 
 test("the same business found in several countries appears once with all searched markets",async()=>{
   const job={...multiJob,results:[{...buyer,country:"",search_country:"Alemanha",company_country:""},{...buyer,country:"",search_country:"Portugal",company_country:""}]};
-  api.get.mockImplementation(path=>response(path.includes("search-jobs")?job:[]));
+  let polls=0;
+  api.get.mockImplementation(path=>response(path.includes("search-jobs")?{...job,status:++polls === 1 ? "running" : "complete"}:[]));
   mount(TradeIntel,"/?buyer_job=job1");
   await screen.findByText("ABC-Ingredients");
+  await waitFor(()=>expect(polls).toBeGreaterThan(1),{timeout:4000});
   expect(screen.getAllByText("ABC-Ingredients")).toHaveLength(1);
   expect(screen.getByText("Alemanha, Portugal")).toBeTruthy();
   expect(screen.getByText("não confirmado")).toBeTruthy();
