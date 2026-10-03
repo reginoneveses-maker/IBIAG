@@ -1,3 +1,4 @@
+import unicodedata
 import os, re, requests
 from typing import List, Dict
 from urllib.parse import urlparse
@@ -35,7 +36,9 @@ def _text(item: Dict) -> str:
     return " ".join(str(item.get(k, "") or "") for k in ("title", "description", "snippet", "markdown"))
 
 def _normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+    value = unicodedata.normalize("NFKD", value or "")
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
 
 def _product_terms(product: str) -> List[str]:
     stop = {"powder", "juice", "concentrate", "extract", "organic", "natural", "frozen", "pulp", "puree"}
@@ -71,7 +74,7 @@ def _linkedin(results: List[Dict]) -> str:
     return next((x.get("url", "") for x in results if _extract_domain(x.get("url", "")) in {"linkedin.com", "br.linkedin.com"}), "")
 
 def discover_buyers(product: str, country: str, limit: int = 8) -> List[Dict]:
-    results = _search(f'"{product}" importer buyer distributor ingredient "{country}"', limit)
+    results = _search(f'"{product}" importer buyer distributor ingredient "{country}"', min(max(limit * 3, limit), 20))
     buyers, seen = [], set()
     for item in results:
         url, domain = item.get("url", ""), _extract_domain(item.get("url", ""))
