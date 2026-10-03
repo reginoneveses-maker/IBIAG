@@ -66,7 +66,7 @@ const base = "http://127.0.0.1:8765";
     assert((await page.getByTestId("price-supplier-total").innerText()).includes("17.500,00"));
     assert((await page.getByTestId("price-sale-total").innerText()).includes("22.151,90"));
     await page.getByTestId("save-price-button").click();
-    await page.getByTestId("prices-table").getByText("AÇAÍ EXTRACT POWDER",{exact:true}).waitFor();
+    await page.getByTestId("prices-table").locator("tbody tr").filter({hasText:"AÇAÍ EXTRACT POWDER"}).waitFor();
     const prices=(await (await page.request.get(base+"/api/prices",{headers:{Authorization:"Bearer "+access_token}})).json());
     assert.equal(prices.length,1);assert.equal(prices[0].quantity,1000);assert.equal(prices[0].supplier_total,17500);assert.equal(prices[0].offer_id,"price-offer-a");
     await page.reload();
