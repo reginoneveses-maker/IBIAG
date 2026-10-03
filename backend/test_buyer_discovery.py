@@ -195,7 +195,8 @@ class BuyerDiscoveryTests(unittest.TestCase):
         limited=Mock(status_code=429,headers={"Retry-After":"1"})
         limited.raise_for_status.side_effect=requests.HTTPError(response=limited)
         okay=Mock(json=lambda:{"success":True,"data":{"web":[]}},raise_for_status=lambda:None)
-        with patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery.requests,"post",side_effect=[limited,okay]) as post,patch.object(discovery.time,"sleep") as sleep:
+        clock=[100.0]
+        with patch.object(discovery,"PROVIDER_PAUSE_UNTIL",0),patch.object(discovery.time,"monotonic",side_effect=lambda:clock[0]),patch.object(discovery,"FIRECRAWL_KEY","test"),patch.object(discovery.requests,"post",side_effect=[limited,okay]) as post,patch.object(discovery.time,"sleep",side_effect=lambda delay:clock.__setitem__(0,clock[0]+delay)) as sleep:
             self.assertEqual(discovery._search("Acerola"),[])
             self.assertEqual(post.call_count,2)
             sleep.assert_called_once_with(1)

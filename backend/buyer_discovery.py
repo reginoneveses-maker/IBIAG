@@ -13,6 +13,8 @@ FIRECRAWL_KEY = os.environ.get("FIRECRAWL_API_KEY", "").strip()
 BUSINESS_PAGE_SLOTS = BoundedSemaphore(2)
 DISCOVERY_VERSION = 3
 PROVIDER_SLOTS = BoundedSemaphore(2)
+PROVIDER_PAUSE_LOCK = Lock()
+PROVIDER_PAUSE_UNTIL = 0.0
 JOB_CONTEXT = ContextVar("buyer_discovery_context", default=None)
 
 
@@ -49,12 +51,16 @@ class DiscoveryResults(list):
 
 
 def _provider_post(path, body, timeout):
+    global PROVIDER_PAUSE_UNTIL
     context = JOB_CONTEXT.get()
     if context and context.fatal: raise context.fatal
     if not FIRECRAWL_KEY:
         raise ProviderError("FIRECRAWL_API_KEY não configurada", "configuration", True)
     for attempt in range(2):
         try:
+            with PROVIDER_PAUSE_LOCK:
+                pause = max(0, PROVIDER_PAUSE_UNTIL - time.monotonic())
+            if pause: time.sleep(pause)
             with PROVIDER_SLOTS:
                 if context and context.fatal: raise context.fatal
                 response = requests.post(FIRECRAWL_URL + path, headers=_headers(), json=body, timeout=timeout)
@@ -75,7 +81,10 @@ def _provider_post(path, body, timeout):
             logging.warning("Buyer discovery provider failure: operation=%s status=%s category=%s attempt=%s", path, status, code, attempt + 1)
             if not terminal and (status == 429 or status in (500, 502, 503, 504) or isinstance(exc, (requests.Timeout, requests.ConnectionError))) and attempt < 1:
                 retry = getattr(getattr(exc, "response", None), "headers", {}).get("Retry-After", "")
-                delay = min(15, max(1, float(retry))) if str(retry).replace(".", "", 1).isdigit() else 2 ** (attempt + 1)
+                delay = min(60, max(1, float(retry))) if str(retry).replace(".", "", 1).isdigit() else 30 if status == 429 else 2 ** (attempt + 1)
+                if status == 429:
+                    with PROVIDER_PAUSE_LOCK:
+                        PROVIDER_PAUSE_UNTIL = max(PROVIDER_PAUSE_UNTIL, time.monotonic() + delay)
                 time.sleep(delay)
                 continue
             error = ProviderError(message, code, terminal)
