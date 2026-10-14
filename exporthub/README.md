@@ -229,6 +229,17 @@ Teste: `node scripts/test-product-quote.cjs` cobre cadastro→cotação, 1.000 k
 - Base = produto + frete + seguro + documentos + outros custos + tributos de custo (valor fixo ou % sobre produto/operação/base informada, quando marcados para somar ao preço).
 - Preço = base ÷ (1 − indiretos) ÷ (1 − margem) ÷ (1 − tributos sobre o preço − comissões/despesas). A margem incide sobre o preço antes de tributos, como na planilha; no motor anterior incidia sobre o preço final, então os mesmos números agora geram preços um pouco maiores.
 - Os custos indiretos vêm do padrão da empresa (Precificador → Salvar como padrão da empresa), salvo em `commercial.pricingProfile`. Sem ele, o assistente mostra só uma prévia sinalizada e bloqueia a proposta final.
-- Cada cotação nova guarda `pricingModel` (taxas usadas). Cotações antigas não são recalculadas; `calculatePrice` continua disponível para a calculadora legada.
+- Cada cotação nova guarda `pricingModel` (taxas usadas). Cotações antigas não são recalculadas e abrem em modo leitura (`components/exporthub/QuoteSummary.tsx`); a calculadora legada e a fórmula antiga foram removidas.
 
 Teste: `NODE_PATH=$PWD/node_modules node scripts/test-unified-pricing.cjs`.
+
+## Cenários de entrega do assistente
+
+| Cenário | Condição | O que entra no preço | Custos obrigatórios da proposta de frete |
+|---|---|---|---|
+| Fábrica | EXW | produto + embalagem/pallet/comissão da ficha; **sem frete e sem despacho de exportação** | nenhum (não exige proposta de agente) |
+| Porto de origem | FCA / FOB | até a entrega no terminal de origem | coleta, taxas de origem, despacho de exportação |
+| Porto de destino | CFR / CIF | + frete internacional (CIF: + seguro) | + frete internacional (CIF: + seguro) |
+| Endereço do cliente | DAP | + taxas no terminal de destino e transporte até o endereço; **sem descarga, desembaraço nem tributos de importação** | coleta, taxas de origem, despacho de exportação, frete internacional, taxas no destino, transporte até o cliente |
+
+DAP exige o endereço completo de entrega (rua, número, cidade, CEP; o CEP do pedido em texto é extraído automaticamente). Valores de importação enviados numa proposta DAP são ignorados. CPT, CIP, DPU e DDP continuam bloqueados. Testes: `node scripts/test-product-quote.cjs`.

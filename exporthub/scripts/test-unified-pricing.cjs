@@ -1,6 +1,6 @@
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),assert=require('node:assert/strict'),ts=require('typescript'),cache={},root=path.resolve(__dirname,'..');
 function load(file){file=path.resolve(file);if(cache[file])return cache[file].exports;if(file.endsWith('.json'))return JSON.parse(fs.readFileSync(file,'utf8'));const m={exports:{}};cache[file]=m;const req=n=>n.startsWith('@/')?load(path.join(root,n.slice(2))+'.ts'):n.startsWith('.')?load(path.resolve(path.dirname(file),n)+'.ts'):require(n);vm.runInThisContext('(function(require,module,exports){'+ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText+'\n})')(req,m,m.exports);return m.exports}
-const wb=load(root+'/services/workbook-pricing.ts'),uni=load(root+'/services/unified-pricing.ts'),pricing=load(root+'/services/pricing.ts'),validation=load(root+'/db/validation.ts');
+const wb=load(root+'/services/workbook-pricing.ts'),uni=load(root+'/services/unified-pricing.ts'),validation=load(root+'/db/validation.ts');
 const close=(a,b,m)=>assert(Math.abs(a-b)<1e-9,(m||'')+' '+a+' != '+b);
 const base={quantity:1000,costPerKg:17.5,rate:1,freight:3000,insurance:500,documents:0,other:200,margin:20,fees:0,taxes:[]};
 const indirect=uni.indirectCostsFrom({version:1,indirectCosts:[{id:'a',name:'Aluguel',value:5000},{id:'b',name:'Contab.',value:1000}],monthlyRevenue:50000,updatedAt:'2026-10-14'});
@@ -27,7 +27,16 @@ assert.throws(()=>uni.indirectCostsFrom({version:1,indirectCosts:[{id:'a',name:'
 // 6) Entradas inválidas.
 for(const bad of [{margin:100},{margin:-1},{fees:90,taxes:taxRev},{quantity:0},{rate:0},{freight:NaN}])assert.throws(()=>uni.calculateUnifiedPrice({...base,taxes:[],...bad,indirect}),undefined,JSON.stringify(bad));
 // 7) Motor legado preservado (cotações antigas continuam recalculáveis) e persistência.
-close(pricing.calculatePrice({...base}).revenue,21200/(1-0.2),'legado intacto');
+// Casos de tributo portados do motor anterior (valor fixo, base informada, desabilitado, limites).
+const tx=(o)=>({id:'x',name:'Tributo',enabled:true,mode:'percent',base:'product',rate:10,amount:0,customBase:0,addToPrice:true,...o});
+close(uni.calculateUnifiedPrice({...base,taxes:[tx({mode:'fixed',amount:500})],indirect:none}).totalBRL,(21200+500)/0.8,'valor fixo');
+close(uni.calculateUnifiedPrice({...base,taxes:[tx({base:'custom',customBase:1000,rate:12})],indirect:none}).totalBRL,(21200+120)/0.8,'base informada');
+close(uni.calculateUnifiedPrice({...base,taxes:[tx({base:'product'})],indirect:none}).totalBRL,(21200+1750)/0.8,'sobre o produto');
+close(uni.calculateUnifiedPrice({...base,taxes:[tx({enabled:false,rate:NaN})],indirect:none}).totalBRL,21200/0.8,'desabilitado ignora entradas inválidas');
+assert.throws(()=>uni.calculateUnifiedPrice({...base,taxes:[tx({rate:-1})],indirect:none}),/Revise/);
+assert.throws(()=>uni.calculateUnifiedPrice({...base,taxes:[tx({rate:101})],indirect:none}),/100%/);
+assert.throws(()=>uni.calculateUnifiedPrice({...base,margin:90,taxes:[tx({base:'revenue',rate:10})],indirect:none}).totalBRL&&uni.calculateUnifiedPrice({...base,taxes:[tx({base:'revenue',rate:100})],indirect:none}),/100%/);
+
 const quote={id:'COT-1',product:'P',opportunityId:'',supplier:'S',incoterm:'FOB',currency:'BRL',quantity:1000,costPerKg:17.5,rate:1,total:1,unitPrice:1,createdAt:'2026-10-14'};
 const data={ops:[],quotes:[quote,{...quote,id:'COT-2',pricingModel:u.model}],pricingProfile:{version:1,indirectCosts:[{id:'a',name:'Aluguel',value:5000}],monthlyRevenue:50000,updatedAt:'2026-10-14'}};
 assert(validation.recordSchemas.commercial.safeParse(data).success);assert(!validation.recordSchemas.commercial.safeParse({...data,pricingProfile:{...data.pricingProfile,monthlyRevenue:0}}).success);
