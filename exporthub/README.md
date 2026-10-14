@@ -243,3 +243,11 @@ Teste: `NODE_PATH=$PWD/node_modules node scripts/test-unified-pricing.cjs`.
 | Endereço do cliente | DAP | + taxas no terminal de destino e transporte até o endereço; **sem descarga, desembaraço nem tributos de importação** | coleta, taxas de origem, despacho de exportação, frete internacional, taxas no destino, transporte até o cliente |
 
 DAP exige o endereço completo de entrega (rua, número, cidade, CEP; o CEP do pedido em texto é extraído automaticamente). Valores de importação enviados numa proposta DAP são ignorados. CPT, CIP, DPU e DDP continuam bloqueados. Testes: `node scripts/test-product-quote.cjs`.
+
+## Equipe e acessos
+
+O proprietário (e-mail definido em `db/permissions.ts`) convida pessoas em **Central de arquivos → Equipe e acessos**, informando o e-mail da conta que a pessoa usa para entrar e o acesso: *editor* (lê e altera dados) ou *leitura*. O convite fica pendente até o primeiro acesso; então vira um acesso pessoal ligado ao ID estável da conta e deixa de valer. **Nenhum e-mail é enviado.** O proprietário é único; ele pode alterar perfis, remover acessos e cancelar convites, tudo com registro no histórico. Backups, histórico e a gestão da equipe são só dele. Regras e fluxo testados em `node scripts/test-members.cjs`.
+
+## Backup e recuperação
+
+Plano, rotina e simulado em `docs/BACKUP_E_RECUPERACAO.md`. Ferramentas: `scripts/verify-backup.cjs` (confere o ZIP) e `scripts/restore-backup.cjs` (restaura em ambiente local vazio e confere). Teste: `node scripts/test-backup-restore.cjs`.
