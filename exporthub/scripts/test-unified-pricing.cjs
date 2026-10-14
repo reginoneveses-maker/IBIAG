@@ -31,4 +31,9 @@ close(pricing.calculatePrice({...base}).revenue,21200/(1-0.2),'legado intacto');
 const quote={id:'COT-1',product:'P',opportunityId:'',supplier:'S',incoterm:'FOB',currency:'BRL',quantity:1000,costPerKg:17.5,rate:1,total:1,unitPrice:1,createdAt:'2026-10-14'};
 const data={ops:[],quotes:[quote,{...quote,id:'COT-2',pricingModel:u.model}],pricingProfile:{version:1,indirectCosts:[{id:'a',name:'Aluguel',value:5000}],monthlyRevenue:50000,updatedAt:'2026-10-14'}};
 assert(validation.recordSchemas.commercial.safeParse(data).success);assert(!validation.recordSchemas.commercial.safeParse({...data,pricingProfile:{...data.pricingProfile,monthlyRevenue:0}}).success);
+// 8) Valores calculados gravados na planilha original (Precificador Ibiag V1.xlsx, aba Produtos): linhas XXXXXX, YYYYY e NNNNN.
+{const ind={configured:true,rate:6800/50000},direct=13500+200*10;
+for(const [qty,unit,expected] of [[150,25,12036.064425770308],[300,49,36327.03081232493],[250,37,25166.316526610648]]){
+ const r=uni.calculateUnifiedPrice({quantity:qty,costPerKg:unit,rate:5.55,freight:0,insurance:0,documents:0,other:qty/700*direct,margin:20,fees:0,taxes:taxRev,indirect:ind});
+ close(r.totalBRL,expected,'linha do Excel '+qty);}}
 console.log('PASS: motor único do assistente reconcilia com a planilha, comissões/tributos no passo final, tributo de custo, câmbio, perfil ausente/inválido, entradas inválidas, legado e persistência.');
