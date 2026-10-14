@@ -24,3 +24,27 @@ assert.throws(()=>assistant.generateAssistantQuotes({...args,indirect:{configure
 const q=assistant.generateAssistantQuotes({...args,indirect:{configured:true,rate:0.1}},'2026-10-13');
 assert(Math.abs(q[1].quote.total-(17500+655+3100)/0.9/0.8)<1e-9);assert.equal(q[1].quote.pricingModel.engine,'workbook-sequential-v1');assert.equal(q[1].quote.pricingModel.indirectRate,0.1);
 console.log('PASS: assistente bloqueia proposta final sem custos indiretos e grava o modelo de preço usado na cotação.')}
+{const validation=load(root+'/db/validation.ts');
+const args={request:'QA',product:'Acerola 17%',customer:'Cliente',opportunityId:'',quantity:1000,packaging:pack,paletized:true,destination:'Nuremberg',readyDate:'2026-10-17',deadline:'',originTerm:'FOB',destinationTerm:'CIF',originOnboardConfirmed:true,costPerKg:d.costBRL,rate:1,currency:'BRL',margin:20,fees:0,taxes:[],extraCost:d.extraCost,indirect:{configured:true,rate:0.1}};
+const base=17500+655,price=(extra)=>(base+extra)/0.9/0.8;
+// EXW: sem frete, sem proposta de agente, retirada na fábrica.
+const exw=assistant.generateAssistantQuotes({...args,scopes:['factory'],offer:{...route,provider:'',reference:'',costs:{},originPort:'',destinationPort:''}},'2026-10-13');
+assert.equal(exw.length,1);assert.equal(exw[0].quote.incoterm,'EXW');assert.equal(exw[0].scope,'factory');assert.equal(exw[0].quote.freight,0);assert.equal(exw[0].quote.documents,0);assert.deepEqual(exw[0].quote.logistics.routes,[]);assert.equal(exw[0].quote.logistics.namedPlace,pack.pickupAddress);assert(Math.abs(exw[0].quote.total-price(0))<1e-9);
+// DAP: todas as etapas, endereço completo, sem importação.
+const doorRoute={...route,costs:{insurance:300,pickup:500,originCharges:100,exportClearance:200,mainFreight:2000,destinationCharges:150,lastMile:400,importClearance:999,duties:999}};
+const dap=assistant.generateAssistantQuotes({...args,scopes:['door'],deliveryAddress:'Rua Exemplo 100, 90000-000 Porto Alegre',offer:doorRoute},'2026-10-13')[0].quote;
+assert.equal(dap.incoterm,'DAP');assert.equal(dap.freight,500+100+2000+150+400);assert.equal(dap.documents,200);assert.equal(dap.insurance,0);assert.equal(dap.other,655);assert(Math.abs(dap.total-price(3150+200))<1e-9);assert.equal(dap.logistics.namedPlace,'Rua Exemplo 100, 90000-000 Porto Alegre');assert(!JSON.stringify(dap.logistics.routes[0].costs).includes('999'));
+assert.throws(()=>assistant.generateAssistantQuotes({...args,scopes:['door'],offer:doorRoute},'2026-10-13'),/endereço completo/);
+assert.throws(()=>assistant.generateAssistantQuotes({...args,scopes:['door'],deliveryAddress:'Rua X',offer:{...doorRoute,costs:{...doorRoute.costs,lastMile:undefined}}},'2026-10-13'),/Transporte até o cliente/);
+assert.throws(()=>assistant.generateAssistantQuotes({...args,scopes:['door'],deliveryAddress:'Rua X',originOnboardConfirmed:false,offer:doorRoute},'2026-10-13'),/a bordo/);
+// Quatro cenários juntos: EXW < FOB < CIF e DAP > CIF; propostas e persistência.
+const all=assistant.generateAssistantQuotes({...args,scopes:['factory','origin','destination','door'],deliveryAddress:'Rua X 1, Porto Alegre',offer:doorRoute},'2026-10-13').map(r=>r.quote);
+assert.deepEqual(all.map(q=>q.incoterm),['EXW','FOB','CIF','DAP']);assert(all[0].total<all[1].total&&all[1].total<all[2].total&&all[2].total<all[3].total);
+assert(validation.recordSchemas.commercial.safeParse({ops:[],quotes:all}).success);
+const html=assistant.proposalHTML(all,'Cliente');assert(!html.includes('undefined')&&html.includes('EXW')&&html.includes('DAP')&&html.includes('descarga')&&html.includes('disponibilizado'));
+// Interpretação do pedido.
+const fs2=fs;const prods=JSON.parse(fs2.readFileSync(root+'/data/products.json','utf8')),vars=JSON.parse(fs2.readFileSync(root+'/data/product-variants.json','utf8'));const cat=prods.flatMap(p=>vars[p.id]?.map(v=>({...v,portugueseName:v.name,name:p.originalName}))||[{...p,portugueseName:p.name}]);
+const t1=assistant.interpretQuoteRequest('Cotar 1000 kg de extrato de acerola em pó 17% saindo de Belém para Porto Alegre, CEP 90000-000, preços EXW, FOB e DAP',cat);
+assert.deepEqual(t1.scopes,['factory','origin','door']);assert.equal(t1.postalCode,'90000-000');assert.equal(t1.destination,'Porto Alegre');
+assert.deepEqual(assistant.interpretQuoteRequest('300 kg de acerola extrato 21% saindo de Belém para Hamburgo, preço no porto de origem e no porto de destino',cat).scopes,['origin','destination']);
+console.log('PASS: EXW sem frete, DAP com todas as etapas sem importação, endereço e custos obrigatórios, quatro cenários ordenados, proposta e interpretação do pedido.')}
