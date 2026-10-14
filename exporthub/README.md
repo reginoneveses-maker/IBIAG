@@ -221,3 +221,14 @@ O assistente carrega preço convertido, margem, despesas, comissão, tributos, o
 Os subtotais por cenário incluem os custos não relacionados a transporte já cadastrados ou informados; frete e custos ainda desconhecidos são destacados como pendências. Campos de frete/disponibilidade/portos/datas permanecem manuais, sem consulta a transportadoras. Os cenários automáticos deste assistente são FCA/FOB e CFR/CIF; os demais Incoterms são cadastrados como referência e a tentativa de finalizar um pedido com essas condições é bloqueada. O leitor reconhece teores explícitos e não confunde suco com pó; se extrato/liofilizado ou fornecedor continuar ambíguo, pede confirmação. O assistente mantém o cálculo direto; não transforma silenciosamente seus tributos/bases no modelo mensal do Excel.
 
 Teste: `node scripts/test-product-quote.cjs` cobre cadastro→cotação, 1.000 kg, embalagens/pallets/peso/cubagem, comissão sem duplicação, câmbio, validade, MOQ, custos desconhecidos, bases de rateio, variantes, modal, persistência validada e valores com frete confirmado. Os snapshots de cotações anteriores continuam preservados.
+
+## Motor de preço do assistente (unificado com a planilha)
+
+`services/unified-pricing.ts` calcula as cotações do assistente com a fórmula sequencial da planilha IBIAG, compartilhada com o precificador (`applyWorkbookFormula` em `services/workbook-pricing.ts`).
+
+- Base = produto + frete + seguro + documentos + outros custos + tributos de custo (valor fixo ou % sobre produto/operação/base informada, quando marcados para somar ao preço).
+- Preço = base ÷ (1 − indiretos) ÷ (1 − margem) ÷ (1 − tributos sobre o preço − comissões/despesas). A margem incide sobre o preço antes de tributos, como na planilha; no motor anterior incidia sobre o preço final, então os mesmos números agora geram preços um pouco maiores.
+- Os custos indiretos vêm do padrão da empresa (Precificador → Salvar como padrão da empresa), salvo em `commercial.pricingProfile`. Sem ele, o assistente mostra só uma prévia sinalizada e bloqueia a proposta final.
+- Cada cotação nova guarda `pricingModel` (taxas usadas). Cotações antigas não são recalculadas; `calculatePrice` continua disponível para a calculadora legada.
+
+Teste: `NODE_PATH=$PWD/node_modules node scripts/test-unified-pricing.cjs`.
