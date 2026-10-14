@@ -1,0 +1,1 @@
+CREATE INDEX `idx_crm_files_opportunity` ON `crm_files` (`opportunity_id`);

@@ -1,0 +1,651 @@
+{
+  "IBIAG-003": [
+    {
+      "id": "IBIAG-003-S08",
+      "name": "Polpa de açaí 8% de sólidos",
+      "variantLabel": "8% de sólidos",
+      "forms": [
+        "Polpa"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-003-S12",
+      "name": "Polpa de açaí 12% de sólidos",
+      "variantLabel": "12% de sólidos",
+      "forms": [
+        "Polpa"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-003-S14",
+      "name": "Polpa de açaí 14% de sólidos",
+      "variantLabel": "14% de sólidos",
+      "forms": [
+        "Polpa"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-006": [
+    {
+      "id": "IBIAG-006-C17",
+      "name": "Extrato seco de acerola em pó 17% vitamina C nativa",
+      "variantLabel": "17% vitamina C nativa",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-006-C21",
+      "name": "Extrato seco de acerola em pó 21% vitamina C nativa",
+      "variantLabel": "21% vitamina C nativa",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-006-C25",
+      "name": "Extrato seco de acerola em pó 25% vitamina C nativa",
+      "variantLabel": "25% vitamina C nativa",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    }
+  ],
+  "IBIAG-007": [
+    {
+      "id": "IBIAG-007-C17",
+      "name": "Acerola liofilizada 17% vitamina C nativa",
+      "variantLabel": "17% vitamina C nativa",
+      "forms": [
+        "Liofilizado"
+      ],
+      "categories": [
+        "Liofilizados"
+      ]
+    },
+    {
+      "id": "IBIAG-007-C30",
+      "name": "Acerola liofilizada 30% vitamina C nativa",
+      "variantLabel": "30% vitamina C nativa",
+      "forms": [
+        "Liofilizado"
+      ],
+      "categories": [
+        "Liofilizados"
+      ]
+    },
+    {
+      "id": "IBIAG-007-C40",
+      "name": "Acerola liofilizada 40% vitamina C nativa",
+      "variantLabel": "40% vitamina C nativa",
+      "forms": [
+        "Liofilizado"
+      ],
+      "categories": [
+        "Liofilizados"
+      ]
+    }
+  ],
+  "IBIAG-008": [
+    {
+      "id": "IBIAG-008-NFC",
+      "name": "Suco de acerola — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-008-CONC",
+      "name": "Suco de acerola — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-015": [
+    {
+      "id": "IBIAG-015-NFC",
+      "name": "Suco de caju — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-015-CONC",
+      "name": "Suco de caju — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-021": [
+    {
+      "id": "IBIAG-021-NFC",
+      "name": "Água de coco — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-021-CONC",
+      "name": "Água de coco — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-032": [
+    {
+      "id": "IBIAG-032-NFC",
+      "name": "Goiaba — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-032-CONC",
+      "name": "Goiaba — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-035": [
+    {
+      "id": "IBIAG-035-NFC",
+      "name": "Limão — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-035-CONC",
+      "name": "Limão — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-038": [
+    {
+      "id": "IBIAG-038-NFC",
+      "name": "Suco de melão — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-038-CONC",
+      "name": "Suco de melão — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-042": [
+    {
+      "id": "IBIAG-042-NFC",
+      "name": "Laranja — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-042-CONC",
+      "name": "Laranja — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-047": [
+    {
+      "id": "IBIAG-047-NFC",
+      "name": "Suco de abacaxi — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-047-CONC",
+      "name": "Suco de abacaxi — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-054": [
+    {
+      "id": "IBIAG-054-NFC",
+      "name": "Suco de melancia — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-054-CONC",
+      "name": "Suco de melancia — clarificado / concentrado",
+      "variantLabel": "Clarificado / concentrado",
+      "forms": [
+        "Clarificado / concentrado"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-012": [
+    {
+      "id": "IBIAG-012-CAJA",
+      "name": "Cajá — suco NFC / purê",
+      "variantLabel": "Cajá",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-012-UMBU",
+      "name": "Cajá-umbu — suco NFC / purê",
+      "variantLabel": "Cajá-umbu",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    }
+  ],
+  "IBIAG-017": [
+    {
+      "id": "IBIAG-017-EXTRATO",
+      "name": "Catuaba — extrato em pó",
+      "variantLabel": "Extrato em pó",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-017-PO",
+      "name": "Catuaba — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-017-CORTE",
+      "name": "Catuaba — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-024": [
+    {
+      "id": "IBIAG-024-NFC",
+      "name": "Graviola — suco NFC / purê",
+      "variantLabel": "Suco NFC / purê",
+      "forms": [
+        "Suco NFC / purê"
+      ],
+      "categories": [
+        "Sucos e polpas"
+      ]
+    },
+    {
+      "id": "IBIAG-024-PO",
+      "name": "Graviola — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-024-CORTE",
+      "name": "Graviola — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-034": [
+    {
+      "id": "IBIAG-034-PO",
+      "name": "Jambu — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-034-CORTE",
+      "name": "Jambu — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-040": [
+    {
+      "id": "IBIAG-040-EXTRATO",
+      "name": "Muirapuama — extrato em pó",
+      "variantLabel": "Extrato em pó",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-040-PO",
+      "name": "Muirapuama — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-040-CORTE",
+      "name": "Muirapuama — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-045": [
+    {
+      "id": "IBIAG-045-PO",
+      "name": "Pau d’arco — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-045-CORTE",
+      "name": "Pau d’arco — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-046": [
+    {
+      "id": "IBIAG-046-PO",
+      "name": "Pfaffia paniculata (ginseng brasileiro) — em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-046-CORTE",
+      "name": "Pfaffia paniculata (ginseng brasileiro) — cortado",
+      "variantLabel": "Cortado",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-028": [
+    {
+      "id": "IBIAG-028-C10",
+      "name": "Extrato de guaraná em pó 10% cafeína",
+      "variantLabel": "10% cafeína",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-028-C22",
+      "name": "Extrato de guaraná em pó 22% cafeína",
+      "variantLabel": "22% cafeína",
+      "forms": [
+        "Extrato em pó"
+      ],
+      "categories": [
+        "Extratos e chás",
+        "Pós e farinhas"
+      ]
+    }
+  ],
+  "IBIAG-029": [
+    {
+      "id": "IBIAG-029-C12",
+      "name": "Extrato fluido de guaraná 1,2% cafeína",
+      "variantLabel": "1,2% cafeína",
+      "forms": [
+        "Extrato fluido"
+      ],
+      "categories": [
+        "Extratos e chás"
+      ]
+    },
+    {
+      "id": "IBIAG-029-C46",
+      "name": "Extrato fluido de guaraná 4–6% cafeína",
+      "variantLabel": "4–6% cafeína",
+      "forms": [
+        "Extrato fluido"
+      ],
+      "categories": [
+        "Extratos e chás"
+      ]
+    }
+  ],
+  "IBIAG-041": [
+    {
+      "id": "IBIAG-041-PO",
+      "name": "Ora-pro-nóbis em pó",
+      "variantLabel": "Pó",
+      "forms": [
+        "Pó"
+      ],
+      "categories": [
+        "Pós e farinhas"
+      ]
+    },
+    {
+      "id": "IBIAG-041-LIO",
+      "name": "Ora-pro-nóbis liofilizado",
+      "variantLabel": "Liofilizado",
+      "forms": [
+        "Liofilizado"
+      ],
+      "categories": [
+        "Liofilizados"
+      ]
+    }
+  ],
+  "IBIAG-055": [
+    {
+      "id": "IBIAG-055-VERDE",
+      "name": "Erva-mate 5/10 verde",
+      "variantLabel": "Verde, corte 5/10",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    },
+    {
+      "id": "IBIAG-055-TOSTADA",
+      "name": "Erva-mate 5/10 tostada",
+      "variantLabel": "Tostada, corte 5/10",
+      "forms": [
+        "Cortado"
+      ],
+      "categories": [
+        "Outros"
+      ]
+    }
+  ],
+  "IBIAG-058": [
+    {
+      "id": "IBIAG-058-VERDE",
+      "name": "Chá solúvel de erva-mate verde",
+      "variantLabel": "Verde",
+      "forms": [
+        "Chá solúvel"
+      ],
+      "categories": [
+        "Extratos e chás"
+      ]
+    },
+    {
+      "id": "IBIAG-058-TOSTADA",
+      "name": "Chá solúvel de erva-mate tostada",
+      "variantLabel": "Tostado",
+      "forms": [
+        "Chá solúvel"
+      ],
+      "categories": [
+        "Extratos e chás"
+      ]
+    }
+  ]
+}
