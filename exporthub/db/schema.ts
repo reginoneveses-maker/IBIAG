@@ -13,3 +13,4 @@ export const sectorFiles=sqliteTable('sector_files',{id:text('id').primaryKey(),
 export const auditEvents=sqliteTable('audit_events',{id:text('id').primaryKey(),at:text('at').notNull(),userId:text('user_id').notNull(),actor:text('actor').notNull(),action:text('action').notNull(),resourceType:text('resource_type').notNull(),resourceId:text('resource_id').notNull()},table=>[index('idx_audit_events_at').on(table.at)]);
 
 export const workspaceMembers=sqliteTable('workspace_members',{userId:text('user_id').primaryKey(),email:text('email').notNull().unique(),role:text('role').notNull(),createdAt:text('created_at').notNull()});
+export const workspaceInvites=sqliteTable('workspace_invites',{email:text('email').primaryKey(),role:text('role').notNull(),invitedBy:text('invited_by').notNull(),createdAt:text('created_at').notNull()});
