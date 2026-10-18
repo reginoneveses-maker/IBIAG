@@ -109,7 +109,8 @@ def verify_pw(pw, h):
     except Exception: return False
 
 def create_token(uid, email):
-    return jwt.encode({"sub": uid, "email": email, "exp": datetime.now(timezone.utc) + timedelta(days=7)},
+    return jwt.encode({"sub": uid, "email": email, "jti": str(uuid.uuid4()),
+                       "exp": datetime.now(timezone.utc) + timedelta(days=7)},
                       JWT_SECRET, algorithm=JWT_ALG)
 
 async def get_current_user(request: Request):
