@@ -12,6 +12,7 @@ import Pipeline from "@/pages/Pipeline";
 import TradeIntel from "@/pages/TradeIntel";
 import Templates from "@/pages/Templates";
 import Tasks from "@/pages/Tasks";
+import AccountAccess from "@/pages/AccountAccess";
 import Orders from "@/pages/Orders";
 import Inventory from "@/pages/Inventory";
 import ImportCRM from "@/pages/ImportCRM";
@@ -41,6 +42,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Protected><Home /></Protected>} />
               <Route path="/gestao" element={<Protected><Layout module="gestao" /></Protected>}>
+                <Route path="acessos" element={<AdminOnly><AccountAccess /></AdminOnly>} />
                 <Route index element={<AdminOnly><GestaoHome /></AdminOnly>} />
                 <Route path="procedimentos" element={<Procedimentos />} />
                 <Route path="financeiro" element={<AdminOnly><Financeiro /></AdminOnly>} />

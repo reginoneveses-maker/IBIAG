@@ -38,7 +38,7 @@ const Pipeline = () => {
   useEffect(() => {
     let active = true;
     if (user?.role === "admin" && detailLead?.id) {
-      api.get("/auth/users").then(response => { if (active) setOwners(response.data); })
+      api.get("/auth/users").then(response => { if (active) setOwners(response.data.filter(owner => owner.active !== false)); })
         .catch(() => { if (active) setOwners([]); });
     } else setOwners([]);
     return () => { active = false; };

@@ -23,7 +23,7 @@ const Tasks = () => {
   useEffect(() => {
     let active = true;
     if (user?.role === "admin") {
-      api.get("/auth/users").then(r => { if (active) setOwners(r.data); })
+      api.get("/auth/users").then(r => { if (active) setOwners(r.data.filter(owner => owner.active !== false)); })
         .catch(() => { if (active) toast.error("Não foi possível carregar os responsáveis."); });
     } else setOwners([]);
     return () => { active = false; };
