@@ -17,8 +17,9 @@ ativar serviços ou disparar backups para realizar estes passos.
    responsável, referências a usuários ausentes, IDs duplicados, anexos órfãos e
    classificações desconhecidas. Não apagar, transferir ou reclassificar em massa.
 4. Confirmar origens HTTPS exatas e validade do segredo JWT (mínimo 32 caracteres)
-   sem imprimir valores. Verificar a política do segredo de bootstrap: o código
-   existente sincroniza a senha do administrador no startup. Conferir também os
+   sem imprimir valores. No candidato do PR 33, o bootstrap passa a criar somente contas ausentes;
+   não redefine a senha existente ao mudar ADMIN_PASSWORD ou reiniciar. A versão
+   ainda publicada deve ser conferida separadamente. Conferir também os
    seeds/migrações de startup antes de reiniciar uma instalação existente.
 5. Confirmar o comando real do container e o peer visto pelo servidor. A
    documentação pública do proxy não comprovou uma lista de IPs confiáveis nem
@@ -32,7 +33,7 @@ ativar serviços ou disparar backups para realizar estes passos.
    sem esperar checks. Não alterar configurações que reiniciem serviços sem
    conhecer o efeito. Não criar ambiente/serviço pago como atalho.
 8. Resolver ou aceitar explicitamente com a operação as pendências de código
-   registradas na auditoria: recuperação/desativação de contas, limites de ingresso
+   registradas na auditoria: recuperação de senha esquecida/emergência administrativa, limites de ingresso
    e parsers, conteúdo/malware, auditoria dedicada de segredos e desempenho.
 
 ## Evidências depois da publicação controlada
@@ -42,7 +43,9 @@ ativar serviços ou disparar backups para realizar estes passos.
 - Com duas contas autorizadas e um admin: comprovar acesso próprio, negar IDs
   alheios e aliases de arquivos, negar ERP/finanças ao usuário comum e verificar
   dashboard sem totais privados. Conferir dados legados pelo admin.
-- Provar logout/replay, expiração e permissão lida do banco. Provar tentativa por
+- Provar logout/replay, expiração, suspensão/reativação de conta comum, troca de
+  senha e permissão lida do banco. Tokens antigos devem continuar recusados após
+  reativar ou trocar a senha; confirmar novo login e persistência da nova senha. Provar tentativa por
   conta e por cliente real atrás do proxy usando identidades de teste e sem
   bloquear o administrador ou fazer testes de carga em produção.
 - Verificar origens CORS permitidas/negadas, headers reais, HTTPS, docs/debug,
