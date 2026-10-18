@@ -25,6 +25,8 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from password_inputs import password_bytes, auth_validation_error
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
@@ -103,9 +105,9 @@ async def delete_object(path: str):
         return
 
 # ----- Auth helpers -----
-def hash_pw(pw): return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+def hash_pw(pw): return bcrypt.hashpw(password_bytes(pw, minimum=8), bcrypt.gensalt()).decode()
 def verify_pw(pw, h): 
-    try: return bcrypt.checkpw(pw.encode(), h.encode())
+    try: return bcrypt.checkpw(password_bytes(pw), h.encode())
     except Exception: return False
 
 def create_token(uid, email):
@@ -136,6 +138,7 @@ def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
 app = FastAPI(title="IBIAG", version="1.0.0")
+app.add_exception_handler(RequestValidationError, auth_validation_error)
 
 # Production CORS. Keep this explicit in production; "*" is only a development fallback.
 cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
@@ -155,17 +158,19 @@ api = APIRouter(prefix="/api")
 # ----- Models -----
 class LoginBody(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=72)
 
-class RegisterBody(BaseModel):
-    email: EmailStr
-    password: str
+    @field_validator("password")
+    @classmethod
+    def bcrypt_password(cls, value):
+        password_bytes(value)
+        return value
+
+class RegisterBody(LoginBody):
+    password: str = Field(min_length=8, max_length=72)
     name: str = ""
 
-class UserCreateBody(BaseModel):
-    email: EmailStr
-    password: str
-    name: str = ""
+class UserCreateBody(RegisterBody):
     role: str = "user"
 
 class Product(BaseModel):
@@ -560,8 +565,6 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
     email = body.email.lower().strip()
     if body.role not in {"admin", "user"}:
         raise HTTPException(400, "Invalid role")
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must have at least 8 characters")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
     record = {"id": str(uuid.uuid4()), "email": email,
@@ -570,6 +573,7 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
               "created_at": now_iso()}
     await db.users.insert_one(record)
     record.pop("password_hash", None)
+    record.pop("_id", None)
     return record
 
 # Shared MongoDB limiter: one atomic counter per email per fixed 15-minute
