@@ -15,7 +15,7 @@ def is_spec_document(doc):
     return bool(re.search(r"\b(?:specs?|specification|specifications|ficha tecnica|technical data sheet|technical specification)\b", text))
 
 
-async def supplier_spec_library(db):
+async def supplier_spec_library(db, document_query=None, private_paths=()):
     suppliers = {s["id"]: s async for s in db.suppliers.find({}, {"_id": 0})}
     names = {}
     for supplier in suppliers.values():
@@ -41,7 +41,7 @@ async def supplier_spec_library(db):
         return "", "Ofertas vinculadas a fornecedores diferentes." if linked else "Fornecedor não identificado."
 
     items, unassigned, seen_paths = [], [], set()
-    async for spec in db.specs.find({"deleted_at": {"$in": [None, ""]}}, {"_id": 0}):
+    async for spec in db.specs.find({"deleted_at": {"$in": [None, ""]}, "original_file_path": {"$nin": list(private_paths)}, "ibiag_file_path": {"$nin": list(private_paths)}}, {"_id": 0}):
         sid, reason = resolve(spec)
         row = {**spec, "source_type": "spec", "supplier_id": sid, "supplier_name": suppliers[sid]["name"] if sid else spec.get("supplier_name", "")}
         if sid:
@@ -51,7 +51,7 @@ async def supplier_spec_library(db):
                     seen_paths.add((sid, spec[slot + "_file_path"]))
         else:
             unassigned.append({**row, "assignment_reason": reason})
-    async for doc in db.documents.find({"deleted_at": {"$in": [None, ""]}}, {"_id": 0}):
+    async for doc in db.documents.find({"$and": [{"deleted_at": {"$in": [None, ""]}}, document_query or {}]}, {"_id": 0}):
         links = offer_links.get(doc["id"], [])
         if not is_spec_document(doc) and not links:
             continue
