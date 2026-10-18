@@ -119,6 +119,10 @@ async def get_current_user(request: Request):
         raise HTTPException(401, "Not authenticated")
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        # Store only a one-way digest, never a bearer token, in the denylist.
+        token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        if await db.revoked_access_tokens.find_one({"_id": token_digest}):
+            raise HTTPException(401, "Session ended")
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(401, "User not found")
@@ -582,7 +586,18 @@ async def me(user=Depends(get_current_user)):
     return user
 
 @api.post("/auth/logout")
-async def logout(): return {"ok": True}
+async def logout(request: Request, user=Depends(get_current_user)):
+    # The current token is valid (checked by dependency). Invalidate it
+    # server-side until its original expiration, including across workers.
+    token = request.headers["Authorization"][7:]
+    payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    await db.revoked_access_tokens.update_one(
+        {"_id": token_digest},
+        {"$setOnInsert": {"user_id": user["id"], "expires_at": datetime.fromtimestamp(payload["exp"], tz=timezone.utc)}},
+        upsert=True,
+    )
+    return {"ok": True}
 
 # Deployment sync: document storage cleanup enabled.
 # ============ FILES / STORAGE ============
@@ -2610,6 +2625,9 @@ async def seed_all():
 
 @app.on_event("startup")
 async def startup():
+    # Expired revocations are deleted by MongoDB automatically. TTL cleanup
+    # may be delayed, but JWT expiration remains enforced independently.
+    await db.revoked_access_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.buyer_search_jobs.update_many({"status": {"$in": ["pending", "running"]}}, {"$set": {"status": "interrupted", "updated_at": now_iso()}})
     await db.leads.create_index("discovery_key", unique=True, sparse=True)
     await seed_all()
