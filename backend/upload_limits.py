@@ -7,10 +7,11 @@ MAX_IMPORT_BYTES = 50 * 1024 * 1024
 MAX_EXPANDED_BYTES = 100 * 1024 * 1024
 
 
-async def read_import(file):
-    raw = await file.read(MAX_IMPORT_BYTES + 1)
-    if not raw or len(raw) > MAX_IMPORT_BYTES:
-        raise HTTPException(413, "Arquivo vazio ou acima do limite de 50 MB")
+async def read_import(file, max_bytes=None):
+    limit = min(MAX_IMPORT_BYTES, max_bytes) if max_bytes is not None else MAX_IMPORT_BYTES
+    raw = await file.read(limit + 1)
+    if not raw or len(raw) > limit:
+        raise HTTPException(413, "Arquivo vazio ou acima do limite permitido")
     if zipfile.is_zipfile(io.BytesIO(raw)):
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             entries = archive.infolist()
