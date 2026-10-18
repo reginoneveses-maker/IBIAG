@@ -572,9 +572,29 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
     record.pop("password_hash", None)
     return record
 
+# Shared MongoDB limiter: one atomic counter per email per fixed 15-minute
+# window, across application workers. Never store the plaintext email here.
+LOGIN_WINDOW_SECONDS = 900
+LOGIN_MAX_ATTEMPTS = 5
+
 @api.post("/auth/login")
 async def login(body: LoginBody):
     email = body.email.lower().strip()
+    now = datetime.now(timezone.utc)
+    window = int(now.timestamp()) // LOGIN_WINDOW_SECONDS
+    limiter_key = hashlib.sha256(f"{window}:{email}".encode("utf-8")).hexdigest()
+    # Count attempts before credential verification, preventing concurrent
+    # requests from bypassing the threshold. MongoDB $inc is atomic.
+    attempt = await db.login_attempts.find_one_and_update(
+        {"_id": limiter_key},
+        {"$inc": {"count": 1}, "$setOnInsert": {
+            "expires_at": datetime.fromtimestamp((window + 2) * LOGIN_WINDOW_SECONDS, tz=timezone.utc)
+        }},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if attempt["count"] > LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many login attempts. Try again later.", headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)})
     user = await db.users.find_one({"email": email})
     if not user or not verify_pw(body.password, user["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
@@ -2628,6 +2648,7 @@ async def startup():
     # Expired revocations are deleted by MongoDB automatically. TTL cleanup
     # may be delayed, but JWT expiration remains enforced independently.
     await db.revoked_access_tokens.create_index("expires_at", expireAfterSeconds=0)
+    await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
     await db.buyer_search_jobs.update_many({"status": {"$in": ["pending", "running"]}}, {"$set": {"status": "interrupted", "updated_at": now_iso()}})
     await db.leads.create_index("discovery_key", unique=True, sparse=True)
     await seed_all()
