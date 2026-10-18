@@ -257,6 +257,7 @@ class Task(BaseModel):
     description: str = ""
     due_date: str = ""
     completed: bool = False
+    owner_id: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 class Supplier(BaseModel):
@@ -2104,25 +2105,58 @@ async def create_int(i: Interaction, user=Depends(get_current_user)):
     await db.interactions.insert_one(i.model_dump()); return i
 
 # ============ TASKS ============
+def task_access_query(user, task_id=None):
+    # Ownership comes from the authenticated database user, never request data.
+    # Legacy tasks without an owner remain administrator-only until assigned.
+    query = {} if user.get("role") == "admin" else {"owner_id": user["id"]}
+    if task_id is not None:
+        query["id"] = task_id
+    return query
+
 @api.get("/tasks", response_model=List[Task])
 async def list_tasks(user=Depends(get_current_user)):
-    return await db.tasks.find({}, {"_id": 0}).to_list(500)
+    return await db.tasks.find(task_access_query(user), {"_id": 0}).to_list(500)
 
 @api.post("/tasks", response_model=Task)
 async def create_task(t: Task, user=Depends(get_current_user)):
+    if not t.title.strip():
+        raise HTTPException(400, "Título obrigatório")
+    t.id = str(uuid.uuid4())
+    t.owner_id = user["id"]
+    t.created_at = now_iso()
+    t.title = t.title.strip()
     await db.tasks.insert_one(t.model_dump()); return t
 
 @api.patch("/tasks/{tid}/toggle", response_model=Task)
 async def toggle_task(tid: str, user=Depends(get_current_user)):
-    doc = await db.tasks.find_one({"id": tid}, {"_id": 0})
+    # Match authorization and change state atomically, including concurrent tabs.
+    doc = await db.tasks.find_one_and_update(
+        task_access_query(user, tid),
+        [{"$set": {"completed": {"$eq": [{"$ifNull": ["$completed", False]}, False]}}}],
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not doc: raise HTTPException(404, "Not found")
-    nv = not doc["completed"]
-    await db.tasks.update_one({"id": tid}, {"$set": {"completed": nv}})
-    doc["completed"] = nv; return doc
+    return doc
 
 @api.delete("/tasks/{tid}")
 async def del_task(tid: str, user=Depends(get_current_user)):
-    r = await db.tasks.delete_one({"id": tid}); return {"deleted": r.deleted_count}
+    r = await db.tasks.delete_one(task_access_query(user, tid))
+    if not r.deleted_count: raise HTTPException(404, "Not found")
+    return {"deleted": r.deleted_count}
+
+class TaskOwnerBody(BaseModel):
+    owner_id: str = Field(min_length=1, max_length=200)
+
+@api.patch("/tasks/{tid}/owner", response_model=Task)
+async def assign_task_owner(tid: str, body: TaskOwnerBody, user=Depends(get_current_user)):
+    require_admin(user)
+    if not await db.users.find_one({"id": body.owner_id}, {"id": 1}):
+        raise HTTPException(400, "Usuário não encontrado")
+    doc = await db.tasks.find_one_and_update(
+        {"id": tid}, {"$set": {"owner_id": body.owner_id,
+                               "owner_updated_by": user["id"], "owner_updated_at": now_iso()}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not doc: raise HTTPException(404, "Not found")
+    return doc
 
 # ============ TEMPLATES (public) ============
 class MessageTemplate(BaseModel):
