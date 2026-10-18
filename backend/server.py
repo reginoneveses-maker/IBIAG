@@ -2355,7 +2355,7 @@ class TradeRecord(BaseModel):
 @api.get("/trade-data", response_model=List[TradeRecord])
 async def list_trade(country: Optional[str] = Query(None, max_length=8),
                      industry: Optional[str] = Query(None, max_length=64),
-                     search: Optional[str] = Query(None, max_length=128),
+                     search: Optional[str] = Query(None, max_length=128, pattern=r"^[^\x00]*$"),
                      user=Depends(get_current_user)):
     q = {}
     if country: q["country_code"] = country

@@ -52,8 +52,8 @@ class TradeSearchSecurityTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_oversized_filters_are_rejected_before_query_and_authentication_is_required(self):
         with patch.object(self.db.trade_data, "find", side_effect=AssertionError("must not query")):
-            for key, maximum in (("search", 128), ("country", 8), ("industry", 64)):
-                response = await self.client.get("/api/trade-data", params={key: "x" * (maximum + 1)}, headers=self.headers)
+            for key, value in (("search", "x" * 129), ("country", "x" * 9), ("industry", "x" * 65), ("search", "bad\x00pattern")):
+                response = await self.client.get("/api/trade-data", params={key: value}, headers=self.headers)
                 self.assertEqual(response.status_code, 422, response.text)
         response = await self.client.get("/api/trade-data", params={"search": "acme"})
         self.assertEqual(response.status_code, 401)
