@@ -1,6 +1,8 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
-Resultado mais recente: os PRs 32/33 foram integrados somente na revisão draft 28. A composição a20892a passou integralmente na pipeline [39135986654](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39135986654): 236 testes backend, 40 subtestes, 266 testes frontend, build e navegador. Não houve publicação de aplicação ou alteração de conta em produção. A etapa 1 continua aberta.
+Resultado mais recente: PR 34 integrado somente à revisão draft 28. A composição b4cfca8 passou integralmente na pipeline [39137199614](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39137199614): 243 testes backend, 40 subtestes, 266 testes frontend, build e navegador. A etapa 1 permanece aberta e não houve publicação de aplicação em produção.
+
+Marco anterior: os PRs 32/33 foram integrados somente na revisão draft 28. A composição a20892a passou integralmente na pipeline [39135986654](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39135986654): 236 testes backend, 40 subtestes, 266 testes frontend, build e navegador. Não houve publicação de aplicação ou alteração de conta em produção. A etapa 1 continua aberta.
 
 A etapa 1 (Segurança e Controle de Acesso) permanece aberta. Foram recuperadas
 as conversas “Análise do ExportHub” e “Criar plataforma ExportHub”, confrontadas
@@ -202,3 +204,13 @@ A suspensão não cancela requisições já autorizadas, jobs antigos ou arquivo
 Permanecem abertos: proxy real e configuração publicada, recuperação de acesso, limites de ingresso/recursos de parser e conteúdo dos uploads, auditoria dedicada de segredos/privilégios de banco/storage, contas e dados legados e validação dos fluxos publicados. Main não recebeu estas alterações de aplicação; nenhum serviço pago, mensagem, consulta externa, backup ou conta real foi ativado/alterado nesta continuação.
 
 Pipeline final da composição: 39135986654, SHA a20892a, sucesso completo após integrar os PRs 32/33. O relatório foi atualizado em branch de auditoria, sem alterar a árvore de código já testada nem main.
+
+## Continuação — XML de NF-e com limites próprios
+
+O PR 34 substitui decoding que descartava bytes e substituição de namespace por parsing incremental explícito com defusedxml 0.7.1. DTD, entidades e referências externas são proibidas. Há limite de 5 MiB antes do parser, 64 níveis e 50 mil elementos. Excesso retorna 413; XML inválido/proibido, estrutura não reconhecida ou total inválido/não finito/negativo retorna mensagem estática 400, sem exceção interna. Namespaces, prefixos e encoding declarado são preservados na extração. A rota continua administrativa e não persiste documento/nota/arquivo.
+
+Sete testes novos verificam entrada/saída válidas, prefixo e ISO-8859-1, DTD/entidades locais/remotas sem fetch, tamanho/profundidade/nós, erros redigidos, valores monetários e autorização/ausência de gravações. Validação local conjunta: 196 testes e 40 subtestes passaram; 47 casos de ambiente/MongoDB foram ignorados localmente. Pipeline individual 39136973269 passou integralmente: 243 testes backend, 40 subtestes, 266 testes frontend, build e navegador, incluindo os casos anteriores com MongoDB descartável.
+
+O PR 34 foi integrado somente à revisão draft 28 por b4cfca8. Não houve publicação da aplicação em main nem acesso a XMLs de produção. Documentação e referência oficial da dependência fixada: docs/NFE_XML_SECURITY.md. A correção não comprova validade fiscal, assinatura digital ou conformidade completa de schema, não é antivírus e não limita o ingresso multipart/proxy. Recursos de CSV/XLSX e proteção dos demais uploads permanecem pendentes, junto com recuperação de acesso, privilégios/segredos, dados legados e validação publicada do proxy/fluxos. Nenhum serviço pago, consulta de provedor ou backup foi ativado.
+
+Pipeline final da composição b4cfca8: 39137199614, sucesso completo. A árvore integrada foi comparada com a árvore local testada, sem diferenças. Um teste local adicional de compatibilidade confirmou a leitura de XLSX sintético com a nova dependência; isso não comprova proteção integral de planilhas. Nenhum serviço externo pago, backup ou conta real foi ativado/alterado.
