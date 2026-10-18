@@ -101,10 +101,10 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Link to="/prospects/orders" className="p-4 rounded-xl bg-white/80 border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-orders">
+        {stats?.can_view_erp && <Link to="/prospects/orders" className="p-4 rounded-xl bg-white/80 border border-[#0F382C]/10 hover:border-amber-600/40 transition-all" data-testid="erp-orders">
           <div className="flex items-center gap-1 text-[11px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60"><ShoppingCart className="w-3 h-3" />Pedidos Ativos</div>
           <div className="mt-1 font-display text-2xl font-bold text-[#0F382C]">{stats?.orders_pending ?? 0}</div>
-        </Link>
+        </Link>}
         <div className="p-4 rounded-xl bg-white/80 border border-[#0F382C]/10" data-testid="kpi-won">
           <div className="flex items-center gap-1 text-[11px] font-mono-alt uppercase tracking-widest text-[#0F382C]/60"><Trophy className="w-3 h-3" />{t("kpi_won")}</div>
           <div className="mt-1 font-display text-2xl font-bold text-emerald-700">{stats?.won ?? 0}</div>

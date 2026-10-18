@@ -1,6 +1,10 @@
 """CRM authorization predicates; no ownership is accepted from browser data."""
 from fastapi import HTTPException
 
+TEAM_DOCUMENT_CATEGORIES = [None, "", "Produtos", "Fornecedores", "Clientes & Comercial",
+    "Qualidade & Compliance", "Exportação & Logística", "general", "products", "suppliers",
+    "commercial", "quality", "logistics", "pop", "pop_signed", "marketing", "ibiag_organic"]
+
 
 def lead_scope(user, query=None):
     query = dict(query or {})
@@ -26,7 +30,8 @@ async def document_scope(db, user, query=None):
         return query
     ids = await visible_lead_ids(db, user)
     return {"$and": [query, {"$or": [{"lead_id": {"$in": [None, ""]}}, {"lead_id": {"$in": ids}}]},
-                     {"file_path": {"$nin": await private_file_paths(db, user)}}]}
+                     {"file_path": {"$nin": await private_file_paths(db, user)}},
+                     {"category": {"$in": TEAM_DOCUMENT_CATEGORIES}}]}
 
 
 async def private_file_paths(db, user):
@@ -34,7 +39,14 @@ async def private_file_paths(db, user):
         return []
     ids = await visible_lead_ids(db, user)
     query = {"lead_id": {"$exists": True, "$nin": [None, "", *ids]}}
-    return list({doc["file_path"] async for doc in db.documents.find(query, {"file_path": 1}) if doc.get("file_path")})
+    paths = {doc["file_path"] async for doc in db.documents.find(query, {"file_path": 1}) if doc.get("file_path")}
+    # Financial/legal/unknown classifications are not shared by default.
+    async for doc in db.documents.find({"category": {"$exists": True, "$nin": TEAM_DOCUMENT_CATEGORIES}}, {"file_path": 1}):
+        if doc.get("file_path"): paths.add(doc["file_path"])
+    for name in ("contracts", "invoices", "finance"):
+        async for record in db[name].find({"file_path": {"$exists": True}}, {"file_path": 1}):
+            if record.get("file_path"): paths.add(record["file_path"])
+    return list(paths)
 
 
 async def shared_file_scope(db, user, query=None, fields=("file_path",)):

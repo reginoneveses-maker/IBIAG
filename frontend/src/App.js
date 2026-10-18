@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LangProvider } from "@/i18n";
 import { AuthProvider, useAuth } from "@/AuthContext";
+import AdminOnly from "@/components/AdminOnly";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
@@ -40,16 +41,16 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<Protected><Home /></Protected>} />
               <Route path="/gestao" element={<Protected><Layout module="gestao" /></Protected>}>
-                <Route index element={<GestaoHome />} />
+                <Route index element={<AdminOnly><GestaoHome /></AdminOnly>} />
                 <Route path="procedimentos" element={<Procedimentos />} />
-                <Route path="financeiro" element={<Financeiro />} />
-                <Route path="fornecedores" element={<FornecedoresHub />} />
-                <Route path="produtos" element={<Produtos />} />
-                <Route path="prospeccao" element={<Specs />} />
-                <Route path="precos" element={<Precos />} />
+                <Route path="financeiro" element={<AdminOnly><Financeiro /></AdminOnly>} />
+                <Route path="fornecedores" element={<AdminOnly><FornecedoresHub /></AdminOnly>} />
+                <Route path="produtos" element={<AdminOnly><Produtos /></AdminOnly>} />
+                <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
+                <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
-                <Route path="pedidos" element={<Orders />} />
-                <Route path="estoque" element={<Inventory />} />
+                <Route path="pedidos" element={<AdminOnly><Orders /></AdminOnly>} />
+                <Route path="estoque" element={<AdminOnly><Inventory /></AdminOnly>} />
               </Route>
               <Route path="/prospects" element={<Protected><Layout module="crm" /></Protected>}>
                 <Route index element={<Dashboard />} />
@@ -58,8 +59,8 @@ function App() {
                 <Route path="trade" element={<TradeIntel />} />
                 <Route path="templates" element={<Templates />} />
                 <Route path="tasks" element={<Tasks />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="inventory" element={<Inventory />} />
+                <Route path="orders" element={<AdminOnly><Orders /></AdminOnly>} />
+                <Route path="inventory" element={<AdminOnly><Inventory /></AdminOnly>} />
                 <Route path="import" element={<ImportCRM />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />

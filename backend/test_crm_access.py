@@ -154,11 +154,11 @@ class CrmAccessTests(unittest.IsolatedAsyncioTestCase):
         await self.db.certifications.insert_one({"id":"cert","supplier_id":"supplier","name":"Private","file_path":path})
         for url,body in (("/specs/spec",{"supplier_id":"supplier","product_name":"Overwrite"}),
                          ("/certifications/cert",{"supplier_id":"supplier","name":"Overwrite"})):
-            self.assertEqual((await self.request("bob","PUT",url,json=body)).status_code,404)
-            self.assertEqual((await self.request("bob","DELETE",url)).status_code,404)
+            self.assertEqual((await self.request("bob","PUT",url,json=body)).status_code,403)
+            self.assertEqual((await self.request("bob","DELETE",url)).status_code,403)
         for url,body in (("/specs",{"supplier_id":"supplier","product_name":"Copy","original_file_path":path}),
                          ("/certifications",{"supplier_id":"supplier","name":"Copy","file_path":path})):
-            self.assertEqual((await self.request("bob","POST",url,json=body)).status_code,404)
+            self.assertEqual((await self.request("bob","POST",url,json=body)).status_code,403)
         self.assertEqual(await self.db.specs.count_documents({}),1)
         self.assertEqual(await self.db.certifications.count_documents({}),1)
 
@@ -190,7 +190,7 @@ class CrmAccessTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len((await self.request("bob","GET","/interactions")).json()),1)
         # The original upload prefix cannot republish the transferred document.
         response=await self.request("alice","POST","/documents",json={"title":"Repub","file_name":"private.pdf","file_path":path})
-        self.assertEqual(response.status_code,404,response.text)
+        self.assertEqual(response.status_code,403,response.text)
 
     async def test_legacy_is_preserved_and_explicitly_assignable(self):
         await self.db.leads.insert_one({"id":"legacy","company":"Existing Company"})
