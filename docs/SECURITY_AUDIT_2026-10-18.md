@@ -1,11 +1,13 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+Resultado mais recente: os PRs 32/33 foram integrados somente na revisão draft 28. A composição a20892a passou integralmente na pipeline [39135986654](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39135986654): 236 testes backend, 40 subtestes, 266 testes frontend, build e navegador. Não houve publicação de aplicação ou alteração de conta em produção. A etapa 1 continua aberta.
+
 A etapa 1 (Segurança e Controle de Acesso) permanece aberta. Foram recuperadas
 as conversas “Análise do ExportHub” e “Criar plataforma ExportHub”, confrontadas
 com o código, PRs, GitHub Actions e configuração de hospedagem disponível.
 Relatos anteriores não foram tratados como comprovação de produção.
 
-Resultado mais recente: a integração final 9e25b65 passou na pipeline [39119193582](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39119193582): 206 testes backend, 40 subtestes, 257 testes frontend, build e navegador. PRs 29–31 integrados somente na revisão draft 28. Etapa 1 aberta; nada publicado em produção.
+Marco anterior: a integração 9e25b65 passou na pipeline [39119193582](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39119193582): 206 testes backend, 40 subtestes, 257 testes frontend, build e navegador. PRs 29–31 integrados somente na revisão draft 28. Etapa 1 aberta; nada publicado em produção.
 
 ## Ordem preservada
 
@@ -125,7 +127,7 @@ não integração na branch de produção.
 3. Estabelecer validação e publicação controlada: hoje commits em `main` podem
    disparar deploy sem aguardar checks. Nenhum deploy de aplicação foi solicitado
    nesta execução.
-4. Concluir recuperação/desativação de contas, revisão de bootstrap/startup,
+4. Concluir recuperação de senha esquecida e emergência administrativa, revisão de bootstrap/startup,
    limites de ingresso e parsers, conteúdo dos uploads e auditoria dedicada de
    segredos e permissões do banco/storage. CORS/headers já têm correções testadas,
    mas ainda precisam da configuração e verificação publicadas.
@@ -174,9 +176,9 @@ continuação. A etapa 1 permanece aberta.
 - PR 29: 46 rotas administrativas, dashboard sem consulta/exposição de finanças ao usuário comum, documentos financeiros/societários e aliases protegidos; frontend impede montar páginas restritas. Pipeline 39118021039 passou. Integrado somente na branch de revisão por c45149b, sem deploy.
 - PR 30: CORS exato, chave JWT mínima de 32 caracteres, docs/debug fechados por padrão, cabeçalhos/no-store, erros redigidos até na fronteira ASGI e downloads como anexos inertes. Não há rotação de chaves automática. Validação local: 171 testes backend e 40 subtestes passaram, 29 testes externos ignorados; 257 testes frontend em 11 suítes passaram. Pipeline 39118591560 passou: 200 testes backend e 40 subtestes, 257 testes frontend, build e navegador. Integrado somente na branch de revisão por 5f5570d.
 
-Inventário estático atual: 113 rotas; 46 dependem diretamente de admin e 63 de usuário autenticado (algumas destas também exigem admin no corpo). Restam quatro sem dependência explícita: login, cadastro público desligado por padrão, health e raiz. Isso é inventário, não comprovação dinâmica de cada caminho.
+Inventário estático após os PRs 32/33: 115 rotas; 47 dependem diretamente de admin e 64 de usuário autenticado (algumas destas também exigem admin no corpo). Restam quatro sem dependência explícita: login, cadastro público desligado por padrão, health e raiz. Isso é inventário, não comprovação dinâmica de cada caminho.
 
-Pendências técnicas identificadas: limites de ingresso e de recursos dos parsers/importadores; política de conteúdo/malware; ciclo de vida e recuperação/desativação de contas; revisão dedicada de segredos e privilégios de banco/storage. O proxy real ainda não tem allowlist comprovada: não foi habilitada confiança em X-Forwarded-For/X-Real-IP. Também faltam publicação controlada, revisão das contas/legados e testes autorizados no ambiente publicado.
+Pendências técnicas identificadas: limites de ingresso e de recursos dos parsers/importadores; política de conteúdo/malware; ciclo de vida e recuperação de senha esquecida e emergência administrativa; revisão dedicada de segredos e privilégios de banco/storage. O proxy real ainda não tem allowlist comprovada: não foi habilitada confiança em X-Forwarded-For/X-Real-IP. Também faltam publicação controlada, revisão das contas/legados e testes autorizados no ambiente publicado.
 
 Nenhuma alteração de aplicação foi enviada a main nesta continuação. Não houve ativação de pesquisas pagas, novos serviços, backups de produção ou consulta a valores secretos. Não se declara a etapa 1 concluída.
 
@@ -185,3 +187,18 @@ O PR 31 corrige uma falha 500 reproduzida pesquisando `[`: filtros passam a usar
 Roteiro detalhado de liberação: [SECURITY_RELEASE_VALIDATION.md](SECURITY_RELEASE_VALIDATION.md). Inclui o comportamento já existente de sincronizar senha administrativa e executar seeds/migrações no startup; esses efeitos precisam revisão antes de reiniciar a instalação existente.
 
 Estado deste marco: PRs 29, 30 e 31 integrados somente no PR draft 28; main permanece sem essas alterações de aplicação. As pipelines individuais/composição de código passaram. A pipeline final 39119193582, no SHA 9e25b65, passou integralmente. Nenhuma validação publicada foi realizada, e não há declaração de conclusão integral da etapa 1.
+
+## Continuação — suspensão, troca de senha e bootstrap
+
+- PR 32: painel administrativo de suspensão/reativação de contas comuns, validação de estado/geração em cada requisição e bloqueio de novos logins. Tokens anteriores, inclusive legados, não voltam a funcionar após reativar. Atribuições novas a contas suspensas são recusadas; dados existentes não são apagados. Não permite suspender administradores por esta API. Pipeline 39135033549 passou com 220 testes backend, 40 subtestes, 261 testes frontend, build e navegador. Integrado somente na revisão por b4c7fa4, cuja pipeline 39135326370 também passou.
+- PR 33: troca autenticada de senha com confirmação da credencial atual, limite compartilhado de cinco tentativas por janela de 15 minutos, gravação com comparação de hash/geração e revogação das sessões. Tela limpa campos e exige novo login. O bootstrap deixa de restaurar ADMIN_PASSWORD sobre conta já existente e usa criação atômica com índice único. Não promove uma conta comum existente. Pipeline 39135666895 passou: 236 testes backend, 40 subtestes, 266 testes frontend em 13 suítes, build e navegador. Integrado somente na revisão por a20892a.
+
+Validação local deste marco: 189 testes backend e 40 subtestes passaram; 47 casos dependentes de MongoDB/ambiente foram ignorados localmente e executados no CI. O navegador usa contas sintéticas para suspender, negar login/replay, reativar, exigir novo login, trocar senha de admin e rejeitar token/senha antigos. Não foram usados dados de produção.
+
+Páginas do candidato: /gestao/acessos (somente admin) e /prospects/senha (conta ativa). São código na revisão; não foram publicadas. Documentação: docs/ACCOUNT_SUSPENSION.md e docs/PASSWORD_CHANGE.md.
+
+A suspensão não cancela requisições já autorizadas, jobs antigos ou arquivos já obtidos. A troca autenticada não é recuperação de senha esquecida. Recuperação de conta e emergência administrativa ainda precisam de fluxo próprio. Mudar ADMIN_PASSWORD deixa de redefinir contas existentes quando o novo código for publicado; nenhum segredo foi rotacionado nesta execução. Os demais seeds/migrações de negócio ainda exigem revisão antes do deploy.
+
+Permanecem abertos: proxy real e configuração publicada, recuperação de acesso, limites de ingresso/recursos de parser e conteúdo dos uploads, auditoria dedicada de segredos/privilégios de banco/storage, contas e dados legados e validação dos fluxos publicados. Main não recebeu estas alterações de aplicação; nenhum serviço pago, mensagem, consulta externa, backup ou conta real foi ativado/alterado nesta continuação.
+
+Pipeline final da composição: 39135986654, SHA a20892a, sucesso completo após integrar os PRs 32/33. O relatório foi atualizado em branch de auditoria, sem alterar a árvore de código já testada nem main.
