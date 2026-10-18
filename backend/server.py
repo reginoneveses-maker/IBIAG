@@ -25,6 +25,7 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from discovery_permissions import paid_discovery_enabled, require_paid_discovery
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
@@ -2272,6 +2273,7 @@ async def buyer_discovery_markets(user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search-jobs")
 async def create_buyer_search_job(body: BuyerDiscoveryRequest, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    require_paid_discovery()
     if not body.product.strip():
         raise HTTPException(400, "Informe o produto.")
     try:
@@ -2309,6 +2311,7 @@ async def get_buyer_search_job(job_id: str, user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search-jobs/{job_id}/retry")
 async def retry_buyer_search_job(job_id: str, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    require_paid_discovery()
     previous = await authorized_buyer_job(job_id, user)
     if previous.get("discovery_version", 0) < DISCOVERY_VERSION:
         raise HTTPException(400, "Esta pesquisa usa o filtro anterior. Inicie uma nova pesquisa.")
@@ -2339,6 +2342,7 @@ async def cancel_buyer_search_job(job_id: str, user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search")
 async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_current_user)):
+    require_paid_discovery()
     if body.countries or body.region or any(separator in body.country for separator in [",", ";", "\n"]):
         raise HTTPException(400, "Para vários países ou regiões, use a pesquisa por mercados.")
     product = body.product.strip()
@@ -2356,6 +2360,7 @@ async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_c
 
 @api.post("/buyer-discovery/{company}/decision-maker")
 async def buyer_discovery_decision_maker(company: str, product: str = "", country: str = "", user=Depends(get_current_user)):
+    require_paid_discovery()
     if not company.strip():
         raise HTTPException(400, "Empresa obrigatória.")
     try:
@@ -2380,7 +2385,8 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
             raise ValueError()
     except (ValueError, TypeError):
         raise HTTPException(400, "Score deve ser um número entre 0 e 100")
-    enriched = await asyncio.to_thread(enrich_company, payload)
+    enriched = (await asyncio.to_thread(enrich_company, payload)) if paid_discovery_enabled() else {
+        "enrichment_status": "paused", "enrichment_message": "Enriquecimento externo pausado."}
     # Preserve the identity already grounded on the product page; contact
     # enrichment must not replace it with a homepage's product/article title.
     payload = {**payload, **{k: v for k, v in enriched.items() if v and not (k == "company" and payload.get("relationship_verified") is True)}}
@@ -2445,6 +2451,7 @@ async def enrich_existing_lead(lid: str, user=Depends(get_current_user)):
     lead = await db.leads.find_one({"id": lid}, {"_id": 0})
     if not lead:
         raise HTTPException(404, "Empresa não encontrada")
+    require_paid_discovery()
     return await buyer_discovery_to_crm(lead, user)
 
 # ============ DASHBOARD ============
