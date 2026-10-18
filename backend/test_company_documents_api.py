@@ -30,7 +30,7 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
                 raise server.HTTPException(404, "Arquivo não encontrado")
             return self.objects[path]
         async def delete(path): self.objects.pop(path, None)
-        self.patches = [patch.object(server, "db", self.db), patch.object(server, "put_object", put),
+        self.patches = [patch.dict(os.environ, {"ALLOW_PAID_DISCOVERY":"true"}), patch.object(server, "db", self.db), patch.object(server, "put_object", put),
                         patch.object(server, "get_object", get), patch.object(server, "delete_object", delete)]
         for p in self.patches: p.start()
         token = server.create_token("u", "test@example.com")

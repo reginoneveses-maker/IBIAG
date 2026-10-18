@@ -25,6 +25,12 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from safe_errors import install_error_handlers
+from upload_limits import read_import
+from password_inputs import password_bytes, auth_validation_error
+from fastapi.exceptions import RequestValidationError
+from crm_access import lead_scope, require_lead, visible_lead_ids, document_scope, private_file_paths, shared_file_scope, authorize_crm_file
+from discovery_permissions import paid_discovery_enabled, require_paid_discovery
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
@@ -103,13 +109,14 @@ async def delete_object(path: str):
         return
 
 # ----- Auth helpers -----
-def hash_pw(pw): return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+def hash_pw(pw): return bcrypt.hashpw(password_bytes(pw, minimum=8), bcrypt.gensalt()).decode()
 def verify_pw(pw, h): 
-    try: return bcrypt.checkpw(pw.encode(), h.encode())
+    try: return bcrypt.checkpw(password_bytes(pw), h.encode())
     except Exception: return False
 
 def create_token(uid, email):
-    return jwt.encode({"sub": uid, "email": email, "exp": datetime.now(timezone.utc) + timedelta(days=7)},
+    return jwt.encode({"sub": uid, "email": email, "jti": str(uuid.uuid4()),
+                       "exp": datetime.now(timezone.utc) + timedelta(days=7)},
                       JWT_SECRET, algorithm=JWT_ALG)
 
 async def get_current_user(request: Request):
@@ -136,6 +143,8 @@ def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
 app = FastAPI(title="IBIAG", version="1.0.0")
+install_error_handlers(app)
+app.add_exception_handler(RequestValidationError, auth_validation_error)
 
 # Production CORS. Keep this explicit in production; "*" is only a development fallback.
 cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
@@ -155,17 +164,19 @@ api = APIRouter(prefix="/api")
 # ----- Models -----
 class LoginBody(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=72)
 
-class RegisterBody(BaseModel):
-    email: EmailStr
-    password: str
+    @field_validator("password")
+    @classmethod
+    def bcrypt_password(cls, value):
+        password_bytes(value)
+        return value
+
+class RegisterBody(LoginBody):
+    password: str = Field(min_length=8, max_length=72)
     name: str = ""
 
-class UserCreateBody(BaseModel):
-    email: EmailStr
-    password: str
-    name: str = ""
+class UserCreateBody(RegisterBody):
     role: str = "user"
 
 class Product(BaseModel):
@@ -201,6 +212,7 @@ class Product(BaseModel):
 
 class Lead(BaseModel):
     model_config = ConfigDict(extra="ignore")
+    owner_id: str = ""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     company: str
     contact_name: str = ""
@@ -257,6 +269,7 @@ class Task(BaseModel):
     description: str = ""
     due_date: str = ""
     completed: bool = False
+    owner_id: str = ""
     created_at: str = Field(default_factory=now_iso)
 
 class Supplier(BaseModel):
@@ -560,8 +573,6 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
     email = body.email.lower().strip()
     if body.role not in {"admin", "user"}:
         raise HTTPException(400, "Invalid role")
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must have at least 8 characters")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
     record = {"id": str(uuid.uuid4()), "email": email,
@@ -570,19 +581,35 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
               "created_at": now_iso()}
     await db.users.insert_one(record)
     record.pop("password_hash", None)
+    record.pop("_id", None)
     return record
 
 # Shared MongoDB limiter: one atomic counter per email per fixed 15-minute
 # window, across application workers. Never store the plaintext email here.
 LOGIN_WINDOW_SECONDS = 900
 LOGIN_MAX_ATTEMPTS = 5
+LOGIN_IP_MAX_ATTEMPTS = 30
 
 @api.post("/auth/login")
-async def login(body: LoginBody):
+async def login(body: LoginBody, request: Request):
     email = body.email.lower().strip()
     now = datetime.now(timezone.utc)
     window = int(now.timestamp()) // LOGIN_WINDOW_SECONDS
     limiter_key = hashlib.sha256(f"{window}:{email}".encode("utf-8")).hexdigest()
+    # Trust the socket peer, not client-controlled forwarded headers.
+    peer = request.client.host if request.client else "unknown"
+    peer_key = hashlib.sha256(f"peer:{window}:{peer}".encode("utf-8")).hexdigest()
+    peer_attempt = await db.login_attempts.find_one_and_update(
+        {"_id": peer_key},
+        {"$inc": {"count": 1}, "$setOnInsert": {
+            "expires_at": datetime.fromtimestamp((window + 2) * LOGIN_WINDOW_SECONDS, tz=timezone.utc)
+        }},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if peer_attempt["count"] > LOGIN_IP_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many login attempts. Try again later.",
+                            headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)})
     # Count attempts before credential verification, preventing concurrent
     # requests from bypassing the threshold. MongoDB $inc is atomic.
     attempt = await db.login_attempts.find_one_and_update(
@@ -636,6 +663,7 @@ async def upload_file(file: UploadFile = File(...), user=Depends(get_current_use
 
 @api.get("/files/{full_path:path}")
 async def download_file(full_path: str, user=Depends(get_current_user)):
+    await authorize_crm_file(db, user, full_path)
     allowed_prefix = f"{APP_NAME}/uploads/{user['id']}/"
     if user.get("role") != "admin" and not full_path.startswith(allowed_prefix):
         # Published documents are shared with authenticated IBIAG team members;
@@ -805,7 +833,7 @@ async def import_document_batch(file: UploadFile = File(...), user=Depends(get_c
         record = document.model_dump()
         record.update(source_sha256=digest, owner_id=user["id"])
         try:
-            await register_folder_path(folder_path)
+            await register_folder_path(folder_path, user)
             await db.documents.insert_one(record)
         except Exception:
             await delete_object(path)
@@ -822,11 +850,13 @@ def normalize_folder_path(value):
         raise HTTPException(400, "Caminho de pasta acima de 500 caracteres")
     return path
 
-async def register_folder_path(path):
+async def register_folder_path(path, user=None):
     parts = path.split("/") if path else []
     for i in range(1, len(parts) + 1):
         parent = "/".join(parts[:i])
-        await db.document_folders.update_one({"_id": parent}, {"$setOnInsert": {"path": parent}}, upsert=True)
+        owner_id = user["id"] if user else ""
+        key = hashlib.sha256((owner_id + "\0" + parent).encode()).hexdigest()
+        await db.document_folders.update_one({"_id": key}, {"$setOnInsert": {"path": parent, "owner_id": owner_id}}, upsert=True)
 
 class DocumentFolderBody(BaseModel):
     path: str
@@ -834,9 +864,9 @@ class DocumentFolderBody(BaseModel):
 @api.get("/document-folders")
 async def list_document_folders(user=Depends(get_current_user)):
     paths = set()
-    async for record in db.document_folders.find({}, {"_id": 0}):
+    async for record in db.document_folders.find(lead_scope(user), {"_id": 0}):
         paths.add(record["path"])
-    async for record in db.documents.find({"deleted_at": {"$in": [None, ""]}}, {"folder_path": 1}):
+    async for record in db.documents.find(await document_scope(db, user, {"deleted_at": {"$in": [None, ""]}}), {"folder_path": 1}):
         path = record.get("folder_path", "")
         parts = path.split("/") if path else []
         paths.update("/".join(parts[:i]) for i in range(1, len(parts) + 1))
@@ -847,13 +877,15 @@ async def create_document_folder(body: DocumentFolderBody, user=Depends(get_curr
     path = normalize_folder_path(body.path)
     if not path:
         raise HTTPException(400, "Informe o nome da pasta")
-    await register_folder_path(path)
+    await register_folder_path(path, user)
     return {"path": path}
 
-async def document_records(category=None, section=None, search="", lead_id=None, trash=False):
+async def document_records(user, category=None, section=None, search="", lead_id=None, trash=False):
     query = {"deleted_at": {"$exists": True, "$nin": [None, ""]}} if trash else {"deleted_at": {"$in": [None, ""]}}
     if lead_id:
+        await require_lead(db, user, lead_id)
         query["lead_id"] = lead_id
+    query = await document_scope(db, user, query)
     async for raw in db.documents.find(query, {"_id": 0}).sort([("created_at", -1), ("id", 1)]):
         record = normalize_document(raw)
         if not trash and not matches_document(record, category, section):
@@ -871,7 +903,7 @@ async def documents_page(category: Optional[str] = None, section: Optional[str] 
         require_admin(user)
     skip, limit = max(0, skip), min(500, max(1, limit))
     items, total = [], 0
-    async for record in document_records(category, section, search, lead_id, trash):
+    async for record in document_records(user, category, section, search, lead_id, trash):
         if skip <= total < skip + limit:
             items.append(record)
         total += 1
@@ -881,7 +913,7 @@ async def documents_page(category: Optional[str] = None, section: Optional[str] 
 async def list_docs(category: Optional[str] = None, section: Optional[str] = None,
                     lead_id: Optional[str] = None, user=Depends(get_current_user)):
     # Retain the list contract used by portfolio and legacy panels without silently truncating.
-    return [d async for d in document_records(category, section, lead_id=lead_id)]
+    return [d async for d in document_records(user, category, section, lead_id=lead_id)]
 
 async def validate_document_metadata(d, user):
     try:
@@ -895,7 +927,7 @@ async def validate_document_metadata(d, user):
     for field, name, collection in [("product_id", "product_name", db.products), ("supplier_id", "supplier_name", db.suppliers), ("lead_id", "lead_name", db.leads)]:
         value = getattr(d, field)
         if value:
-            record = await collection.find_one({"id": value})
+            record = await collection.find_one(lead_scope(user, {"id": value}) if field == "lead_id" else {"id": value})
             if not record:
                 raise HTTPException(400, "Vínculo não encontrado: " + field)
             setattr(d, name, record.get("company", record.get("name", "")))
@@ -909,10 +941,11 @@ async def create_doc(d: Document, user=Depends(get_current_user)):
     await validate_document_metadata(d, user)
     if not d.file_path.startswith(f"{APP_NAME}/uploads/{user['id']}/"):
         raise HTTPException(403, "O arquivo deve pertencer ao usuário que o enviou")
+    await authorize_crm_file(db, user, d.file_path)
     _, d.content_type = await get_object(d.file_path)
     if await db.documents.find_one({"id": d.id}):
         raise HTTPException(409, "Documento já cadastrado")
-    await register_folder_path(d.folder_path)
+    await register_folder_path(d.folder_path, user)
     await db.documents.insert_one(d.model_dump())
     return d
 
@@ -930,7 +963,7 @@ async def upload_document(file: UploadFile = File(...), metadata: str = Form(...
     upload = await upload_file(file, user)
     d.file_path, d.content_type, d.size = upload["path"], upload["content_type"], upload["size"]
     try:
-        await register_folder_path(d.folder_path)
+        await register_folder_path(d.folder_path, user)
         await db.documents.insert_one(d.model_dump())
     except Exception:
         await delete_object(d.file_path)
@@ -972,7 +1005,7 @@ async def classify_document(did: str, body: DocumentClassification, user=Depends
         changes["certificate_type"] = body.certificate_type.strip()
     if body.folder_path is not None:
         changes["folder_path"] = normalize_folder_path(body.folder_path)
-        await register_folder_path(changes["folder_path"])
+        await register_folder_path(changes["folder_path"], user)
     result = await db.documents.update_one({"id": did}, {"$set": changes})
     if not result.matched_count:
         raise HTTPException(404, "Documento não encontrado")
@@ -1046,7 +1079,7 @@ async def del_inv(iid: str, user=Depends(get_current_user)):
 @api.post("/invoices/parse-xml")
 async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_current_user)):
     """Parse Brazilian NF-e XML and extract main fields."""
-    data = await file.read()
+    data = await read_import(file)
     try:
         text = data.decode("utf-8", errors="ignore")
         # Strip namespaces
@@ -1325,19 +1358,27 @@ async def del_con(cid: str, user=Depends(get_current_user)):
 @api.get("/certifications", response_model=List[Certification])
 async def list_cert(supplier_id: Optional[str] = None, user=Depends(get_current_user)):
     q = {"supplier_id": supplier_id} if supplier_id else {}
-    return await db.certifications.find(q, {"_id": 0}).sort("expiry_date", 1).to_list(1000)
+    return await db.certifications.find(await shared_file_scope(db, user, q), {"_id": 0}).sort("expiry_date", 1).to_list(1000)
 
 @api.post("/certifications", response_model=Certification)
 async def create_cert(c: Certification, user=Depends(get_current_user)):
+    await authorize_crm_file(db, user, c.file_path)
+    c.id = str(uuid.uuid4())
     await db.certifications.insert_one(c.model_dump()); return c
 
 @api.put("/certifications/{cid}", response_model=Certification)
 async def upd_cert(cid: str, c: Certification, user=Depends(get_current_user)):
-    c.id = cid; await db.certifications.replace_one({"id": cid}, c.model_dump()); return c
+    await authorize_crm_file(db, user, c.file_path)
+    c.id = cid
+    result = await db.certifications.replace_one(await shared_file_scope(db, user, {"id": cid}), c.model_dump())
+    if not result.matched_count: raise HTTPException(404, "Certificado não encontrado")
+    return c
 
 @api.delete("/certifications/{cid}")
 async def del_cert(cid: str, user=Depends(get_current_user)):
-    r = await db.certifications.delete_one({"id": cid}); return {"deleted": r.deleted_count}
+    r = await db.certifications.delete_one(await shared_file_scope(db, user, {"id": cid}))
+    if not r.deleted_count: raise HTTPException(404, "Certificado não encontrado")
+    return {"deleted": 1}
 
 # ============ PURCHASES (Compras) ============
 @api.get("/purchases", response_model=List[Purchase])
@@ -1372,7 +1413,7 @@ async def del_pur(pid: str, user=Depends(get_current_user)):
 # ============ SPECS (Prospecção IBIAG) ============
 @api.get("/specs/library")
 async def get_supplier_spec_library(user=Depends(get_current_user)):
-    return await supplier_spec_library(db)
+    return await supplier_spec_library(db, await document_scope(db, user), await private_file_paths(db, user))
 
 class SpecDocumentSupplier(BaseModel):
     supplier_id: str
@@ -1409,6 +1450,7 @@ async def validate_spec_supplier(spec, user, existing=None):
     spec.product_name = spec.product_name.strip()
     for slot in ("original", "ibiag"):
         path = getattr(spec, slot + "_file_path")
+        await authorize_crm_file(db, user, path)
         if not path or existing and path == existing.get(slot + "_file_path"):
             continue
         if user.get("role") != "admin" and not path.startswith(f"{APP_NAME}/uploads/{user['id']}/"):
@@ -1420,7 +1462,7 @@ async def validate_spec_supplier(spec, user, existing=None):
 @api.get("/specs", response_model=List[Spec])
 async def list_specs(supplier_id: Optional[str] = None, user=Depends(get_current_user)):
     q = {"supplier_id": supplier_id} if supplier_id else {}
-    return await db.specs.find(q, {"_id": 0}).sort("product_name", 1).to_list(1000)
+    return await db.specs.find(await shared_file_scope(db, user, q, ("original_file_path", "ibiag_file_path")), {"_id": 0}).sort("product_name", 1).to_list(1000)
 
 @api.post("/specs", response_model=Spec)
 async def create_spec(s: Spec, user=Depends(get_current_user)):
@@ -1431,16 +1473,20 @@ async def create_spec(s: Spec, user=Depends(get_current_user)):
 
 @api.put("/specs/{sid}", response_model=Spec)
 async def upd_spec(sid: str, s: Spec, user=Depends(get_current_user)):
-    existing = await db.specs.find_one({"id": sid}, {"_id": 0})
+    existing = await db.specs.find_one(await shared_file_scope(db, user, {"id": sid}, ("original_file_path", "ibiag_file_path")), {"_id": 0})
     if not existing:
         raise HTTPException(404, "Spec não encontrada")
     await validate_spec_supplier(s, user, existing)
     s.id = sid; s.updated_at = now_iso()
-    await db.specs.replace_one({"id": sid}, s.model_dump()); return s
+    result = await db.specs.replace_one(await shared_file_scope(db, user, {"id": sid}, ("original_file_path", "ibiag_file_path")), s.model_dump())
+    if not result.matched_count: raise HTTPException(404, "Spec não encontrada")
+    return s
 
 @api.delete("/specs/{sid}")
 async def del_spec(sid: str, user=Depends(get_current_user)):
-    r = await db.specs.delete_one({"id": sid}); return {"deleted": r.deleted_count}
+    r = await db.specs.delete_one(await shared_file_scope(db, user, {"id": sid}, ("original_file_path", "ibiag_file_path")))
+    if not r.deleted_count: raise HTTPException(404, "Spec não encontrada")
+    return {"deleted": 1}
 
 # ============ PRICES ============
 def compute_price(p: PriceEntry) -> PriceEntry:
@@ -1655,15 +1701,15 @@ async def product_offer_documents(oid: str, user=Depends(get_current_user)):
     ids = list(dict.fromkeys(offer.get("spec_document_ids", []) + offer.get("certificate_document_ids", []) + offer.get("other_document_ids", [])))
     result = []
     if ids:
-        docs = await db.documents.find({"id": {"$in": ids}, "deleted_at": {"$in": [None, ""]}}, {"_id": 0}).to_list(200)
+        docs = await db.documents.find(await document_scope(db, user, {"id": {"$in": ids}, "deleted_at": {"$in": [None, ""]}}), {"_id": 0}).to_list(200)
         result.extend([{**d, "link_type": "document"} for d in docs])
     spec_ids = offer.get("spec_ids", [])
     if spec_ids:
-        specs = await db.specs.find({"id": {"$in": spec_ids}}, {"_id": 0}).to_list(200)
+        specs = await db.specs.find(await shared_file_scope(db, user, {"id": {"$in": spec_ids}}, ("original_file_path", "ibiag_file_path")), {"_id": 0}).to_list(200)
         result.extend([{**x, "link_type": "spec"} for x in specs])
     cert_ids = offer.get("certification_ids", [])
     if cert_ids:
-        certs = await db.certifications.find({"id": {"$in": cert_ids}}, {"_id": 0}).to_list(200)
+        certs = await db.certifications.find(await shared_file_scope(db, user, {"id": {"$in": cert_ids}}), {"_id": 0}).to_list(200)
         result.extend([{**x, "link_type": "certification"} for x in certs])
     return result
 
@@ -1728,7 +1774,7 @@ class PortfolioImportResult(BaseModel):
 async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, dry_run: bool = False, user=Depends(get_current_user)):
     """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
     require_admin(user)
-    raw = await file.read()
+    raw = await read_import(file)
     try:
         df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
     except Exception as e:
@@ -1841,8 +1887,9 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
 async def restore_portfolio_commissions(file: UploadFile = File(...), dry_run: bool = True, user=Depends(get_current_user)):
     """Restore only commission fields; preserve IDs, prices and document links."""
     require_admin(user)
+    raw = await read_import(file)
     try:
-        df = pd.read_excel(io.BytesIO(await file.read()), sheet_name="IBIAG", header=2, dtype=object).fillna("")
+        df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
     except Exception as exc:
         raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {exc}")
     df.columns = [str(c).strip() for c in df.columns]
@@ -1945,7 +1992,7 @@ def _norm_company(value: str) -> str:
 @api.post("/leads/import", response_model=LeadImportResult)
 async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
     name = (file.filename or "").lower()
-    raw = await file.read()
+    raw = await read_import(file)
     try:
         if name.endswith(".xlsx") or name.endswith(".xls"):
             df = pd.read_excel(io.BytesIO(raw))
@@ -1967,7 +2014,7 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
     errors = []
     # Load existing CRM records once; avoids one database scan per imported row.
     # No artificial CRM-size cap: load all existing lead keys for conservative deduplication.
-    candidates = await db.leads.find({}, {"_id": 0}).to_list(None)
+    candidates = await db.leads.find(lead_scope(user), {"_id": 0}).to_list(None)
 
     aliases = {
         "company": ["company","empresa","razao_social","razão_social","nome_empresa","cliente"],
@@ -2025,12 +2072,12 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
             updates = {k:v for k,v in data.items() if v not in ("", None) and not existing.get(k)}
             if updates:
                 updates["updated_at"] = now_iso()
-                await db.leads.update_one({"id": existing["id"]}, {"$set": updates})
+                await db.leads.update_one(lead_scope(user, {"id": existing["id"]}), {"$set": updates})
                 updated += 1
             else:
                 skipped += 1
         else:
-            lead = Lead(**data)
+            lead = Lead(**data, owner_id=user["id"])
             lead_doc = lead.model_dump()
             await db.leads.insert_one(lead_doc)
             candidates.append(lead_doc)
@@ -2054,7 +2101,7 @@ async def list_leads(
         q["industry"] = industry
     skip = max(0, skip)
     limit = min(max(1, limit), 250)
-    return await db.leads.find(q, {"_id": 0}).sort("updated_at", -1).skip(skip).limit(limit).to_list(limit)
+    return await db.leads.find(lead_scope(user, q), {"_id": 0}).sort("updated_at", -1).skip(skip).limit(limit).to_list(limit)
 
 @api.get("/leads/count")
 async def count_leads(stage: Optional[str] = None, industry: Optional[str] = None, user=Depends(get_current_user)):
@@ -2063,66 +2110,137 @@ async def count_leads(stage: Optional[str] = None, industry: Optional[str] = Non
         q["stage"] = stage
     if industry:
         q["industry"] = industry
-    return {"total": await db.leads.count_documents(q)}
+    return {"total": await db.leads.count_documents(lead_scope(user, q))}
 
 @api.get("/leads/{lid}", response_model=Lead)
 async def get_lead(lid: str, user=Depends(get_current_user)):
-    lead = await db.leads.find_one({"id": lid}, {"_id": 0})
-    if not lead:
-        raise HTTPException(404, "Empresa não encontrada")
-    return lead
+    return await require_lead(db, user, lid)
 
 @api.post("/leads", response_model=Lead)
 async def create_lead(lead: Lead, user=Depends(get_current_user)):
-    await db.leads.insert_one(lead.model_dump()); return lead
+    lead.id = str(uuid.uuid4())
+    lead.owner_id = user["id"]
+    lead.created_at = lead.updated_at = now_iso()
+    await db.leads.insert_one(lead.model_dump())
+    return lead
 
 @api.patch("/leads/{lid}/stage", response_model=Lead)
 async def upd_stage(lid: str, upd: StageUpd, user=Depends(get_current_user)):
-    await db.leads.update_one({"id": lid}, {"$set": {"stage": upd.stage, "updated_at": now_iso()}})
-    doc = await db.leads.find_one({"id": lid}, {"_id": 0})
-    if not doc: raise HTTPException(404, "Not found")
+    doc = await db.leads.find_one_and_update(lead_scope(user, {"id": lid}),
+        {"$set": {"stage": upd.stage, "updated_at": now_iso()}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not doc: raise HTTPException(404, "Empresa não encontrada")
     return doc
 
 @api.put("/leads/{lid}", response_model=Lead)
 async def upd_lead(lid: str, lead: Lead, user=Depends(get_current_user)):
-    lead.id = lid; lead.updated_at = now_iso()
-    await db.leads.replace_one({"id": lid}, lead.model_dump()); return lead
+    # Update editable fields, preserving ownership and internal discovery keys.
+    changes = lead.model_dump(exclude={"id", "owner_id", "created_at"})
+    changes["updated_at"] = now_iso()
+    doc = await db.leads.find_one_and_update(lead_scope(user, {"id": lid}), {"$set": changes, "$unset": {"discovery_key": ""}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not doc: raise HTTPException(404, "Empresa não encontrada")
+    return doc
+
+class LeadOwnerBody(BaseModel):
+    owner_id: str = Field(min_length=1, max_length=200)
+
+@api.patch("/leads/{lid}/owner", response_model=Lead)
+async def assign_lead_owner(lid: str, body: LeadOwnerBody, user=Depends(get_current_user)):
+    require_admin(user)
+    if not await db.users.find_one({"id": body.owner_id}, {"id": 1}):
+        raise HTTPException(400, "Usuário não encontrado")
+    # Release the old owner's creation-deduplication key on transfer. The lead
+    # ID remains stable; linked history and documents follow its access scope.
+    doc = await db.leads.find_one_and_update({"id": lid},
+        {"$set": {"owner_id": body.owner_id, "updated_at": now_iso(),
+                  "owner_updated_by": user["id"], "owner_updated_at": now_iso()},
+         "$unset": {"discovery_key": ""}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not doc: raise HTTPException(404, "Empresa não encontrada")
+    return doc
 
 @api.delete("/leads/{lid}")
 async def del_lead(lid: str, user=Depends(get_current_user)):
-    r = await db.leads.delete_one({"id": lid})
+    result = await db.leads.delete_one(lead_scope(user, {"id": lid}))
+    if not result.deleted_count: raise HTTPException(404, "Empresa não encontrada")
     await db.interactions.delete_many({"lead_id": lid})
-    return {"deleted": r.deleted_count}
+    return {"deleted": 1}
 
 @api.get("/interactions", response_model=List[Interaction])
 async def list_int(lead_id: Optional[str] = None, user=Depends(get_current_user)):
-    q = {"lead_id": lead_id} if lead_id else {}
-    return await db.interactions.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    if lead_id:
+        await require_lead(db, user, lead_id)
+        query = {"lead_id": lead_id}
+    elif user.get("role") == "admin":
+        query = {}
+    else:
+        query = {"lead_id": {"$in": await visible_lead_ids(db, user)}}
+    return await db.interactions.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 @api.post("/interactions", response_model=Interaction)
 async def create_int(i: Interaction, user=Depends(get_current_user)):
-    await db.interactions.insert_one(i.model_dump()); return i
+    await require_lead(db, user, i.lead_id)
+    i.id = str(uuid.uuid4())
+    i.created_at = now_iso()
+    await db.interactions.insert_one(i.model_dump())
+    return i
 
 # ============ TASKS ============
+def task_access_query(user, task_id=None):
+    # Ownership comes from the authenticated database user, never request data.
+    # Legacy tasks without an owner remain administrator-only until assigned.
+    query = {} if user.get("role") == "admin" else {"owner_id": user["id"]}
+    if task_id is not None:
+        query["id"] = task_id
+    return query
+
 @api.get("/tasks", response_model=List[Task])
 async def list_tasks(user=Depends(get_current_user)):
-    return await db.tasks.find({}, {"_id": 0}).to_list(500)
+    return await db.tasks.find(task_access_query(user), {"_id": 0}).to_list(500)
 
 @api.post("/tasks", response_model=Task)
 async def create_task(t: Task, user=Depends(get_current_user)):
+    if not t.title.strip():
+        raise HTTPException(400, "Título obrigatório")
+    t.id = str(uuid.uuid4())
+    t.owner_id = user["id"]
+    t.created_at = now_iso()
+    t.title = t.title.strip()
+    if t.lead_id:
+        await require_lead(db, user, t.lead_id)
     await db.tasks.insert_one(t.model_dump()); return t
 
 @api.patch("/tasks/{tid}/toggle", response_model=Task)
 async def toggle_task(tid: str, user=Depends(get_current_user)):
-    doc = await db.tasks.find_one({"id": tid}, {"_id": 0})
+    # Match authorization and change state atomically, including concurrent tabs.
+    doc = await db.tasks.find_one_and_update(
+        task_access_query(user, tid),
+        [{"$set": {"completed": {"$eq": [{"$ifNull": ["$completed", False]}, False]}}}],
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
     if not doc: raise HTTPException(404, "Not found")
-    nv = not doc["completed"]
-    await db.tasks.update_one({"id": tid}, {"$set": {"completed": nv}})
-    doc["completed"] = nv; return doc
+    return doc
 
 @api.delete("/tasks/{tid}")
 async def del_task(tid: str, user=Depends(get_current_user)):
-    r = await db.tasks.delete_one({"id": tid}); return {"deleted": r.deleted_count}
+    r = await db.tasks.delete_one(task_access_query(user, tid))
+    if not r.deleted_count: raise HTTPException(404, "Not found")
+    return {"deleted": r.deleted_count}
+
+class TaskOwnerBody(BaseModel):
+    owner_id: str = Field(min_length=1, max_length=200)
+
+@api.patch("/tasks/{tid}/owner", response_model=Task)
+async def assign_task_owner(tid: str, body: TaskOwnerBody, user=Depends(get_current_user)):
+    require_admin(user)
+    if not await db.users.find_one({"id": body.owner_id}, {"id": 1}):
+        raise HTTPException(400, "Usuário não encontrado")
+    doc = await db.tasks.find_one_and_update(
+        {"id": tid}, {"$set": {"owner_id": body.owner_id,
+                               "owner_updated_by": user["id"], "owner_updated_at": now_iso()}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if not doc: raise HTTPException(404, "Not found")
+    return doc
 
 # ============ TEMPLATES (public) ============
 class MessageTemplate(BaseModel):
@@ -2148,7 +2266,7 @@ async def comexstat_ncm(search: str = "", page: int = 1, per_page: int = 50, use
     try:
         return ncm_search(search=search, page=page, per_page=per_page)
     except requests.RequestException as e:
-        logging.exception("Comex Stat NCM search failed")
+        logging.error("Comex Stat NCM search failed")
         raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
 @api.post("/comexstat/prospect")
@@ -2175,7 +2293,7 @@ async def comexstat_prospect(payload: dict, user=Depends(get_current_user)):
         markets = normalize_markets(data)
         return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data, "markets": markets}
     except (requests.RequestException, ValueError) as e:
-        logging.exception("Comex Stat prospect query failed")
+        logging.error("Comex Stat prospect query failed")
         raise HTTPException(502, f"Não foi possível montar o prospecting snapshot: {str(e)[:180]}")
 
 @api.post("/comexstat/markets")
@@ -2205,7 +2323,7 @@ async def comexstat_markets(payload: dict, user=Depends(get_current_user)):
             "markets": normalize_markets(data),
         }
     except (requests.RequestException, ValueError) as e:
-        logging.exception("Comex Stat markets query failed")
+        logging.error("Comex Stat markets query failed")
         raise HTTPException(502, f"Não foi possível montar os mercados: {str(e)[:180]}")
 
 @api.post("/comexstat/general")
@@ -2213,7 +2331,7 @@ async def comexstat_general(payload: dict, user=Depends(get_current_user)):
     try:
         return comex_general(payload)
     except requests.RequestException as e:
-        logging.exception("Comex Stat general query failed")
+        logging.error("Comex Stat general query failed")
         raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
 # ============ TRADE (public) ============
@@ -2246,12 +2364,13 @@ async def list_trade(country: Optional[str] = None, industry: Optional[str] = No
 async def trade_to_crm(tid: str, user=Depends(get_current_user)):
     tr = await db.trade_data.find_one({"id": tid}, {"_id": 0})
     if not tr: raise HTTPException(404, "Not found")
-    existing = await db.leads.find_one({"company": tr["importer_company"]}, {"_id": 0})
+    existing = await db.leads.find_one(lead_scope(user, {"company": tr["importer_company"]}), {"_id": 0})
     if existing: return existing
     lead = Lead(company=tr["importer_company"], country=tr["importer_country"],
                 country_code=tr["country_code"], industry=tr["industry_segment"],
                 stage="new_lead", source="trade_data", deal_value=tr["value_usd"],
                 notes=f"From Trade Intel. HS {tr['hs_code']}. {tr['volume_kg']:.0f} kg / USD {tr['value_usd']:.0f}")
+    lead.owner_id = user["id"]
     await db.leads.insert_one(lead.model_dump())
     return lead
 
@@ -2272,6 +2391,7 @@ async def buyer_discovery_markets(user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search-jobs")
 async def create_buyer_search_job(body: BuyerDiscoveryRequest, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    require_paid_discovery()
     if not body.product.strip():
         raise HTTPException(400, "Informe o produto.")
     try:
@@ -2309,6 +2429,7 @@ async def get_buyer_search_job(job_id: str, user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search-jobs/{job_id}/retry")
 async def retry_buyer_search_job(job_id: str, tasks: BackgroundTasks, user=Depends(get_current_user)):
+    require_paid_discovery()
     previous = await authorized_buyer_job(job_id, user)
     if previous.get("discovery_version", 0) < DISCOVERY_VERSION:
         raise HTTPException(400, "Esta pesquisa usa o filtro anterior. Inicie uma nova pesquisa.")
@@ -2339,6 +2460,7 @@ async def cancel_buyer_search_job(job_id: str, user=Depends(get_current_user)):
 
 @api.post("/buyer-discovery/search")
 async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_current_user)):
+    require_paid_discovery()
     if body.countries or body.region or any(separator in body.country for separator in [",", ";", "\n"]):
         raise HTTPException(400, "Para vários países ou regiões, use a pesquisa por mercados.")
     product = body.product.strip()
@@ -2350,12 +2472,13 @@ async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_c
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except requests.RequestException as e:
-        logging.exception("Buyer discovery provider error")
+        logging.error("Buyer discovery provider error")
         raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
     return {"product": product, "country": country, "results": buyers, "warnings": getattr(buyers, "warnings", []), "source": "web_discovery"}
 
 @api.post("/buyer-discovery/{company}/decision-maker")
 async def buyer_discovery_decision_maker(company: str, product: str = "", country: str = "", user=Depends(get_current_user)):
+    require_paid_discovery()
     if not company.strip():
         raise HTTPException(400, "Empresa obrigatória.")
     try:
@@ -2364,7 +2487,7 @@ async def buyer_discovery_decision_maker(company: str, product: str = "", countr
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except requests.RequestException as e:
-        logging.exception("Decision maker discovery provider error")
+        logging.error("Decision maker discovery provider error")
         raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
 
 @api.post("/buyer-discovery/to-crm")
@@ -2380,7 +2503,8 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
             raise ValueError()
     except (ValueError, TypeError):
         raise HTTPException(400, "Score deve ser um número entre 0 e 100")
-    enriched = await asyncio.to_thread(enrich_company, payload)
+    enriched = (await asyncio.to_thread(enrich_company, payload)) if paid_discovery_enabled() else {
+        "enrichment_status": "paused", "enrichment_message": "Enriquecimento externo pausado."}
     # Preserve the identity already grounded on the product page; contact
     # enrichment must not replace it with a homepage's product/article title.
     payload = {**payload, **{k: v for k, v in enriched.items() if v and not (k == "company" and payload.get("relationship_verified") is True)}}
@@ -2417,9 +2541,9 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         "contact_candidates": payload.get("contact_candidates") if isinstance(payload.get("contact_candidates"), dict) else {},
         "updated_at": now_iso(),
     }
-    existing = await db.leads.find_one({"company": {"$regex": f"^{re.escape(original_company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(original_country)}$", "$options": "i"}}, {"_id": 0})
+    existing = await db.leads.find_one(lead_scope(user, {"company": {"$regex": f"^{re.escape(original_company)}$", "$options": "i"}, "country": {"$regex": f"^{re.escape(original_country)}$", "$options": "i"}}), {"_id": 0})
     if not existing:
-        existing = await db.leads.find_one({"company": company, "country": country}, {"_id": 0})
+        existing = await db.leads.find_one(lead_scope(user, {"company": company, "country": country}), {"_id": 0})
     if existing:
         changes = {k: v for k, v in data.items() if v and not existing.get(k) and k != "evidence_urls"}
         if existing.get("source") == "buyer_discovery":
@@ -2430,45 +2554,47 @@ async def buyer_discovery_to_crm(payload: dict, user=Depends(get_current_user)):
         update = {"$set": changes}
         if data["evidence_urls"]:
             update["$addToSet"] = {"evidence_urls": {"$each": data["evidence_urls"]}}
-        await db.leads.update_one({"id": existing["id"]}, update)
-        return await db.leads.find_one({"id": existing["id"]}, {"_id": 0})
+        await db.leads.update_one(lead_scope(user, {"id": existing["id"]}), update)
+        return await require_lead(db, user, existing["id"])
     lead = Lead(**data)
-    key = hashlib.sha256((company.casefold() + "\0" + country.strip().casefold()).encode()).hexdigest()
+    lead.owner_id = user["id"]
+    key = hashlib.sha256((user["id"] + "\0" + company.casefold() + "\0" + country.strip().casefold()).encode()).hexdigest()
     record = {**lead.model_dump(), "discovery_key": key}
     try:
-        return await db.leads.find_one_and_update({"discovery_key": key}, {"$setOnInsert": record}, upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0})
+        return await db.leads.find_one_and_update({"discovery_key": key, "owner_id": user["id"]}, {"$setOnInsert": record}, upsert=True, return_document=ReturnDocument.AFTER, projection={"_id": 0})
     except DuplicateKeyError:
-        return await db.leads.find_one({"discovery_key": key}, {"_id": 0})
+        return await db.leads.find_one({"discovery_key": key, "owner_id": user["id"]}, {"_id": 0})
 
 @api.post("/leads/{lid}/enrich")
 async def enrich_existing_lead(lid: str, user=Depends(get_current_user)):
-    lead = await db.leads.find_one({"id": lid}, {"_id": 0})
+    lead = await require_lead(db, user, lid)
     if not lead:
         raise HTTPException(404, "Empresa não encontrada")
+    require_paid_discovery()
     return await buyer_discovery_to_crm(lead, user)
 
 # ============ DASHBOARD ============
 @api.get("/dashboard/stats")
 async def dashboard(user=Depends(get_current_user)):
-    total_leads = await db.leads.count_documents({})
-    active = await db.leads.count_documents({"stage": {"$nin": ["closed_won", "closed_lost"]}})
-    won = await db.leads.count_documents({"stage": "closed_won"})
-    lost = await db.leads.count_documents({"stage": "closed_lost"})
-    samples = await db.leads.count_documents({"stage": {"$in": ["sample_quote", "sample_sent"]}})
+    total_leads = await db.leads.count_documents(lead_scope(user))
+    active = await db.leads.count_documents(lead_scope(user, {"stage": {"$nin": ["closed_won", "closed_lost"]}}))
+    won = await db.leads.count_documents(lead_scope(user, {"stage": "closed_won"}))
+    lost = await db.leads.count_documents(lead_scope(user, {"stage": "closed_lost"}))
+    samples = await db.leads.count_documents(lead_scope(user, {"stage": {"$in": ["sample_quote", "sample_sent"]}}))
     conv = round((won / (won + lost)) * 100, 1) if (won + lost) > 0 else 0.0
     pipeline_value = 0.0
     async for d in db.leads.aggregate([
-        {"$match": {"stage": {"$nin": ["closed_won", "closed_lost"]}}},
+        {"$match": lead_scope(user, {"stage": {"$nin": ["closed_won", "closed_lost"]}})},
         {"$group": {"_id": None, "total": {"$sum": "$deal_value"}}}]):
         pipeline_value = d.get("total", 0.0)
     by_stage = {}
-    async for d in db.leads.aggregate([{"$group": {"_id": "$stage", "count": {"$sum": 1}}}]):
+    async for d in db.leads.aggregate([{"$match": lead_scope(user)}, {"$group": {"_id": "$stage", "count": {"$sum": 1}}}]):
         by_stage[d["_id"]] = d["count"]
     by_industry = {}
-    async for d in db.leads.aggregate([{"$group": {"_id": "$industry", "count": {"$sum": 1}}}]):
+    async for d in db.leads.aggregate([{"$match": lead_scope(user)}, {"$group": {"_id": "$industry", "count": {"$sum": 1}}}]):
         by_industry[d["_id"]] = d["count"]
     # ERP stats
-    docs_count = await db.documents.count_documents({"deleted_at": {"$in": [None, ""]}})
+    docs_count = await db.documents.count_documents(await document_scope(db, user, {"deleted_at": {"$in": [None, ""]}}))
     invoices_count = await db.invoices.count_documents({})
     suppliers_count = await db.suppliers.count_documents({})
     orders_pending = await db.orders.count_documents({"status": {"$in": ["draft", "confirmed"]}, "deleted_at": {"$in": [None, ""]}})
@@ -2515,7 +2641,7 @@ async def health():
         await db.command("ping")
         return {"status": "ok", "database": "ok", "timestamp": now_iso()}
     except Exception:
-        logging.exception("Health check failed")
+        logging.error("Health check failed")
         raise HTTPException(503, "Database unavailable")
 
 @api.get("/")

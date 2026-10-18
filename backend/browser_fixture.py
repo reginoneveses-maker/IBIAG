@@ -1,6 +1,7 @@
 """Local-only browser test server: isolated database/storage and fixed discovery responses."""
 import os
 from pathlib import Path
+os.environ["ALLOW_PAID_DISCOVERY"]="true"  # All discovery functions below are isolated fakes.
 os.environ.update(MONGO_URL="mongodb://localhost:27017", DB_NAME="ibiag_browser_test", JWT_SECRET="browser-test-only-secret-32-characters")
 from mongomock_motor import AsyncMongoMockClient
 from fastapi.responses import FileResponse

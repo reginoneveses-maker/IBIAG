@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, STAGES, INDUSTRIES, stageColor, flag, fmtUSD, externalUrl, downloadDocument } from "@/lib/api";
 import { useLang } from "@/i18n";
+import { useAuth } from "@/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +17,9 @@ const emptyLead = { company: "", contact_name: "", email: "", phone: "", website
 
 const Pipeline = () => {
   const { t } = useLang();
+  const { user } = useAuth();
+  const [owners, setOwners] = useState([]);
+  const [assigningOwner, setAssigningOwner] = useState(false);
   const [leads, setLeads] = useState([]);
   const [industryFilter, setIndustryFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -30,6 +34,29 @@ const Pipeline = () => {
   const requestedLead = params.get("lead");
   const [interactions, setInteractions] = useState([]);
   const [newInter, setNewInter] = useState({ type: "email", subject: "", content: "" });
+
+  useEffect(() => {
+    let active = true;
+    if (user?.role === "admin" && detailLead?.id) {
+      api.get("/auth/users").then(response => { if (active) setOwners(response.data); })
+        .catch(() => { if (active) setOwners([]); });
+    } else setOwners([]);
+    return () => { active = false; };
+  }, [user?.role, detailLead?.id]);
+
+  const assignOwner = async ownerId => {
+    if (!detailLead || !ownerId) return;
+    const id = detailLead.id;
+    setAssigningOwner(true);
+    try {
+      const response = await api.patch(`/leads/${id}/owner`, {owner_id: ownerId});
+      setDetailLead(current => current?.id === id ? response.data : current);
+      setLeads(current => current.map(lead => lead.id === id ? response.data : lead));
+      toast.success("Responsável atualizado.");
+    } catch {
+      toast.error("Não foi possível alterar o responsável.");
+    } finally { setAssigningOwner(false); }
+  };
 
   const load = async () => {
     try {
@@ -250,6 +277,17 @@ const Pipeline = () => {
               <span>{flag(detailLead?.country_code)}</span> {detailLead?.company}
             </DialogTitle>
           </DialogHeader>
+          {user?.role === "admin" && <label className="block text-sm">
+            Responsável pelo cadastro
+            <select aria-label="Responsável pelo cadastro" value={detailLead?.owner_id || ""}
+              disabled={assigningOwner || !owners.length} onChange={event => assignOwner(event.target.value)}
+              className="block mt-1 rounded border p-2 bg-white">
+              <option value="" disabled>Sem responsável</option>
+              {detailLead?.owner_id && !owners.some(owner => owner.id === detailLead.owner_id) &&
+                <option value={detailLead.owner_id}>Responsável indisponível</option>}
+              {owners.map(owner => <option key={owner.id} value={owner.id}>{owner.name || owner.email}</option>)}
+            </select>
+          </label>}
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-[#104496]/60 font-mono-alt text-[10px] uppercase tracking-widest">{t("contact_name")}</span><div>{detailLead?.contact_name || "—"}</div></div>
