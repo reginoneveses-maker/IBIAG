@@ -25,6 +25,7 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from upload_limits import read_import
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
@@ -1046,7 +1047,7 @@ async def del_inv(iid: str, user=Depends(get_current_user)):
 @api.post("/invoices/parse-xml")
 async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_current_user)):
     """Parse Brazilian NF-e XML and extract main fields."""
-    data = await file.read()
+    data = await read_import(file)
     try:
         text = data.decode("utf-8", errors="ignore")
         # Strip namespaces
@@ -1728,7 +1729,7 @@ class PortfolioImportResult(BaseModel):
 async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, dry_run: bool = False, user=Depends(get_current_user)):
     """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
     require_admin(user)
-    raw = await file.read()
+    raw = await read_import(file)
     try:
         df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
     except Exception as e:
@@ -1841,8 +1842,9 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
 async def restore_portfolio_commissions(file: UploadFile = File(...), dry_run: bool = True, user=Depends(get_current_user)):
     """Restore only commission fields; preserve IDs, prices and document links."""
     require_admin(user)
+    raw = await read_import(file)
     try:
-        df = pd.read_excel(io.BytesIO(await file.read()), sheet_name="IBIAG", header=2, dtype=object).fillna("")
+        df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
     except Exception as exc:
         raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {exc}")
     df.columns = [str(c).strip() for c in df.columns]
@@ -1945,7 +1947,7 @@ def _norm_company(value: str) -> str:
 @api.post("/leads/import", response_model=LeadImportResult)
 async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
     name = (file.filename or "").lower()
-    raw = await file.read()
+    raw = await read_import(file)
     try:
         if name.endswith(".xlsx") or name.endswith(".xls"):
             df = pd.read_excel(io.BytesIO(raw))
