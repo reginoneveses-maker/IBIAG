@@ -28,6 +28,7 @@ from pymongo.errors import DuplicateKeyError
 from api_security import cors_origins_from, validate_jwt_secret, documentation_options, SecurityResponseMiddleware
 from safe_errors import install_error_handlers, failure_response
 from upload_limits import read_import
+from invoice_xml import parse_invoice_xml
 from password_inputs import password_bytes, auth_validation_error
 from fastapi.exceptions import RequestValidationError
 from crm_access import lead_scope, require_lead, visible_lead_ids, document_scope, private_file_paths, shared_file_scope, authorize_crm_file
@@ -35,7 +36,6 @@ from discovery_permissions import paid_discovery_enabled, require_paid_discovery
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
-import xml.etree.ElementTree as ET
 
 # ----- Config -----
 mongo_url = os.environ['MONGO_URL']
@@ -1148,41 +1148,7 @@ async def del_inv(iid: str, user=Depends(get_admin_user)):
 @api.post("/invoices/parse-xml")
 async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_admin_user)):
     """Parse Brazilian NF-e XML and extract main fields."""
-    data = await read_import(file)
-    try:
-        text = data.decode("utf-8", errors="ignore")
-        # Strip namespaces
-        import re
-        text_nons = re.sub(r' xmlns="[^"]+"', "", text, count=1)
-        root = ET.fromstring(text_nons)
-        def find_txt(el, path):
-            n = el.find(path)
-            return (n.text or "").strip() if n is not None and n.text else ""
-        infNFe = root.find(".//infNFe") or root
-        ide = infNFe.find("ide")
-        emit = infNFe.find("emit")
-        dest = infNFe.find("dest")
-        total = infNFe.find(".//ICMSTot")
-        tp = find_txt(ide, "tpNF") if ide is not None else ""  # 0=entrada, 1=saida
-        number = find_txt(ide, "nNF") if ide is not None else ""
-        issue = find_txt(ide, "dhEmi") if ide is not None else find_txt(ide, "dEmi") if ide is not None else ""
-        emit_name = find_txt(emit, "xNome") if emit is not None else ""
-        emit_cnpj = find_txt(emit, "CNPJ") if emit is not None else ""
-        dest_name = find_txt(dest, "xNome") if dest is not None else ""
-        dest_cnpj = (find_txt(dest, "CNPJ") if dest is not None else "") or (find_txt(dest, "CPF") if dest is not None else "")
-        vNF = find_txt(total, "vNF") if total is not None else "0"
-        kind = "saida" if tp == "1" else "entrada"
-        party_name = dest_name if kind == "saida" else emit_name
-        party_cnpj = dest_cnpj if kind == "saida" else emit_cnpj
-        return {
-            "number": number, "kind": kind,
-            "party_name": party_name, "party_cnpj": party_cnpj,
-            "issue_date": issue[:10] if issue else "",
-            "total": float(vNF) if vNF else 0,
-            "description": f"NF-e {number} — {emit_name} → {dest_name}"
-        }
-    except Exception as e:
-        raise HTTPException(400, f"XML inválido: {str(e)[:150]}")
+    return await parse_invoice_xml(file)
 
 @asynccontextmanager
 async def business_write_lock():
