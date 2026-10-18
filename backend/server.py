@@ -546,6 +546,9 @@ def require_admin(user):
         raise HTTPException(403, "Admin permission required")
     return user
 
+async def get_admin_user(user=Depends(get_current_user)):
+    return require_admin(user)
+
 @api.post("/auth/register")
 async def register(body: RegisterBody):
     if os.environ.get("ALLOW_PUBLIC_REGISTRATION", "false").lower() != "true":
@@ -920,6 +923,8 @@ async def validate_document_metadata(d, user):
         d.category, d.section = validate_classification(d.category, d.section)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    if user.get("role") != "admin" and (not d.lead_id or d.category in {"Financeiro & Fiscal", "Societário"}):
+        raise HTTPException(403, "Publicação de documentos da empresa exige administrador")
     if not d.title.strip():
         raise HTTPException(400, "Título obrigatório")
     d.title = d.title.strip()
@@ -1034,15 +1039,15 @@ async def list_sup(user=Depends(get_current_user)):
     return await db.suppliers.find({}, {"_id": 0}).to_list(1000)
 
 @api.post("/suppliers", response_model=Supplier)
-async def create_sup(s: Supplier, user=Depends(get_current_user)):
+async def create_sup(s: Supplier, user=Depends(get_admin_user)):
     await db.suppliers.insert_one(s.model_dump()); return s
 
 @api.put("/suppliers/{sid}", response_model=Supplier)
-async def upd_sup(sid: str, s: Supplier, user=Depends(get_current_user)):
+async def upd_sup(sid: str, s: Supplier, user=Depends(get_admin_user)):
     s.id = sid; await db.suppliers.replace_one({"id": sid}, s.model_dump()); return s
 
 @api.delete("/suppliers/{sid}")
-async def del_sup(sid: str, user=Depends(get_current_user)):
+async def del_sup(sid: str, user=Depends(get_admin_user)):
     require_admin(user)
     supplier = await db.suppliers.find_one({"id": sid}, {"_id": 0})
     if not supplier:
@@ -1064,20 +1069,20 @@ async def del_sup(sid: str, user=Depends(get_current_user)):
 
 # ============ INVOICES ============
 @api.get("/invoices", response_model=List[Invoice])
-async def list_inv(kind: Optional[str] = None, user=Depends(get_current_user)):
+async def list_inv(kind: Optional[str] = None, user=Depends(get_admin_user)):
     q = {"kind": kind} if kind else {}
     return await db.invoices.find(q, {"_id": 0}).sort("issue_date", -1).to_list(1000)
 
 @api.post("/invoices", response_model=Invoice)
-async def create_inv(i: Invoice, user=Depends(get_current_user)):
+async def create_inv(i: Invoice, user=Depends(get_admin_user)):
     await db.invoices.insert_one(i.model_dump()); return i
 
 @api.delete("/invoices/{iid}")
-async def del_inv(iid: str, user=Depends(get_current_user)):
+async def del_inv(iid: str, user=Depends(get_admin_user)):
     r = await db.invoices.delete_one({"id": iid}); return {"deleted": r.deleted_count}
 
 @api.post("/invoices/parse-xml")
-async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_current_user)):
+async def parse_nfe_xml(file: UploadFile = File(...), user=Depends(get_admin_user)):
     """Parse Brazilian NF-e XML and extract main fields."""
     data = await read_import(file)
     try:
@@ -1223,23 +1228,23 @@ async def save_purchase_workflow(purchase, create=False):
 
 # ============ SALES ORDERS ============
 @api.get("/orders", response_model=List[SalesOrder])
-async def list_ord(status: Optional[str] = None, archived: bool = False, user=Depends(get_current_user)):
+async def list_ord(status: Optional[str] = None, archived: bool = False, user=Depends(get_admin_user)):
     if archived: require_admin(user)
     q = {"deleted_at": {"$nin": [None, ""]}} if archived else {"deleted_at": {"$in": [None, ""]}}
     if status: q["status"] = status
     return await db.orders.find(q, {"_id": 0}).sort("order_date", -1).to_list(1000)
 
 @api.post("/orders", response_model=SalesOrder)
-async def create_ord(o: SalesOrder, user=Depends(get_current_user)):
+async def create_ord(o: SalesOrder, user=Depends(get_admin_user)):
     return await save_order_workflow(o, create=True)
 
 @api.put("/orders/{oid}", response_model=SalesOrder)
-async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_current_user)):
+async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_admin_user)):
     o.id = oid
     return await save_order_workflow(o)
 
 @api.delete("/orders/{oid}")
-async def del_ord(oid: str, user=Depends(get_current_user)):
+async def del_ord(oid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
         record = await db.orders.find_one({"id": oid}, {"_id": 0})
@@ -1262,21 +1267,21 @@ async def restore_business_record(collection, rid, user):
         return {"restored": True}
 
 @api.post("/orders/{oid}/restore")
-async def restore_order(oid: str, user=Depends(get_current_user)):
+async def restore_order(oid: str, user=Depends(get_admin_user)):
     return await restore_business_record(db.orders, oid, user)
 
 @api.post("/purchases/{pid}/restore")
-async def restore_purchase(pid: str, user=Depends(get_current_user)):
+async def restore_purchase(pid: str, user=Depends(get_admin_user)):
     return await restore_business_record(db.purchases, pid, user)
 
 # ============ FINANCE ============
 @api.get("/finance", response_model=List[FinanceEntry])
-async def list_fin(kind: Optional[str] = None, paid: Optional[bool] = None, user=Depends(get_current_user)):
+async def list_fin(kind: Optional[str] = None, paid: Optional[bool] = None, user=Depends(get_admin_user)):
     entries = await all_finance_entries()
     return sorted([f for f in entries if (not kind or f["kind"] == kind) and (paid is None or f.get("paid", False) == paid)], key=lambda f:f.get("due_date", ""))
 
 @api.post("/finance", response_model=FinanceEntry)
-async def create_fin(f: FinanceEntry, user=Depends(get_current_user)):
+async def create_fin(f: FinanceEntry, user=Depends(get_admin_user)):
     async with business_write_lock() as ensure_owned:
         if f.id.startswith(("order:", "purchase:")) or f.source_order_id or f.source_purchase_id:
             raise HTTPException(400, "Lançamentos de pedidos e compras são gerados pela operação de origem")
@@ -1299,7 +1304,7 @@ async def create_fin(f: FinanceEntry, user=Depends(get_current_user)):
         await db.finance.insert_one(f.model_dump()); return f
 
 @api.patch("/finance/{fid}/toggle-paid", response_model=FinanceEntry)
-async def toggle_paid(fid: str, body: Optional[dict] = None, user=Depends(get_current_user)):
+async def toggle_paid(fid: str, body: Optional[dict] = None, user=Depends(get_admin_user)):
     if body is not None and not isinstance(body.get("paid"), bool):
         raise HTTPException(400, "Informe o estado de pagamento")
     if fid.startswith(("order:", "purchase:")):
@@ -1331,27 +1336,27 @@ async def toggle_paid(fid: str, body: Optional[dict] = None, user=Depends(get_cu
     return doc
 
 @api.delete("/finance/{fid}")
-async def del_fin(fid: str, user=Depends(get_current_user)):
+async def del_fin(fid: str, user=Depends(get_admin_user)):
     if fid.startswith(("order:", "purchase:")):
         raise HTTPException(400, "Cancele o pedido ou a compra de origem para retirar este lançamento")
     r = await db.finance.delete_one({"id": fid}); return {"deleted": r.deleted_count}
 
 # ============ CONTRACTS ============
 @api.get("/contracts", response_model=List[Contract])
-async def list_con(kind: Optional[str] = None, user=Depends(get_current_user)):
+async def list_con(kind: Optional[str] = None, user=Depends(get_admin_user)):
     q = {"kind": kind} if kind else {}
     return await db.contracts.find(q, {"_id": 0}).sort("end_date", 1).to_list(1000)
 
 @api.post("/contracts", response_model=Contract)
-async def create_con(c: Contract, user=Depends(get_current_user)):
+async def create_con(c: Contract, user=Depends(get_admin_user)):
     await db.contracts.insert_one(c.model_dump()); return c
 
 @api.put("/contracts/{cid}", response_model=Contract)
-async def upd_con(cid: str, c: Contract, user=Depends(get_current_user)):
+async def upd_con(cid: str, c: Contract, user=Depends(get_admin_user)):
     c.id = cid; await db.contracts.replace_one({"id": cid}, c.model_dump()); return c
 
 @api.delete("/contracts/{cid}")
-async def del_con(cid: str, user=Depends(get_current_user)):
+async def del_con(cid: str, user=Depends(get_admin_user)):
     r = await db.contracts.delete_one({"id": cid}); return {"deleted": r.deleted_count}
 
 # ============ CERTIFICATIONS (por fornecedor) ============
@@ -1361,13 +1366,13 @@ async def list_cert(supplier_id: Optional[str] = None, user=Depends(get_current_
     return await db.certifications.find(await shared_file_scope(db, user, q), {"_id": 0}).sort("expiry_date", 1).to_list(1000)
 
 @api.post("/certifications", response_model=Certification)
-async def create_cert(c: Certification, user=Depends(get_current_user)):
+async def create_cert(c: Certification, user=Depends(get_admin_user)):
     await authorize_crm_file(db, user, c.file_path)
     c.id = str(uuid.uuid4())
     await db.certifications.insert_one(c.model_dump()); return c
 
 @api.put("/certifications/{cid}", response_model=Certification)
-async def upd_cert(cid: str, c: Certification, user=Depends(get_current_user)):
+async def upd_cert(cid: str, c: Certification, user=Depends(get_admin_user)):
     await authorize_crm_file(db, user, c.file_path)
     c.id = cid
     result = await db.certifications.replace_one(await shared_file_scope(db, user, {"id": cid}), c.model_dump())
@@ -1375,14 +1380,14 @@ async def upd_cert(cid: str, c: Certification, user=Depends(get_current_user)):
     return c
 
 @api.delete("/certifications/{cid}")
-async def del_cert(cid: str, user=Depends(get_current_user)):
+async def del_cert(cid: str, user=Depends(get_admin_user)):
     r = await db.certifications.delete_one(await shared_file_scope(db, user, {"id": cid}))
     if not r.deleted_count: raise HTTPException(404, "Certificado não encontrado")
     return {"deleted": 1}
 
 # ============ PURCHASES (Compras) ============
 @api.get("/purchases", response_model=List[Purchase])
-async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = None, archived: bool = False, user=Depends(get_current_user)):
+async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = None, archived: bool = False, user=Depends(get_admin_user)):
     if archived: require_admin(user)
     q = {"deleted_at": {"$nin": [None, ""]}} if archived else {"deleted_at": {"$in": [None, ""]}}
     if status: q["status"] = status
@@ -1390,16 +1395,16 @@ async def list_pur(status: Optional[str] = None, supplier_id: Optional[str] = No
     return await db.purchases.find(q, {"_id": 0}).sort("date", -1).to_list(1000)
 
 @api.post("/purchases", response_model=Purchase)
-async def create_pur(p: Purchase, user=Depends(get_current_user)):
+async def create_pur(p: Purchase, user=Depends(get_admin_user)):
     return await save_purchase_workflow(p, create=True)
 
 @api.put("/purchases/{pid}", response_model=Purchase)
-async def upd_pur(pid: str, p: Purchase, user=Depends(get_current_user)):
+async def upd_pur(pid: str, p: Purchase, user=Depends(get_admin_user)):
     p.id = pid
     return await save_purchase_workflow(p)
 
 @api.delete("/purchases/{pid}")
-async def del_pur(pid: str, user=Depends(get_current_user)):
+async def del_pur(pid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
         record = await db.purchases.find_one({"id": pid}, {"_id": 0})
@@ -1419,7 +1424,7 @@ class SpecDocumentSupplier(BaseModel):
     supplier_id: str
 
 @api.patch("/specs/documents/{did}/supplier")
-async def assign_spec_document_supplier(did: str, body: SpecDocumentSupplier, user=Depends(get_current_user)):
+async def assign_spec_document_supplier(did: str, body: SpecDocumentSupplier, user=Depends(get_admin_user)):
     require_admin(user)
     supplier = await db.suppliers.find_one({"id": body.supplier_id}, {"_id": 0})
     if not supplier:
@@ -1465,14 +1470,14 @@ async def list_specs(supplier_id: Optional[str] = None, user=Depends(get_current
     return await db.specs.find(await shared_file_scope(db, user, q, ("original_file_path", "ibiag_file_path")), {"_id": 0}).sort("product_name", 1).to_list(1000)
 
 @api.post("/specs", response_model=Spec)
-async def create_spec(s: Spec, user=Depends(get_current_user)):
+async def create_spec(s: Spec, user=Depends(get_admin_user)):
     await validate_spec_supplier(s, user)
     if await db.specs.find_one({"id": s.id}):
         raise HTTPException(409, "Spec já cadastrada")
     await db.specs.insert_one(s.model_dump()); return s
 
 @api.put("/specs/{sid}", response_model=Spec)
-async def upd_spec(sid: str, s: Spec, user=Depends(get_current_user)):
+async def upd_spec(sid: str, s: Spec, user=Depends(get_admin_user)):
     existing = await db.specs.find_one(await shared_file_scope(db, user, {"id": sid}, ("original_file_path", "ibiag_file_path")), {"_id": 0})
     if not existing:
         raise HTTPException(404, "Spec não encontrada")
@@ -1483,7 +1488,7 @@ async def upd_spec(sid: str, s: Spec, user=Depends(get_current_user)):
     return s
 
 @api.delete("/specs/{sid}")
-async def del_spec(sid: str, user=Depends(get_current_user)):
+async def del_spec(sid: str, user=Depends(get_admin_user)):
     r = await db.specs.delete_one(await shared_file_scope(db, user, {"id": sid}, ("original_file_path", "ibiag_file_path")))
     if not r.deleted_count: raise HTTPException(404, "Spec não encontrada")
     return {"deleted": 1}
@@ -1516,7 +1521,7 @@ async def validate_price_offer(p):
     p.unit = offer.get("unit") or product.get("unit") or "kg"
 
 @api.get("/prices", response_model=List[PriceEntry])
-async def list_prices(user=Depends(get_current_user)):
+async def list_prices(user=Depends(get_admin_user)):
     records = await db.prices.find({}, {"_id": 0}).sort("product_name", 1).to_list(1000)
     result = []
     for record in records:
@@ -1539,24 +1544,24 @@ async def calc_price(p: PriceEntry, user=Depends(get_current_user)):
     return compute_price(p)
 
 @api.post("/prices", response_model=PriceEntry)
-async def create_price(p: PriceEntry, user=Depends(get_current_user)):
+async def create_price(p: PriceEntry, user=Depends(get_admin_user)):
     await validate_price_offer(p)
     p = compute_price(p)
     await db.prices.insert_one(p.model_dump()); return p
 
 @api.put("/prices/{pid}", response_model=PriceEntry)
-async def upd_price(pid: str, p: PriceEntry, user=Depends(get_current_user)):
+async def upd_price(pid: str, p: PriceEntry, user=Depends(get_admin_user)):
     await validate_price_offer(p)
     p.id = pid; p.updated_at = now_iso(); p = compute_price(p)
     await db.prices.replace_one({"id": pid}, p.model_dump()); return p
 
 @api.delete("/prices/{pid}")
-async def del_price(pid: str, user=Depends(get_current_user)):
+async def del_price(pid: str, user=Depends(get_admin_user)):
     r = await db.prices.delete_one({"id": pid}); return {"deleted": r.deleted_count}
 
 # ============ CASHFLOW ============
 @api.get("/finance/cashflow")
-async def cashflow(months: int = 12, currency: str = "BRL", period: str = "history", user=Depends(get_current_user)):
+async def cashflow(months: int = 12, currency: str = "BRL", period: str = "history", user=Depends(get_admin_user)):
     if months < 1 or months > 60:
         raise HTTPException(400, "Informe de 1 a 60 meses")
     currency = currency_code(currency)
@@ -1573,7 +1578,7 @@ async def cashflow(months: int = 12, currency: str = "BRL", period: str = "histo
 
 # ============ GESTÃO STATS ============
 @api.get("/gestao/stats")
-async def gestao_stats(user=Depends(get_current_user)):
+async def gestao_stats(user=Depends(get_admin_user)):
     today = datetime.now(timezone.utc).date()
     certs = await db.certifications.find({}, {"_id": 0}).to_list(2000)
     expiring, expired = [], []
@@ -1610,7 +1615,7 @@ class StockUpd(BaseModel):
     stock: float
 
 @api.patch("/products/{pid}/stock", response_model=Product)
-async def upd_stock(pid: str, body: StockUpd, user=Depends(get_current_user)):
+async def upd_stock(pid: str, body: StockUpd, user=Depends(get_admin_user)):
     require_admin(user)
     if not math.isfinite(body.stock) or body.stock < 0:
         raise HTTPException(400, "Saldo de estoque deve ser zero ou positivo")
@@ -1630,7 +1635,7 @@ async def upd_stock(pid: str, body: StockUpd, user=Depends(get_current_user)):
 
 # ============ PRODUCT PORTFOLIO OFFERS ============
 @api.get("/product-offers", response_model=List[ProductOffer])
-async def list_product_offers(product_id: Optional[str] = None, supplier_id: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_current_user)):
+async def list_product_offers(product_id: Optional[str] = None, supplier_id: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_admin_user)):
     q = {}
     if product_id: q["product_id"] = product_id
     if supplier_id: q["supplier_id"] = supplier_id
@@ -1646,7 +1651,7 @@ async def validate_offer_documents(o):
                 raise HTTPException(400, "Documento, especificação ou certificado não disponível: " + identifier)
 
 @api.post("/product-offers", response_model=ProductOffer)
-async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
+async def create_product_offer(o: ProductOffer, user=Depends(get_admin_user)):
     await validate_offer_documents(o)
     async with business_write_lock() as ensure_owned:
         if not await db.products.find_one({"id": o.product_id}):
@@ -1663,7 +1668,7 @@ async def create_product_offer(o: ProductOffer, user=Depends(get_current_user)):
         return o
 
 @api.put("/product-offers/{oid}", response_model=ProductOffer)
-async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_current_user)):
+async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_admin_user)):
     await validate_offer_documents(o)
     async with business_write_lock() as ensure_owned:
         existing = await db.product_offers.find_one({"id": oid}, {"_id": 0})
@@ -1684,7 +1689,7 @@ async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_curre
         return o
 
 @api.delete("/product-offers/{oid}")
-async def delete_product_offer(oid: str, user=Depends(get_current_user)):
+async def delete_product_offer(oid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
         if await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}):
@@ -1721,7 +1726,7 @@ async def list_products(category: Optional[str] = None, user=Depends(get_current
     return [p for p in balances.values() if not category or p.get("category") == category]
 
 @api.post("/products", response_model=Product)
-async def create_product(p: Product, user=Depends(get_current_user)):
+async def create_product(p: Product, user=Depends(get_admin_user)):
     require_admin(user)
     if not math.isfinite(p.stock) or p.stock < 0: raise HTTPException(400, "Estoque inicial inválido")
     body = p.model_dump()
@@ -1730,7 +1735,7 @@ async def create_product(p: Product, user=Depends(get_current_user)):
     return body
 
 @api.put("/products/{pid}", response_model=Product)
-async def upd_product(pid: str, p: Product, user=Depends(get_current_user)):
+async def upd_product(pid: str, p: Product, user=Depends(get_admin_user)):
     async with business_write_lock() as ensure_owned:
         existing = await db.products.find_one({"id": pid}, {"_id": 0})
         if not existing: raise HTTPException(404, "Produto não encontrado")
@@ -1747,7 +1752,7 @@ async def upd_product(pid: str, p: Product, user=Depends(get_current_user)):
         return inventory_balances(products, orders, purchases)[pid]
 
 @api.delete("/products/{pid}")
-async def del_product(pid: str, user=Depends(get_current_user)):
+async def del_product(pid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
         checks = [
@@ -2595,21 +2600,22 @@ async def dashboard(user=Depends(get_current_user)):
         by_industry[d["_id"]] = d["count"]
     # ERP stats
     docs_count = await db.documents.count_documents(await document_scope(db, user, {"deleted_at": {"$in": [None, ""]}}))
-    invoices_count = await db.invoices.count_documents({})
+    can_view_erp = user.get("role") == "admin"
+    invoices_count = await db.invoices.count_documents({}) if can_view_erp else None
     suppliers_count = await db.suppliers.count_documents({})
-    orders_pending = await db.orders.count_documents({"status": {"$in": ["draft", "confirmed"]}, "deleted_at": {"$in": [None, ""]}})
-    finance_by_currency = pending_totals(await all_finance_entries())
+    orders_pending = await db.orders.count_documents({"status": {"$in": ["draft", "confirmed"]}, "deleted_at": {"$in": [None, ""]}}) if can_view_erp else None
+    finance_by_currency = pending_totals(await all_finance_entries()) if can_view_erp else []
     brl = next((row for row in finance_by_currency if row["currency"] == "BRL"), {})
-    fin_receivable = brl.get("receivable", 0)
-    fin_payable = brl.get("payable", 0)
+    fin_receivable = brl.get("receivable", 0) if can_view_erp else None
+    fin_payable = brl.get("payable", 0) if can_view_erp else None
     today = datetime.now(timezone.utc).date().isoformat()
     soon = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
-    expiring = await db.contracts.count_documents({"end_date": {"$gte": today, "$lte": soon}})
+    expiring = await db.contracts.count_documents({"end_date": {"$gte": today, "$lte": soon}}) if can_view_erp else None
     return {
         "total_leads": total_leads, "active_leads": active, "samples_sent": samples,
         "won": won, "lost": lost, "conversion_rate": conv, "pipeline_value": pipeline_value,
         "by_stage": by_stage, "by_industry": by_industry,
-        "documents": docs_count, "invoices": invoices_count, "suppliers": suppliers_count,
+        "can_view_erp": can_view_erp, "documents": docs_count, "invoices": invoices_count, "suppliers": suppliers_count,
         "orders_pending": orders_pending, "finance_receivable": fin_receivable,
         "finance_payable": fin_payable, "finance_by_currency": finance_by_currency, "contracts_expiring": expiring
     }
