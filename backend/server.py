@@ -183,6 +183,17 @@ class AccountActiveBody(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     active: bool
 
+class PasswordChangeBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=8, max_length=72)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def valid_password_bytes(cls, value):
+        password_bytes(value)
+        return value
+
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -655,6 +666,36 @@ async def login(body: LoginBody, request: Request):
 @api.get("/auth/me")
 async def me(user=Depends(get_current_user)):
     return user
+
+@api.post("/auth/password")
+async def change_password(body: PasswordChangeBody, user=Depends(get_current_user)):
+    now = datetime.now(timezone.utc)
+    window = int(now.timestamp()) // LOGIN_WINDOW_SECONDS
+    key = hashlib.sha256(f"password-change:{window}:{user['id']}".encode()).hexdigest()
+    attempt = await db.login_attempts.find_one_and_update(
+        {"_id": key}, {"$inc": {"count": 1}, "$setOnInsert": {
+            "expires_at": datetime.fromtimestamp((window + 2) * LOGIN_WINDOW_SECONDS, tz=timezone.utc)}},
+        upsert=True, return_document=ReturnDocument.AFTER)
+    if attempt["count"] > LOGIN_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many attempts. Try again later.", headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)})
+    record = await db.users.find_one({"id": user["id"]})
+    if not record or record.get("active", True) is not True or record.get("session_version", 0) != user.get("session_version", 0):
+        raise HTTPException(401, "Session ended")
+    if not verify_pw(body.current_password, record["password_hash"]):
+        raise HTTPException(400, "Current password is incorrect")
+    if body.current_password == body.new_password:
+        raise HTTPException(400, "Choose a different password")
+    # Compare both the hash and generation: concurrent password changes or
+    # suspensions cannot overwrite newer credentials or revive a session.
+    version_filter = record["session_version"] if "session_version" in record else {"$exists": False}
+    result = await db.users.update_one(
+        {"id": user["id"], "password_hash": record["password_hash"], "session_version": version_filter,
+         "active": {"$ne": False}},
+        {"$set": {"password_hash": hash_pw(body.new_password), "password_changed_at": now_iso()},
+         "$inc": {"session_version": 1}})
+    if not result.modified_count:
+        raise HTTPException(409, "Account changed. Sign in again before retrying.")
+    return {"ok": True}
 
 @api.post("/auth/logout")
 async def logout(request: Request, user=Depends(get_current_user)):
@@ -2688,19 +2729,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ----- SEED -----
-async def seed_all():
-    # Admin
+async def seed_admin():
+    # Bootstrap creates only: a restart must not restore a stale environment
+    # password over credentials already stored by an authenticated user.
+    await db.users.create_index("email", unique=True)
     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
     admin_pw = os.environ.get("ADMIN_PASSWORD", "")
     if admin_email and admin_pw:
         existing = await db.users.find_one({"email": admin_email})
         if not existing:
-            await db.users.insert_one({"id": str(uuid.uuid4()), "email": admin_email,
-                                        "name": "Administrador IBIAG", "password_hash": hash_pw(admin_pw),
-                                        "role": "admin", "created_at": now_iso()})
-        elif not verify_pw(admin_pw, existing["password_hash"]):
-            await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_pw(admin_pw)}})
-    await db.users.create_index("email", unique=True)
+            try:
+                await db.users.update_one({"email": admin_email}, {"$setOnInsert": {
+                    "id": str(uuid.uuid4()), "email": admin_email, "name": "Administrador IBIAG",
+                    "password_hash": hash_pw(admin_pw), "role": "admin", "created_at": now_iso()}}, upsert=True)
+            except DuplicateKeyError:
+                if not await db.users.find_one({"email": admin_email}, {"id": 1}):
+                    raise
+
+async def seed_all():
+    await seed_admin()
 
     # Products & templates & trade & leads seed (kept same as before)
     # Official IBIAG Ingredients portfolio 2026. Keep demo records out of production.

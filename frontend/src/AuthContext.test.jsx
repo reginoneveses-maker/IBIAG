@@ -76,3 +76,32 @@ test("request interceptor preserves the captured logout session", () => {
   expect(requestInterceptor({headers:{}}).headers.Authorization).toBe("Bearer new-session");
 });
 const requestInterceptor=api.interceptors.request.use.mock.calls[0][0];
+
+function PasswordSession() {
+  const {user,changePassword} = useAuth();
+  return <><span>{user ? "signed in" : "signed out"}</span><button onClick={()=>changePassword("old-password","new-password")}>Change</button></>;
+}
+
+test("password rotation captures its token and clears the matching browser session",async()=>{
+  localStorage.setItem("token","old-session");
+  api.post.mockResolvedValue({data:{ok:true}});
+  render(<AuthProvider><PasswordSession/></AuthProvider>);
+  await screen.findByText("signed in");
+  fireEvent.click(screen.getByText("Change"));
+  await screen.findByText("signed out");
+  expect(localStorage.getItem("token")).toBeNull();
+  expect(api.post).toHaveBeenCalledWith("/auth/password",{current_password:"old-password",new_password:"new-password"},
+    {headers:{Authorization:"Bearer old-session"},timeout:15000});
+});
+
+test("a delayed password response does not clear a newer login token",async()=>{
+  localStorage.setItem("token","old-session");
+  let finish;
+  api.post.mockReturnValue(new Promise(resolve=>{finish=resolve;}));
+  render(<AuthProvider><PasswordSession/></AuthProvider>);
+  await screen.findByText("signed in");
+  fireEvent.click(screen.getByText("Change"));
+  localStorage.setItem("token","new-session");
+  await act(async()=>{finish({data:{ok:true}});});
+  expect(localStorage.getItem("token")).toBe("new-session");
+});

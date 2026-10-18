@@ -131,6 +131,7 @@ const Layout = ({ module = "crm" }) => {
           <Link to="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/8">
             <LayoutGrid className="w-4 h-4" /> Trocar módulo
           </Link>
+          <Link to="/prospects/senha" className="block px-3 py-2.5 text-sm text-white/70">Alterar senha</Link>
           {user?.role === "admin" && <Link to="/gestao/acessos" className="block px-3 py-2.5 text-sm text-white/70">Acesso da equipe</Link>}
           {user?.role==="admin"&&<button disabled={backupBusy} onClick={backup} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/70 hover:text-white hover:bg-white/8"><FolderArchive className="w-4 h-4"/>{backupBusy?"Preparando backup…":"Baixar backup completo"}</button>}
           <button onClick={logout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/60 hover:text-white hover:bg-white/8">

@@ -60,7 +60,18 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  return <AuthCtx.Provider value={{ user, login, register, logout, loading }}>{children}</AuthCtx.Provider>;
+  const changePassword = async (currentPassword, newPassword) => {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Session ended");
+    await api.post("/auth/password", {current_password: currentPassword, new_password: newPassword},
+      {headers: {Authorization: `Bearer ${token}`}, timeout: 15000});
+    if (localStorage.getItem("token") === token) {
+      localStorage.removeItem("token");
+      setUser(null);
+    }
+  };
+
+  return <AuthCtx.Provider value={{ user, login, register, logout, changePassword, loading }}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

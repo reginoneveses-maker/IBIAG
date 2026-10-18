@@ -189,6 +189,16 @@ const base = "http://127.0.0.1:8765";
     await page.getByRole("button",{name:"Suspender conta",exact:true}).waitFor();
     assert.equal((await page.request.get(base+"/api/auth/me",{headers:memberHeaders})).status(),401);
     assert.equal((await page.request.post(base+"/api/auth/login",{data:memberCredentials})).status(),200);
+    await page.getByRole("link",{name:"Alterar senha",exact:true}).click();
+    await page.getByLabel("Senha atual",{exact:true}).fill("browser-test");
+    await page.getByLabel("Nova senha",{exact:true}).fill("browser-updated-test");
+    await page.getByLabel("Confirmar nova senha",{exact:true}).fill("browser-updated-test");
+    await page.getByRole("button",{name:"Alterar senha e encerrar sessões",exact:true}).click();
+    await page.waitForURL(base+"/login");
+    assert.equal(await page.evaluate(()=>localStorage.getItem("token")),null);
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:adminHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-test"}})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-updated-test"}})).status(),200);
     assert.deepEqual(errors,[]);
     console.log("PASS browser: search → decision → CRM → reload → company documents → folder upload → download → move → reload");
   } finally {
