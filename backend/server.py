@@ -25,6 +25,7 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
+from safe_errors import install_error_handlers
 from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
@@ -136,6 +137,7 @@ def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
 app = FastAPI(title="IBIAG", version="1.0.0")
+install_error_handlers(app)
 
 # Production CORS. Keep this explicit in production; "*" is only a development fallback.
 cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
@@ -2148,7 +2150,7 @@ async def comexstat_ncm(search: str = "", page: int = 1, per_page: int = 50, use
     try:
         return ncm_search(search=search, page=page, per_page=per_page)
     except requests.RequestException as e:
-        logging.exception("Comex Stat NCM search failed")
+        logging.error("Comex Stat NCM search failed")
         raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
 @api.post("/comexstat/prospect")
@@ -2175,7 +2177,7 @@ async def comexstat_prospect(payload: dict, user=Depends(get_current_user)):
         markets = normalize_markets(data)
         return {"flow": flow, "period": period, "ncm": ncm, "query": query, "data": data, "markets": markets}
     except (requests.RequestException, ValueError) as e:
-        logging.exception("Comex Stat prospect query failed")
+        logging.error("Comex Stat prospect query failed")
         raise HTTPException(502, f"Não foi possível montar o prospecting snapshot: {str(e)[:180]}")
 
 @api.post("/comexstat/markets")
@@ -2205,7 +2207,7 @@ async def comexstat_markets(payload: dict, user=Depends(get_current_user)):
             "markets": normalize_markets(data),
         }
     except (requests.RequestException, ValueError) as e:
-        logging.exception("Comex Stat markets query failed")
+        logging.error("Comex Stat markets query failed")
         raise HTTPException(502, f"Não foi possível montar os mercados: {str(e)[:180]}")
 
 @api.post("/comexstat/general")
@@ -2213,7 +2215,7 @@ async def comexstat_general(payload: dict, user=Depends(get_current_user)):
     try:
         return comex_general(payload)
     except requests.RequestException as e:
-        logging.exception("Comex Stat general query failed")
+        logging.error("Comex Stat general query failed")
         raise HTTPException(502, f"Comex Stat indisponível: {str(e)[:180]}")
 
 # ============ TRADE (public) ============
@@ -2350,7 +2352,7 @@ async def buyer_discovery_search(body: BuyerDiscoveryRequest, user=Depends(get_c
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except requests.RequestException as e:
-        logging.exception("Buyer discovery provider error")
+        logging.error("Buyer discovery provider error")
         raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
     return {"product": product, "country": country, "results": buyers, "warnings": getattr(buyers, "warnings", []), "source": "web_discovery"}
 
@@ -2364,7 +2366,7 @@ async def buyer_discovery_decision_maker(company: str, product: str = "", countr
     except RuntimeError as e:
         raise HTTPException(503, str(e))
     except requests.RequestException as e:
-        logging.exception("Decision maker discovery provider error")
+        logging.error("Decision maker discovery provider error")
         raise HTTPException(502, f"Provedor de pesquisa indisponível: {e}")
 
 @api.post("/buyer-discovery/to-crm")
@@ -2515,7 +2517,7 @@ async def health():
         await db.command("ping")
         return {"status": "ok", "database": "ok", "timestamp": now_iso()}
     except Exception:
-        logging.exception("Health check failed")
+        logging.error("Health check failed")
         raise HTTPException(503, "Database unavailable")
 
 @api.get("/")
