@@ -576,13 +576,28 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
 # window, across application workers. Never store the plaintext email here.
 LOGIN_WINDOW_SECONDS = 900
 LOGIN_MAX_ATTEMPTS = 5
+LOGIN_IP_MAX_ATTEMPTS = 30
 
 @api.post("/auth/login")
-async def login(body: LoginBody):
+async def login(body: LoginBody, request: Request):
     email = body.email.lower().strip()
     now = datetime.now(timezone.utc)
     window = int(now.timestamp()) // LOGIN_WINDOW_SECONDS
     limiter_key = hashlib.sha256(f"{window}:{email}".encode("utf-8")).hexdigest()
+    # Trust the socket peer, not client-controlled forwarded headers.
+    peer = request.client.host if request.client else "unknown"
+    peer_key = hashlib.sha256(f"peer:{window}:{peer}".encode("utf-8")).hexdigest()
+    peer_attempt = await db.login_attempts.find_one_and_update(
+        {"_id": peer_key},
+        {"$inc": {"count": 1}, "$setOnInsert": {
+            "expires_at": datetime.fromtimestamp((window + 2) * LOGIN_WINDOW_SECONDS, tz=timezone.utc)
+        }},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if peer_attempt["count"] > LOGIN_IP_MAX_ATTEMPTS:
+        raise HTTPException(429, "Too many login attempts. Try again later.",
+                            headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)})
     # Count attempts before credential verification, preventing concurrent
     # requests from bypassing the threshold. MongoDB $inc is atomic.
     attempt = await db.login_attempts.find_one_and_update(
