@@ -115,8 +115,9 @@ def verify_pw(pw, h):
     try: return bcrypt.checkpw(password_bytes(pw), h.encode())
     except Exception: return False
 
-def create_token(uid, email):
+def create_token(uid, email, session_version=0):
     return jwt.encode({"sub": uid, "email": email, "jti": str(uuid.uuid4()),
+                       "sv": session_version,
                        "exp": datetime.now(timezone.utc) + timedelta(days=7)},
                       JWT_SECRET, algorithm=JWT_ALG)
 
@@ -127,6 +128,8 @@ async def get_current_user(request: Request):
         raise HTTPException(401, "Not authenticated")
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        if not isinstance(payload.get("sub"), str) or not payload["sub"] or type(payload.get("sv", 0)) is not int:
+            raise jwt.InvalidTokenError()
         # Store only a one-way digest, never a bearer token, in the denylist.
         token_digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
         if await db.revoked_access_tokens.find_one({"_id": token_digest}):
@@ -134,6 +137,8 @@ async def get_current_user(request: Request):
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(401, "User not found")
+        if user.get("active", True) is not True or payload.get("sv", 0) != user.get("session_version", 0):
+            raise HTTPException(401, "Session ended")
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired")
@@ -173,6 +178,10 @@ class RegisterBody(LoginBody):
 
 class UserCreateBody(RegisterBody):
     role: str = "user"
+
+class AccountActiveBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    active: bool
 
 class Product(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -582,6 +591,23 @@ async def create_user(body: UserCreateBody, user=Depends(get_current_user)):
     record.pop("_id", None)
     return record
 
+@api.patch("/auth/users/{uid}/active")
+async def set_account_active(uid: str, body: AccountActiveBody, user=Depends(get_admin_user)):
+    # Administrative recovery requires a separate policy; never disable an
+    # administrator or let concurrent role changes bypass this restriction.
+    if uid == user["id"]:
+        raise HTTPException(403, "Administrator accounts cannot be suspended here")
+    record = await db.users.find_one_and_update(
+        {"id": uid, "role": "user"},
+        {"$set": {"active": body.active, "access_changed_by": user["id"], "access_changed_at": now_iso()},
+         "$inc": {"session_version": 1}}, return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "password_hash": 0})
+    if not record:
+        if await db.users.find_one({"id": uid}, {"id": 1}):
+            raise HTTPException(403, "Administrator accounts cannot be suspended here")
+        raise HTTPException(404, "User not found")
+    return record
+
 # Shared MongoDB limiter: one atomic counter per email per fixed 15-minute
 # window, across application workers. Never store the plaintext email here.
 LOGIN_WINDOW_SECONDS = 900
@@ -621,9 +647,9 @@ async def login(body: LoginBody, request: Request):
     if attempt["count"] > LOGIN_MAX_ATTEMPTS:
         raise HTTPException(429, "Too many login attempts. Try again later.", headers={"Retry-After": str(LOGIN_WINDOW_SECONDS)})
     user = await db.users.find_one({"email": email})
-    if not user or not verify_pw(body.password, user["password_hash"]):
+    if not user or not verify_pw(body.password, user["password_hash"]) or user.get("active", True) is not True:
         raise HTTPException(401, "Invalid credentials")
-    token = create_token(user["id"], email)
+    token = create_token(user["id"], email, user.get("session_version", 0))
     return {"access_token": token, "user": {"id": user["id"], "email": email, "name": user.get("name", ""), "role": user.get("role", "user")}}
 
 @api.get("/auth/me")
@@ -2150,8 +2176,9 @@ class LeadOwnerBody(BaseModel):
 @api.patch("/leads/{lid}/owner", response_model=Lead)
 async def assign_lead_owner(lid: str, body: LeadOwnerBody, user=Depends(get_current_user)):
     require_admin(user)
-    if not await db.users.find_one({"id": body.owner_id}, {"id": 1}):
-        raise HTTPException(400, "Usuário não encontrado")
+    owner = await db.users.find_one({"id": body.owner_id}, {"id": 1, "active": 1})
+    if not owner or owner.get("active", True) is not True:
+        raise HTTPException(400, "Usuário ativo não encontrado")
     # Release the old owner's creation-deduplication key on transfer. The lead
     # ID remains stable; linked history and documents follow its access scope.
     doc = await db.leads.find_one_and_update({"id": lid},
@@ -2235,8 +2262,9 @@ class TaskOwnerBody(BaseModel):
 @api.patch("/tasks/{tid}/owner", response_model=Task)
 async def assign_task_owner(tid: str, body: TaskOwnerBody, user=Depends(get_current_user)):
     require_admin(user)
-    if not await db.users.find_one({"id": body.owner_id}, {"id": 1}):
-        raise HTTPException(400, "Usuário não encontrado")
+    owner = await db.users.find_one({"id": body.owner_id}, {"id": 1, "active": 1})
+    if not owner or owner.get("active", True) is not True:
+        raise HTTPException(400, "Usuário ativo não encontrado")
     doc = await db.tasks.find_one_and_update(
         {"id": tid}, {"$set": {"owner_id": body.owner_id,
                                "owner_updated_by": user["id"], "owner_updated_at": now_iso()}},

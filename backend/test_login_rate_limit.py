@@ -34,7 +34,7 @@ def load_login(db):
           "ReturnDocument": ReturnDocument, "LOGIN_WINDOW_SECONDS": 900,
           "LOGIN_MAX_ATTEMPTS": 5, "LOGIN_IP_MAX_ATTEMPTS": 30, "Request": SimpleNamespace,
           "verify_pw": lambda supplied, stored: supplied == stored,
-          "create_token": lambda uid, email: "test-token"}
+          "create_token": lambda uid, email, session_version=0: "test-token"}
     exec(compile(ast.Module(body=[fn], type_ignores=[]), "login_under_test", "exec"), ns)
     return ns["login"]
 

@@ -169,6 +169,26 @@ const base = "http://127.0.0.1:8765";
     await page.reload();
     await page.getByRole("button",{name:"Baixar spec-guarana.pdf",exact:true}).waitFor();
     assert.equal(await page.getByRole("button",{name:"Baixar spec-manga.pdf",exact:true}).count(),0);
+    // Isolated fixture only: administrative suspension must revoke an existing
+    // member session, and reactivation must never resurrect that token.
+    const adminHeaders={Authorization:`Bearer ${access_token}`};
+    const memberCredentials={email:"access-test@example.com",password:"browser-member-test"};
+    const createdAccount=await page.request.post(base+"/api/auth/users",{headers:adminHeaders,data:{...memberCredentials,name:"Access test",role:"user"}});
+    assert.equal(createdAccount.status(),200);
+    const memberLogin=await page.request.post(base+"/api/auth/login",{data:memberCredentials});
+    assert.equal(memberLogin.status(),200);
+    const memberHeaders={Authorization:`Bearer ${(await memberLogin.json()).access_token}`};
+    await page.getByRole("link",{name:"Acesso da equipe",exact:true}).click();
+    await page.getByRole("button",{name:"Suspender conta",exact:true}).click();
+    await page.getByRole("button",{name:"Confirmar suspensão",exact:true}).click();
+    await page.getByRole("button",{name:"Reativar conta",exact:true}).waitFor();
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:memberHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:memberCredentials})).status(),401);
+    await page.getByRole("button",{name:"Reativar conta",exact:true}).click();
+    await page.getByRole("button",{name:"Confirmar reativação",exact:true}).click();
+    await page.getByRole("button",{name:"Suspender conta",exact:true}).waitFor();
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:memberHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:memberCredentials})).status(),200);
     assert.deepEqual(errors,[]);
     console.log("PASS browser: search → decision → CRM → reload → company documents → folder upload → download → move → reload");
   } finally {
