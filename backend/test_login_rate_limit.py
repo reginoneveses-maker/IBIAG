@@ -29,7 +29,7 @@ def load_login(db):
     tree = ast.parse(Path(__file__).with_name("server.py").read_text())
     fn = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "login")
     ns = {"api": SimpleNamespace(post=lambda _: lambda fn: fn),
-          "db": db, "datetime": datetime, "timezone": timezone,
+          "db": db, "datetime": datetime, "timezone": timezone, "LoginBody": SimpleNamespace,
           "hashlib": hashlib, "HTTPException": HTTPException,
           "ReturnDocument": ReturnDocument, "LOGIN_WINDOW_SECONDS": 900,
           "LOGIN_MAX_ATTEMPTS": 5,
