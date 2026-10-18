@@ -31,6 +31,8 @@ não foram declaradas concluídas nem liberadas nesta execução.
 | [21](https://github.com/reginoneveses-maker/IBIAG/pull/21) | Respostas genéricas para falhas 5xx | Head `7dd89ab`, pipeline [39114734866](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39114734866) passou; não integrado |
 | [22](https://github.com/reginoneveses-maker/IBIAG/pull/22) | Pausa do agendamento de backup | Pipeline [39114769129](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39114769129) passou; integrado em `c9e2b65` |
 | [23](https://github.com/reginoneveses-maker/IBIAG/pull/23) | Limites nas importações de CRM, portfólio e XML | Head `fd17107`; pipeline [39114930649](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39114930649) passou; não integrado |
+| [24](https://github.com/reginoneveses-maker/IBIAG/pull/24) | Isolamento de tarefas, atribuição administrativa e interface | Head `22a5765`; pipeline [39115505754](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39115505754) passou; não integrado |
+| [25](https://github.com/reginoneveses-maker/IBIAG/pull/25) | Validação de senhas, respostas de autenticação sem entrada confidencial e correção do cadastro | Head `4d438f0`; pipeline [39115756310](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39115756310) passou; não integrado |
 
 As alterações de aplicação continuam em PRs porque a hospedagem acompanha
 `main` e o backend informa `checkSuites=false`. Integrar código pode publicar
@@ -68,14 +70,15 @@ e documentação, fora dos caminhos observados de deploy dos aplicativos.
 
 ## Verificação conjunta local
 
-Foi montada uma branch local de revisão contendo PRs 19–23; um conflito de
+Foi montada uma branch local de revisão contendo PRs 19–25; um conflito de
 imports foi resolvido preservando os dois módulos. Isso é integração de testes,
 não integração na branch de produção.
 
-- Backend: **122 testes passaram, 28 subtestes passaram, 7 ignorados**.
-- Frontend: **249 testes passaram, 8 suítes**.
+- Backend: **137 testes passaram, 32 subtestes passaram, 15 ignorados**.
+- Frontend: **252 testes passaram, 9 suítes**.
 - Build de produção do frontend: passou.
 - `git diff --check`: passou.
+- O teste local de navegador da branch conjunta não chegou a executar: o Chromium não estava instalado e o download retornou arquivo incompleto. As pipelines individuais dos PRs 24 e 25 passaram no teste de navegador do CI; isso não equivale a um E2E da branch conjunta nem a validação de produção.
 - Os testes ignorados localmente dependem de recursos externos/ambiente. A
   validação de MongoDB no CI é evidência separada, não teste de produção.
 - Varredura por padrões em **845 blobs históricos**: nenhum padrão de chave
@@ -90,10 +93,10 @@ não integração na branch de produção.
 | 1. API keys protegidas | Backend lê variáveis; nenhum valor foi consultado ou exposto nesta execução. Escopos e rotação ainda precisam de auditoria |
 | 2. `.env` não exposto | Ignorado no Git e não encontrado na busca histórica de caminhos; configuração HTTP real não foi testada |
 | 3. Senhas fora do código | Admin vem do ambiente; varredura limitada não substitui scanner completo de segredos |
-| 4. Login real | bcrypt/JWT, teste HTTP de login/logout e replay; políticas de senha, expiração e recuperação ainda precisam revisão |
+| 4. Login real | bcrypt/JWT, testes HTTP de login/logout e replay; PR 25 rejeita truncamento, aplica mínimo no cadastro e corrige resposta de criação; força, expiração e recuperação ainda precisam revisão |
 | 5. Permissão no servidor | Há `Depends(get_current_user)` e `require_admin`; negação para não-admin comprovada em rotas de usuários; matriz completa pendente |
 | 6. Não confiar no ID da tela | Algumas rotas validam relações; vários CRUDs ainda usam o ID diretamente sem escopo por proprietário |
-| 7. Cada um vê o autorizado | **Pendente crítico:** CRM/tarefas e dados operacionais são compartilhados; não há isolamento geral por usuário/workspace |
+| 7. Cada um vê o autorizado | PR 24 isola tarefas por proprietário, com acesso administrativo. **Pendente crítico:** CRM e outros dados operacionais são compartilhados; não há isolamento geral por usuário/workspace |
 | 8. Banco protegido | MongoDB consultado não possui proxy TCP público; autenticação, privilégios, criptografia e regras de rede não foram comprovados |
 | 9. Storage/Firebase/Supabase | Código usa GridFS/S3. Não foi identificada integração Firebase/Supabase nesta revisão; IAM/bucket privado exigem validação do provedor efetivo |
 | 10. Admin protegido | Administração de usuários exige admin; testes HTTP negam elevação por usuário comum; auditar todas as ações privilegiadas |
@@ -128,3 +131,31 @@ Foi feita apenas consulta de configuração no Railway, sem ler valores de
 variáveis, alterar infraestrutura, ativar serviços pagos, chamar Firecrawl ou
 disparar backup de produção. Serviços já existentes continuam no estado
 observado; não se afirma que seus custos correntes estejam zerados.
+
+## Continuação: tarefas e senhas
+
+O PR 24 protege listagem, conclusão e exclusão na consulta ao banco. IDs,
+proprietário e criação vêm do servidor. Tarefas antigas não foram apagadas nem
+atribuídas arbitrariamente: ficam com acesso administrativo até atribuição
+explícita. O painel administrativo agora permite selecionar o responsável.
+A transferência valida o usuário de destino e registra o último ator/data; não
+é um histórico integral. No CI, 123 testes e 23 subtestes passaram, incluindo
+os oito casos HTTP repetidos contra MongoDB descartável e conclusão concorrente.
+
+O PR 25 corrige um truncamento reproduzido no bcrypt fixado no projeto:
+entradas diferentes após 72 bytes eram aceitas como iguais. A API e os helpers
+rejeitam entradas maiores, vazias ou com NUL, preservando espaços e Unicode.
+Novos cadastros exigem no mínimo 8 caracteres; login legado de senha curta é
+preservado. Respostas 422 de autenticação não repetem a entrada do usuário.
+O teste de cadastro expôs também um `_id` interno que causava erro de
+serialização após a gravação; ele foi removido da resposta, junto com o hash.
+O job backend do CI passou com 114 testes e 27 subtestes.
+
+Senhas antigas originalmente maiores que 72 bytes precisam de redefinição
+controlada; não houve migração ou consulta aos valores de produção. A política
+do segredo de bootstrap deve ser verificada antes da publicação.
+
+Documentação de cada PR: `docs/TASK_ACCESS_CONTROL.md` e
+`docs/PASSWORD_INPUT_SECURITY.md`. Ambas as mudanças permanecem fora da
+produção. Não foram ativados serviços pagos ou backups de produção nesta
+continuação. A etapa 1 permanece aberta.
