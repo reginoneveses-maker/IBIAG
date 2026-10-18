@@ -32,7 +32,7 @@ def load_login(db):
           "db": db, "datetime": datetime, "timezone": timezone, "LoginBody": SimpleNamespace,
           "hashlib": hashlib, "HTTPException": HTTPException,
           "ReturnDocument": ReturnDocument, "LOGIN_WINDOW_SECONDS": 900,
-          "LOGIN_MAX_ATTEMPTS": 5,
+          "LOGIN_MAX_ATTEMPTS": 5, "LOGIN_IP_MAX_ATTEMPTS": 30, "Request": SimpleNamespace,
           "verify_pw": lambda supplied, stored: supplied == stored,
           "create_token": lambda uid, email: "test-token"}
     exec(compile(ast.Module(body=[fn], type_ignores=[]), "login_under_test", "exec"), ns)
@@ -48,7 +48,8 @@ class LoginLimiterTests(unittest.IsolatedAsyncioTestCase):
                 "id": "u1", "password_hash": "correct", "name": "User", "role": "user"
             })),
         )
-        self.login = load_login(self.db)
+        self.raw_login = load_login(self.db)
+        self.login = lambda body: self.raw_login(body, SimpleNamespace(client=SimpleNamespace(host="192.0.2.1")))
         self.body = SimpleNamespace(email="USER@example.com", password="wrong")
 
     async def test_five_failures_then_429(self):
