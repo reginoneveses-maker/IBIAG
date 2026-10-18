@@ -2625,6 +2625,9 @@ async def seed_all():
 
 @app.on_event("startup")
 async def startup():
+    # Expired revocations are deleted by MongoDB automatically. TTL cleanup
+    # may be delayed, but JWT expiration remains enforced independently.
+    await db.revoked_access_tokens.create_index("expires_at", expireAfterSeconds=0)
     await db.buyer_search_jobs.update_many({"status": {"$in": ["pending", "running"]}}, {"$set": {"status": "interrupted", "updated_at": now_iso()}})
     await db.leads.create_index("discovery_key", unique=True, sparse=True)
     await seed_all()
