@@ -25,7 +25,8 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
-from safe_errors import install_error_handlers
+from api_security import cors_origins_from, validate_jwt_secret, documentation_options, SecurityResponseMiddleware
+from safe_errors import install_error_handlers, failure_response
 from upload_limits import read_import
 from password_inputs import password_bytes, auth_validation_error
 from fastapi.exceptions import RequestValidationError
@@ -42,7 +43,7 @@ client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=15000, socketTim
 db = client[os.environ['DB_NAME']]
 gridfs = AsyncIOMotorGridFSBucket(db, bucket_name="ibiag_files")
 
-JWT_SECRET = os.environ["JWT_SECRET"]
+JWT_SECRET = validate_jwt_secret(os.environ["JWT_SECRET"])
 JWT_ALG = "HS256"
 APP_NAME = os.environ.get("APP_NAME", "agrobrasil")
 EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
@@ -142,22 +143,16 @@ async def get_current_user(request: Request):
 def now_iso(): return datetime.now(timezone.utc).isoformat()
 
 # ----- App -----
-app = FastAPI(title="IBIAG", version="1.0.0")
+app = FastAPI(title="IBIAG", version="1.0.0", **documentation_options(os.environ))
 install_error_handlers(app)
 app.add_exception_handler(RequestValidationError, auth_validation_error)
 
-# Production CORS. Keep this explicit in production; "*" is only a development fallback.
-cors_origins = [x.strip() for x in os.environ.get("CORS_ORIGINS", "").split(",") if x.strip()]
-if not cors_origins:
-    cors_origins = ["http://localhost:3000", "http://localhost:80"]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Explicit origins and headers; bearer authentication does not use cookies.
+cors_origins = cors_origins_from(os.environ)
+app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
+    allow_credentials=False, allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE","OPTIONS"],
+    allow_headers=["Authorization","Content-Type"], expose_headers=["Retry-After","Content-Disposition"])
+app.add_middleware(SecurityResponseMiddleware, error_response=failure_response, allowed_origins=cors_origins)
 
 api = APIRouter(prefix="/api")
 
@@ -677,7 +672,9 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
         if not published:
             raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)
-    return Response(content=data, media_type=ct)
+    return Response(content=data, media_type="application/octet-stream", headers={
+        "Content-Disposition": "attachment; filename=download",
+        "Content-Security-Policy": "sandbox; default-src 'none'; frame-ancestors 'none'; base-uri 'none'"})
 
 # ============ DOCUMENTS ============
 @api.post("/documents/link-batch")

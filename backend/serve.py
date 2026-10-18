@@ -17,7 +17,7 @@ def server_options(environ):
                 raise ValueError("TRUSTED_PROXY_IPS must contain exact IP addresses") from None
             peers.append(item)
     return dict(host="0.0.0.0", port=int(environ.get("PORT", "8000")),
-                proxy_headers=bool(peers), forwarded_allow_ips=peers)
+                proxy_headers=bool(peers), forwarded_allow_ips=peers, server_header=False, access_log=False)
 
 
 if __name__ == "__main__":

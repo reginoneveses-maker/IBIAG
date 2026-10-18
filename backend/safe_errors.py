@@ -1,6 +1,7 @@
 """Public API failures must not disclose upstream payloads or credentials."""
 import logging
 import uuid
+from api_security import API_HEADERS
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
@@ -15,7 +16,7 @@ def failure_response(status_code):
     return JSONResponse(status_code=status_code,
                         content={"detail": "Serviço temporariamente indisponível. Tente novamente.",
                                  "incident_id": incident},
-                        headers={"Cache-Control": "no-store"})
+                        headers=API_HEADERS)
 
 
 async def safe_http_error(request, exc):
