@@ -215,8 +215,9 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_database_write_cleans_uploaded_object(self):
         with patch.object(server.db, "documents", self.db.documents) as documents, patch.object(documents, "insert_one", side_effect=RuntimeError("write failed")):
-            with self.assertRaisesRegex(RuntimeError, "write failed"):
-                await self.upload()
+            response = await self.upload()
+            self.assertEqual(response.status_code, 500)
+            self.assertNotIn("write failed", response.text)
         self.assertEqual(self.objects, {})
 
     async def test_paginated_search_and_empty_folder_persist(self):
