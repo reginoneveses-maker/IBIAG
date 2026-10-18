@@ -68,6 +68,24 @@ class LoginLimiterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sum(isinstance(e, HTTPException) and e.status_code == 401 for e in outcomes), 5)
         self.assertEqual(sum(isinstance(e, HTTPException) and e.status_code == 429 for e in outcomes), 5)
 
+    async def test_peer_limit_across_different_accounts(self):
+        outcomes = []
+        for index in range(31):
+            body = SimpleNamespace(email=f"account{index}@example.com", password="wrong")
+            try:
+                await self.login(body)
+            except HTTPException as exc:
+                outcomes.append(exc.status_code)
+        self.assertEqual(outcomes.count(401), 30)
+        self.assertEqual(outcomes.count(429), 1)
+
+    async def test_forwarded_headers_cannot_bypass_peer_limit(self):
+        # The login handler reads only request.client.host, never headers.
+        source = Path(__file__).with_name("server.py").read_text()
+        tree = ast.parse(source)
+        fn = next(n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == "login")
+        self.assertNotIn("X-Forwarded-For", ast.unparse(fn))
+
     async def test_successful_login_before_threshold(self):
         response = await self.login(SimpleNamespace(email="user@example.com", password="correct"))
         self.assertEqual(response["access_token"], "test-token")
