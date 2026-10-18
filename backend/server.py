@@ -8,7 +8,7 @@ from starlette.background import BackgroundTask
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, Response, BackgroundTasks, Query
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
@@ -2353,13 +2353,17 @@ class TradeRecord(BaseModel):
     contact_hint: str = ""
 
 @api.get("/trade-data", response_model=List[TradeRecord])
-async def list_trade(country: Optional[str] = None, industry: Optional[str] = None, search: Optional[str] = None, user=Depends(get_current_user)):
+async def list_trade(country: Optional[str] = Query(None, max_length=8),
+                     industry: Optional[str] = Query(None, max_length=64),
+                     search: Optional[str] = Query(None, max_length=128),
+                     user=Depends(get_current_user)):
     q = {}
     if country: q["country_code"] = country
     if industry: q["industry_segment"] = industry
     if search:
-        q["$or"] = [{"importer_company": {"$regex": search, "$options": "i"}},
-                    {"product_description": {"$regex": search, "$options": "i"}}]
+        literal = re.escape(search)
+        q["$or"] = [{"importer_company": {"$regex": literal, "$options": "i"}},
+                    {"product_description": {"$regex": literal, "$options": "i"}}]
     return await db.trade_data.find(q, {"_id": 0}).to_list(500)
 
 @api.post("/trade-data/{tid}/add-to-crm", response_model=Lead)
