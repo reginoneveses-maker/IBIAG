@@ -13,6 +13,7 @@ import TradeIntel from "@/pages/TradeIntel";
 import Templates from "@/pages/Templates";
 import Tasks from "@/pages/Tasks";
 import AccountAccess from "@/pages/AccountAccess";
+import PasswordChange from "@/pages/PasswordChange";
 import Orders from "@/pages/Orders";
 import Inventory from "@/pages/Inventory";
 import ImportCRM from "@/pages/ImportCRM";
@@ -55,6 +56,7 @@ function App() {
                 <Route path="estoque" element={<AdminOnly><Inventory /></AdminOnly>} />
               </Route>
               <Route path="/prospects" element={<Protected><Layout module="crm" /></Protected>}>
+                <Route path="senha" element={<PasswordChange />} />
                 <Route index element={<Dashboard />} />
                 <Route path="catalog" element={<Catalog />} />
                 <Route path="pipeline" element={<Pipeline />} />
