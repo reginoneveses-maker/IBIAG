@@ -3,7 +3,8 @@ import ast
 import asyncio
 import hashlib
 import unittest
-from datetime import datetime, timezone
+import uuid
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -17,11 +18,12 @@ SECRET = "isolated-test-secret-never-used-in-production"
 def load_auth(db):
     tree = ast.parse(Path(__file__).with_name("server.py").read_text())
     selected = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and n.name in {"get_current_user", "logout"}]
+                and n.name in {"create_token", "get_current_user", "logout"}]
     ns = {"jwt": jwt, "JWT_SECRET": SECRET, "JWT_ALG": "HS256",
           "db": db, "hashlib": hashlib, "HTTPException": HTTPException,
           "Request": Request, "Depends": Depends, "datetime": datetime,
-          "timezone": timezone, "api": SimpleNamespace(post=lambda _: lambda fn: fn)}
+          "timezone": timezone, "timedelta": timedelta, "uuid": uuid,
+          "api": SimpleNamespace(post=lambda _: lambda fn: fn)}
     exec(compile(ast.Module(body=selected, type_ignores=[]), "auth_under_test", "exec"), ns)
     return ns
 
@@ -61,6 +63,27 @@ class SessionRevocationTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as error:
                 await self.auth["get_current_user"](SimpleNamespace(headers={"Authorization": auth}))
             self.assertEqual(error.exception.status_code, 401)
+
+    async def test_same_second_logins_have_independent_revocation(self):
+        # Freeze time to reproduce identical tokens before unique session IDs.
+        fixed = datetime.now(timezone.utc)
+        class Clock:
+            @staticmethod
+            def now(tz=None):
+                return fixed
+            fromtimestamp = staticmethod(datetime.fromtimestamp)
+        create = self.auth["create_token"]
+        create.__globals__["datetime"] = Clock
+        first = create("user-1", "user@example.com")
+        second = create("user-1", "user@example.com")
+        self.assertNotEqual(first, second)
+        first_request = SimpleNamespace(headers={"Authorization": "Bearer " + first})
+        second_request = SimpleNamespace(headers={"Authorization": "Bearer " + second})
+        user = await self.auth["get_current_user"](first_request)
+        await self.auth["logout"](first_request, user)
+        with self.assertRaises(HTTPException):
+            await self.auth["get_current_user"](first_request)
+        self.assertEqual(await self.auth["get_current_user"](second_request), user)
 
     async def test_logout_requires_authentication_dependency(self):
         with self.assertRaises(HTTPException):
