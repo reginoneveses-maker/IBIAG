@@ -5,6 +5,8 @@ as conversas “Análise do ExportHub” e “Criar plataforma ExportHub”, con
 com o código, PRs, GitHub Actions e configuração de hospedagem disponível.
 Relatos anteriores não foram tratados como comprovação de produção.
 
+Resultado mais recente: a integração final 9e25b65 passou na pipeline [39119193582](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39119193582): 206 testes backend, 40 subtestes, 257 testes frontend, build e navegador. PRs 29–31 integrados somente na revisão draft 28. Etapa 1 aberta; nada publicado em produção.
+
 ## Ordem preservada
 
 1. Segurança e controle de acesso.
@@ -178,8 +180,8 @@ Pendências técnicas identificadas: limites de ingresso e de recursos dos parse
 
 Nenhuma alteração de aplicação foi enviada a main nesta continuação. Não houve ativação de pesquisas pagas, novos serviços, backups de produção ou consulta a valores secretos. Não se declara a etapa 1 concluída.
 
-O PR 31 corrige uma falha 500 reproduzida pesquisando `[`: filtros passam a usar texto literal, com limites e rejeição de NUL antes do MongoDB. Os três testes HTTP são repetidos com MongoDB descartável em CI. Validação local da composição atual: 174 testes e 40 subtestes passaram; 32 ignorados por falta de MongoDB/recursos externos locais. A pipeline 39118957767 do head final 8f43fd4 passou: 206 testes backend e 40 subtestes, 257 testes frontend, build e navegador. Integrado somente na branch de revisão por 1297480. O resumo backend de CI não contém testes ignorados; a validação local mantém os 32 skips por ambiente. A atualização posterior de documentação na integração tem sua própria pipeline, a conferir antes de publicar.
+O PR 31 corrige uma falha 500 reproduzida pesquisando `[`: filtros passam a usar texto literal, com limites e rejeição de NUL antes do MongoDB. Os três testes HTTP são repetidos com MongoDB descartável em CI. Validação local da composição atual: 174 testes e 40 subtestes passaram; 32 ignorados por falta de MongoDB/recursos externos locais. A pipeline 39118957767 do head final 8f43fd4 passou: 206 testes backend e 40 subtestes, 257 testes frontend, build e navegador. Integrado somente na branch de revisão por 1297480. O resumo backend de CI não contém testes ignorados; a validação local mantém os 32 skips por ambiente. A pipeline 39119193582 da integração final 9e25b65 também passou integralmente, após a atualização de documentação.
 
 Roteiro detalhado de liberação: [SECURITY_RELEASE_VALIDATION.md](SECURITY_RELEASE_VALIDATION.md). Inclui o comportamento já existente de sincronizar senha administrativa e executar seeds/migrações no startup; esses efeitos precisam revisão antes de reiniciar a instalação existente.
 
-Estado deste marco: PRs 29, 30 e 31 integrados somente no PR draft 28; main permanece sem essas alterações de aplicação. As pipelines individuais/composição de código passaram. A pipeline de integração no SHA posterior à atualização da documentação ainda deve ser acompanhada. Nenhuma validação publicada foi realizada, e não há declaração de conclusão integral da etapa 1.
+Estado deste marco: PRs 29, 30 e 31 integrados somente no PR draft 28; main permanece sem essas alterações de aplicação. As pipelines individuais/composição de código passaram. A pipeline final 39119193582, no SHA 9e25b65, passou integralmente. Nenhuma validação publicada foi realizada, e não há declaração de conclusão integral da etapa 1.
