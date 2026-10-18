@@ -79,6 +79,19 @@ class LoginLimiterTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcomes.count(401), 30)
         self.assertEqual(outcomes.count(429), 1)
 
+    async def test_different_peers_have_independent_limits(self):
+        for index in range(30):
+            body = SimpleNamespace(email=f"account{index}@example.com", password="wrong")
+            with self.assertRaises(HTTPException) as result:
+                await self.raw_login(body, SimpleNamespace(client=SimpleNamespace(host="192.0.2.1")))
+            self.assertEqual(result.exception.status_code, 401)
+        with self.assertRaises(HTTPException) as result:
+            await self.raw_login(SimpleNamespace(email="other@example.com", password="wrong"),
+                                 SimpleNamespace(client=SimpleNamespace(host="198.51.100.2")))
+        self.assertEqual(result.exception.status_code, 401)
+        self.assertNotIn("192.0.2.1", str(self.counter.data))
+        self.assertNotIn("198.51.100.2", str(self.counter.data))
+
     async def test_forwarded_headers_cannot_bypass_peer_limit(self):
         # The login handler reads only request.client.host, never headers.
         source = Path(__file__).with_name("server.py").read_text()
