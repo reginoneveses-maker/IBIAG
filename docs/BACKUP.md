@@ -29,3 +29,10 @@ A conferência valida manifesto e contagem de registros, sequência e tamanho do
 Variáveis opcionais: `IBIAG_BACKUP_S3_PREFIX` (padrão `ibiag/database`), `IBIAG_BACKUP_RETENTION_DAYS` (padrão 30). Campos vazios usam os padrões. O upload verifica tamanho e SHA-256 armazenado nos metadados remotos. Exclusão por retenção permanece desativada por padrão e exige `BACKUP_PRUNE_ENABLED=true`.
 
 Não coloque credenciais no repositório ou em mensagens. A cópia externa e a recuperação de dados reais só devem ser consideradas verificadas após uma execução bem-sucedida e um teste isolado com o arquivo gerado.
+# Pausa operacional — 18/10/2026
+
+O agendamento automático foi removido do workflow. Execução manual exige
+autorização explícita do responsável e o campo `authorized=true`; o padrão é
+`false`. Não habilitar agendamento, criar cópias, testar restauração contra
+produção ou ativar armazenamento pago sem autorização. Esta mudança só passa
+a valer após integração na branch padrão. Cópias existentes não são apagadas.

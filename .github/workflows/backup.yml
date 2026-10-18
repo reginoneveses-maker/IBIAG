@@ -1,12 +1,17 @@
 name: IBIAG Database Backup
 
 on:
-  schedule:
-    - cron: "17 3 * * *"
   workflow_dispatch:
+    inputs:
+      authorized:
+        description: "Run only after explicit owner authorization for backup/storage costs"
+        type: boolean
+        required: true
+        default: false
 
 jobs:
   backup:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.authorized == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
