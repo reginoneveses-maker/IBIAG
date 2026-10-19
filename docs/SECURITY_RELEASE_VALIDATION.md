@@ -41,11 +41,21 @@ ativar serviços ou disparar backups para realizar estes passos.
    sem esperar checks. Não alterar configurações que reiniciem serviços sem
    conhecer o efeito. Não criar ambiente/serviço pago como atalho.
 8. Resolver ou aceitar explicitamente com a operação as pendências de código
-   registradas na auditoria: recuperação de senha esquecida/emergência administrativa,
-   conteúdo/malware, concorrência/tempo/CPU globais e auditoria operacional de
-   segredos/privilégios. O código já inclui limites de XML, CSV/XLSX e corpos da API;
+   registradas na auditoria: validar a recuperação operacional de acesso já
+   implementada, conteúdo/malware, capacidade/CPU e auditoria operacional de
+   segredos/privilégios. Os limites de requisições/corpos por worker já têm código
+   e testes; ainda precisam calibração/validação de proxy/hospedagem. O código já inclui limites de XML, CSV/XLSX e corpos da API;
    isso não comprova limites do proxy/socket nem detecção de malware. A auditoria
    offline do histórico Git tem cobertura/filtros e exclusões documentados.
+
+## Diagnóstico antes de publicar, sem deploy
+
+Usar STAGE1_OPERATOR_HANDOFF.md para sessão administrativa do backend existente e
+bootstrap com módulos fixados/verificados, sem copiar credenciais ou executar
+startup. O conector atual só disponibiliza nomes de variáveis. A matriz
+STAGE1_CLOSURE_MATRIX.md mapeia os21 requisitos solicitados. Verificar também o
+serviço ibiag-frontend, que usa backend/Dockerfile e tem ingresso público; definir
+API/frontend canônicos e tratar todos os backends legados sem remoção cega.
 
 ## Evidências depois da publicação controlada
 
