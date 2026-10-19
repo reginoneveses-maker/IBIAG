@@ -28,6 +28,7 @@ from api_security import cors_origins_from, validate_jwt_secret, documentation_o
 from safe_errors import install_error_handlers, failure_response
 from upload_limits import read_import
 from tabular_imports import read_table
+from request_body_limits import RequestBodyLimits
 from invoice_xml import parse_invoice_xml
 from password_inputs import password_bytes, auth_validation_error
 from fastapi.exceptions import RequestValidationError
@@ -158,6 +159,7 @@ app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
     allow_credentials=False, allow_methods=["GET","HEAD","POST","PUT","PATCH","DELETE","OPTIONS"],
     allow_headers=["Authorization","Content-Type"], expose_headers=["Retry-After","Content-Disposition"])
 app.add_middleware(SecurityResponseMiddleware, error_response=failure_response, allowed_origins=cors_origins)
+app.add_middleware(RequestBodyLimits, allowed_origins=cors_origins)
 
 api = APIRouter(prefix="/api")
 
