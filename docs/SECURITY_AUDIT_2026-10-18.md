@@ -2,7 +2,7 @@
 
 ## Resultado desta continuação — 19/10/2026
 
-**Etapa 1 ainda aberta para validação operacional; nenhuma liberação em produção.** PRs 39,40,41,42 e43 implementados, revisados/testados e integrados somente à revisão draft28. Head006da6db8953b18e249ad74b49dafcaa4e2e1e64, árvore3f7db46be6f81897eca725ad0387cb097b7eb3fd idêntica à árvore local. Pipeline do último recurso39305765482 PASSOU:330 testes backend +40 subtestes,268 frontend/14 suítes,build e navegador. Inclui MongoDB descartável real e o teste de contexto Docker sem skips no resumo CI. Pipeline final da composição39306286464 em execução. Local final:260 testes backend/40 subtestes passaram,70 casos de MongoDB/Docker/ambiente ignorados localmente e executados em CI.
+**Etapa 1 ainda aberta para validação operacional; nenhuma liberação em produção.** PRs 39,40,41,42 e43 implementados, revisados/testados e integrados somente à revisão draft28. Head006da6db8953b18e249ad74b49dafcaa4e2e1e64, árvore3f7db46be6f81897eca725ad0387cb097b7eb3fd idêntica à árvore local. Pipeline do último recurso39305765482 PASSOU:330 testes backend +40 subtestes,268 frontend/14 suítes,build e navegador. Inclui MongoDB descartável real e o teste de contexto Docker sem skips no resumo CI. [Pipeline final da composição39306286464](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39306286464) CONCLUÍDA COM SUCESSO:330 backend/40 subtestes,268 frontend/14 suítes,build e navegador, incluindo MongoDB e Docker reais descartáveis. Sem skips no resumo final backend do CI. Local final:260 testes backend/40 subtestes passaram,70 casos de MongoDB/Docker/ambiente ignorados localmente e executados em CI.
 
 ### Implementado, testado e integrado à revisão
 
