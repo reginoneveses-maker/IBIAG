@@ -59,6 +59,7 @@ server.app.router.on_startup = [seed_fixture]
 server.app.router.on_shutdown = []
 build = Path(__file__).resolve().parents[1] / "frontend" / "build"
 server.app.mount("/static", StaticFiles(directory=build / "static"), name="test_static")
+server.app.mount("/brand", StaticFiles(directory=build / "brand"), name="test_brand")
 @server.app.get("/{path:path}")
 async def spa(path: str): return FileResponse(build / "index.html")
 if __name__ == "__main__":

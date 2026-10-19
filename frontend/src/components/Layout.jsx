@@ -114,7 +114,7 @@ const Layout = ({ module = "crm" }) => {
         <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
           {navGroups.map((group) => (
             <div key={group.title}>
-              <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35">{group.title}</div>
+              <div className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/60">{group.title}</div>
               <div className="space-y-1">
                 {group.items.map(({ to, icon: Icon, label, end }) => (
                   <NavLink key={to} to={to} end={end}
@@ -150,7 +150,7 @@ const Layout = ({ module = "crm" }) => {
               <Link to="/" aria-label="Início" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
               <div className="font-display font-extrabold text-[#104496]">{brand.name}</div>
             </div>
-            <div className="hidden lg:flex items-center gap-2 text-xs text-[#104496]/45">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-[#104496]/65">
               <Home className="w-3.5 h-3.5" />
               <span>{module === "gestao" ? "Gestão" : "Prospecção & CRM"}</span>
             </div>
@@ -168,7 +168,7 @@ const Layout = ({ module = "crm" }) => {
           </div>
         </header>
 
-        {mobileOpen && <nav className="lg:hidden bg-[#104496] text-white px-3 py-4 max-h-[70vh] overflow-y-auto">{navGroups.map(group => <div key={group.title} className="mb-4"><div className="px-3 mb-1 text-[10px] uppercase tracking-widest text-white/40">{group.title}</div>{group.items.map(({to,icon:Icon,label,end}) => <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-3 rounded-xl text-sm ${isActive ? "bg-white text-[#104496]" : "text-white/75"}`}><Icon className="w-4 h-4"/>{label}</NavLink>)}</div>)}</nav>}
+        {mobileOpen && <nav className="lg:hidden bg-[#104496] text-white px-3 py-4 max-h-[70vh] overflow-y-auto">{navGroups.map(group => <div key={group.title} className="mb-4"><div className="px-3 mb-1 text-[10px] uppercase tracking-widest text-white/65">{group.title}</div>{group.items.map(({to,icon:Icon,label,end}) => <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({isActive}) => `flex items-center gap-3 px-3 py-3 rounded-xl text-sm ${isActive ? "bg-white text-[#104496]" : "text-white/75"}`}><Icon className="w-4 h-4"/>{label}</NavLink>)}</div>)}</nav>}
 
         <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <Outlet />
