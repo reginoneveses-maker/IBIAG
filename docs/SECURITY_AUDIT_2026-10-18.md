@@ -1,5 +1,29 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Continuação de encerramento — 19/10/2026, após 15h (Fortaleza)
+
+O pedido de finalizar a etapa 1 foi retomado com auditoria do candidato e main antes de editar. Main continua c9e2b6508c3f791e0b7ec2ba9863a9a0bf5dae6a; a aplicação segue na revisão draft 28, sem deploy.
+
+PR 39 implementa recuperação operacional de conta comum/admin por operador já autorizado do host/banco. Sem endpoint público/e-mail/provedor novo, senha em argumento/ambiente ou reset no startup. Dry-run padrão; apply exige TTY real, ID/papel/razão explícitos, referência interna não confidencial, confirmação do alvo e duas entradas ocultas. Fallback com eco aborta. CAS de identidade/hash/geração/estado/histórico impede sobrescrita concorrente. Uma gravação journaled/majority revoga sessões e acrescenta evento sem credenciais; não promove, reativa ou altera dados comerciais. Até 100 eventos por conta, sem apagamento automático. O operador deve verificar identidade por canal confiável; isso não é autenticação de recuperação pública nem MFA.
+
+Pipeline individual 39301894535 PASSOU: 306 backend/40 subtestes, 268 frontend/14 suítes, build e navegador. Sete cenários de recuperação repetiram em MongoDB real com majority/journal; seis testes CLI cobrem TTY, dry-run, confirmações, fallback com eco e redaction. Local:243 testes/40 subtestes passaram,63 casos dependentes de ambiente ignorados localmente e executados no CI. Integrado somente à revisão por fb8debc3e8def6b9ea74399dfd181dd24ad82004; pipeline39302416305 da composição também passou. docs/OPERATOR_ACCESS_RECOVERY.md. Não foi aplicada recuperação em conta publicada.
+
+O PR 40 prepara auditoria operacional somente leitura de configuração/privilégios/IDs/owners/órfãos/objetos GridFS. Retorna apenas flags e contagens, com queries fixas e orçamento; não importa a aplicação/startup, escreve, expõe registros ou acessa S3/provedores. Dados desconhecidos/consulta falha não viram aprovação. production_certified permanece false e validações manuais são explícitas. Local:250 testes/40 subtestes passaram e68 casos de ambiente foram ignorados; a pipeline39302951715 está em andamento. docs/OPERATIONAL_READONLY_AUDIT.md.
+
+### Bloqueios operacionais comprovados
+
+O conector autenticado da hospedagem retornou valuesRedacted=true e nenhuma variável legível: permite metadados, mas não uma sessão de execução/consulta no banco. O CLI oficial foi tentado em diretório temporário; a instalação falhou ao baixar o binário GitHub por timeout de conexão no proxy. Não foi solicitado segredo em chat nem aberto proxy de banco como atalho.
+
+Uma sonda HTTPS sem credenciais para /api/auth/me retornou401, comprovando recusa anônima nessa requisição, mas sem nosniff/no-store. Duas outras sondas (/api/health e /docs) tiveram ReadTimeout; isso é evidência inconclusiva de conectividade e não prova de indisponibilidade da aplicação. Sem teste de senha/login/conta real, carga ou escrita. A versão publicada não comprova os controles novos do candidato.
+
+Metadados mantêm checkSuites=false no backend e nenhum volume listado no serviço MongoDB; os nomes de variáveis não identificam URI real, persistência, privilégios ou storage efetivo. A leitura limitada de logs/fluxos não estabeleceu vínculo conclusivo entre a aplicação e o MongoDB listado, autorização habilitada ou peer confiável. Não deduzir segurança/ausência de dados a partir de ausência de log.
+
+Fechamento exige acesso administrativo de execução no servidor existente, sem compartilhar senhas em conversa: executar a auditoria preparada no ambiente correto, resolver achados sem purgas, comprovar persistência/storage e proxy real, e realizar liberação/fluxos autorizados com rollback conhecido. Conteúdo/malware, capacidade e acesso administrativo/MFA permanecem decisões/evidências operacionais explícitas. Novos serviços pagos e backups seguem dependendo de autorização específica; nada disso foi ativado.
+
+Esta seção substitui status antigos de recuperação inexistente; não declara a etapa 1 concluída.
+
+
+
 ## Estado consolidado em 19/10/2026
 
 PRs 35, 36, 37 e 38 implementados e integrados somente à revisão draft 28. Código final 6bf79c498c302f295cded122c33aa8ae098afb65, árvore 47ed8e8be9de36925f2a481a3655897d9642c65f idêntica à árvore local testada. Pipeline do último recurso 39269316708 passou integralmente: 286 testes backend/40 subtestes, 268 frontend/14 suítes, build e navegador. [Pipeline final da composição 39269897699](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39269897699) CONCLUÍDA COM SUCESSO: 286 testes backend/40 subtestes, 268 frontend em 14 suítes, build e navegador. Sem casos ignorados no resumo final do backend em CI. Main c9e2b65 permanece sem a composição de aplicação; etapa 1 NÃO encerrada.
