@@ -1,5 +1,37 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Atualização em 19/10/2026 — importações, ingresso da API e auditoria offline
+
+**Código validado deste marco:** PRs [35](https://github.com/reginoneveses-maker/IBIAG/pull/35) e [36](https://github.com/reginoneveses-maker/IBIAG/pull/36), integrados somente à branch de revisão do draft [28](https://github.com/reginoneveses-maker/IBIAG/pull/28). Head 93f32a854f5452f38a488e117fbba878dfb6f9b1. [Pipeline final 39267821670](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39267821670): sucesso completo, 278 testes backend + 40 subtestes (MongoDB descartável real), 266 testes frontend em 13 suítes, build e navegador. Main permanece c9e2b6508c3f791e0b7ec2ba9863a9a0bf5dae6a, sem deploy desta composição.
+
+### PR 35 — CSV/XLSX com orçamento de recursos
+
+Leitura comum nas três rotas existentes, sem duplicar importadores. CSV UTF-8/BOM e XLSX: até 10.000 linhas de dados, 128 colunas, 250.000 células e 8 Mi caracteres de texto, além dos limites de upload/ZIP anteriores. Preflight CSV respeita aspas/delimitadores antes do parser; XLSX verifica todos os XMLs, rejeita DTD/entidades, caminhos inseguros, coordenadas esparsas e excesso de estilos/shared strings antes de openpyxl. Workbook em read-only, cached values, sem links externos e fechado ao terminar. Dimensões falsas não permitem truncamento silencioso ou alocação descontrolada. Cabeçalhos normalizados duplicados são recusados. Mensagens 400/413 estáticas. Interface deixa de oferecer .xls, que já não tinha dependência de leitura instalada.
+
+Foram adicionados 12 casos unitários e cinco cenários HTTP repetidos também com MongoDB real no CI: CSV/XLSX com 2.000 empresas, zeros iniciais, isolamento de proprietário/deduplicação, layout IBIAG na terceira linha, comissões e ausência de alteração/deleção quando uma importação é recusada. Pipeline individual 39265563142 e composição 39266184557 passaram: 265 backend/40 subtestes, 266 frontend, build/navegador. Local: 213 backend/40 subtestes passaram e 52 dependentes de ambiente foram ignorados; frontend/build passaram. Documentação: docs/TABULAR_IMPORT_SECURITY.md. Não é antivírus, isolamento de processo, limite global de CPU/concorrência ou validação completa de regras comerciais.
+
+### PR 36 — tamanho efetivamente consumido pela API
+
+Middleware ASGI aplica orçamento padrão de 2 MiB e envelopes explícitos para nove rotas de arquivo (64 MiB nos uploads comuns; 6 MiB para XML; 2/3 MiB para lotes específicos). Rejeita Content-Length inválido/duplicado e combinação ambígua com Transfer-Encoding. Conta os bytes efetivamente consumidos, mesmo sem tamanho declarado ou com tamanho subdeclarado; bloco excedente não é entregue ao parser. Integração com a exceção multipart fecha arquivos temporários parciais antes do retorno 413. Respostas de recusa mantêm headers privados e CORS de origem exata.
+
+Treze novos testes verificam fronteiras, chunks, declaração falsa/ambígua, padrões de rotas, CORS, erros estáticos, resposta já iniciada e HTTP real com stream JSON/multipart e arquivo forçado a spool em disco. Pipeline individual 39267150006 passou; composição final acima também passou. Local: 226 backend/40 subtestes passaram, 52 casos de ambiente ignorados e executados no CI. Documentação: docs/REQUEST_BODY_LIMITS.md. Isso limita consumo dentro da aplicação, não o tráfego no socket/proxy, bodies ignorados, tempo de envio, concorrência global ou efeitos já executados. Proxy real continua sem comprovação.
+
+### Auditoria de segredos — escopo e triagem
+
+Scanner temporário detect-secrets 1.5.0, 27 plugins, sem validação de credenciais pela rede (--no-verify), sem chamadas a provedores. Varredura das referências Git disponíveis/fetched no início deste marco: 302 commits, 946 blobs únicos, 32.212.086 bytes. Foram examinados 860 blobs UTF-8 (14.706.474 bytes); 86 blobs binários ficaram fora, sem OCR/descompactação. Controle positivo sintético no mesmo diretório de varredura foi detectado como GitHub Token e alta entropia; seu valor foi criado offline, nunca utilizado e excluído dos resultados reais.
+
+Resultado bruto: 928 candidatos em 68 versões de arquivos, correspondendo a 25 caminhos. Triagem por contexto: 842 hashes públicos de integridade SHA-512 do lockfile; 78 ocorrências de palavra-chave em fixtures/testes ou identificadores de campos da UI; sete URLs de autenticação sintéticas em testes de recusa; uma chave pública de ingestão de analytics no HTML. Não se identificou credencial privada de produção entre esses candidatos. Isso não prova ausência de segredos: permanecem filtros heurísticos padrão, binários, commits/refs não disponíveis, secrets do CI/hosting, logs, banco, storage e permissões reais fora do escopo. As exceções de allowlist/lockfile/swagger foram desabilitadas; nenhum valor de candidato foi publicado ou validado em provedor. A primeira execução apontou zero por contexto de diretório do CLI; esse resultado foi descartado e a análise acima usa nova execução calibrada. Não houve rotação de credenciais.
+
+A chave pública sinalizou um problema diferente: o HTML inicial carregava scripts remotos de geração e analytics, com configuração de gravação de sessão. Não se comprovou coleta/vazamento. A remoção está isolada no PR 37, ainda sujeita à pipeline antes de integrar.
+
+### Pendências atuais da etapa 1
+
+Recuperação de senha esquecida/emergência administrativa; avaliação e remoção de seeds/migrações destrutivos no startup (há exclusões de produtos/trade/leads condicionadas a marcadores legados); validação do peer real do proxy/allowlist/sanitização de cabeçalhos; privilégios efetivos de banco/storage e auditoria operacional de segredos; ownership/duplicidades/órfãos legados; conteúdo/malware e limites globais de uploads/concorrência; política publicada de chaves/origens; liberação controlada e fluxos reais. Main ainda publica automaticamente sem aguardar a pipeline. A etapa 1 segue aberta. Nenhuma conta real, variável de hosting, serviço pago, chamada de provedor, backup de produção ou deploy foi executado.
+
+Os resumos anteriores abaixo são históricos; esta atualização substitui suas contagens e pendências quando divergirem.
+
+
+
 Resultado mais recente: PR 34 integrado somente à revisão draft 28. A composição b4cfca8 passou integralmente na pipeline [39137199614](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39137199614): 243 testes backend, 40 subtestes, 266 testes frontend, build e navegador. A etapa 1 permanece aberta e não houve publicação de aplicação em produção.
 
 Marco anterior: os PRs 32/33 foram integrados somente na revisão draft 28. A composição a20892a passou integralmente na pipeline [39135986654](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39135986654): 236 testes backend, 40 subtestes, 266 testes frontend, build e navegador. Não houve publicação de aplicação ou alteração de conta em produção. A etapa 1 continua aberta.
