@@ -1,5 +1,16 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Sondas públicas concluídas — 19/10/2026, continuação
+
+Oito GETs sem credenciais, sem redirects e sem leitura de corpos foram concluídos nos hosts ibiag-backend-production.up.railway.app e ibiag-frontend-production.up.railway.app. Em ambos: /api/health retornou200(application/json); /api/auth/me retornou401(application/json); /docs retornou200(text/html); /openapi.json retornou200(application/json). Todas as oito respostas estavam sem X-Content-Type-Options:nosniff e sem Cache-Control:no-store. Não foi enviado Origin: a ausência de Access-Control-Allow-Origin:* nestas respostas não valida a política CORS.
+
+Assim, os timeouts das sondas anteriores não se repetiram nesta execução; não devem ser tratados como evidência atual de indisponibilidade. As duas superfícies públicas de backend estão acessíveis e expõem documentação/schema anonimamente. O401 comprova apenas a negação desse endpoint nessa condição; não comprova isolamento de contas, permissões em outras rotas ou proteção completa da API.
+
+As correções correspondentes já constam do candidato testado do PR28; não devem ser duplicadas. Permanecem necessárias a liberação controlada do candidato e a repetição destas sondas nos dois ingressos após identificar seu uso efetivo. Não desativar o backend legado sem confirmar consumidores. Antes da liberação, executar a auditoria no backend existente e comprovar persistência do banco privado: metadados não mostram volume anexado e a sessão de execução continua indisponível aqui. A exposição de docs/schema é um requisito de endurecimento ainda não atendido na implantação, sem demonstração de acesso a dados comerciais.
+
+Nenhum login, tentativa de senha, consulta de catálogo/CRM, upload, alteração de conta/dados/configuração, deploy, reinício ou serviço pago foi realizado. Esta continuação acrescenta evidência de produção, não novas funcionalidades nem aprovação de encerramento da etapa1.
+
+
 ## Banco privado do Railway — nova evidência operacional, 19/10/2026
 
 Consultas somente leitura de status, DNS e fluxos do serviço ibiag-backend identificaram12 registros de resolução de mongodb.railway.internal, todos NOERROR. Na mesma amostra,69 fluxos de saída na porta27017 tinham destino correspondente aos endereços retornados pelo DNS. Os fluxos estão marcados partial e não identificam peerServiceId. A correlação é evidência de tráfego do backend para o nome privado MongoDB no Railway; não comprova autenticação, sucesso de consultas, nome do banco ou integridade dos registros, nem exclui outros destinos.
