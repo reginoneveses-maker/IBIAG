@@ -1,5 +1,40 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Resultado desta continuação — 19/10/2026
+
+**Etapa 1 ainda aberta para validação operacional; nenhuma liberação em produção.** PRs 39,40,41,42 e43 implementados, revisados/testados e integrados somente à revisão draft28. Head006da6db8953b18e249ad74b49dafcaa4e2e1e64, árvore3f7db46be6f81897eca725ad0387cb097b7eb3fd idêntica à árvore local. Pipeline do último recurso39305765482 PASSOU:330 testes backend +40 subtestes,268 frontend/14 suítes,build e navegador. Inclui MongoDB descartável real e o teste de contexto Docker sem skips no resumo CI. Pipeline final da composição39306286464 em execução. Local final:260 testes backend/40 subtestes passaram,70 casos de MongoDB/Docker/ambiente ignorados localmente e executados em CI.
+
+### Implementado, testado e integrado à revisão
+
+| PR | Resultado e evidência |
+|---|---|
+| 39 +43 | Recuperação operacional protegida de conta comum/admin por operador do host, com dry-run/TTY/confirmação/entrada oculta, CAS, revogação de sessões e evento sem credenciais na mesma gravação. Majority/journal testados em MongoDB. Duplicados por caixa de e-mail legada também recusados, com expressão literal limitada; não promove, reativa, normaliza e-mail ou limpa dados. Sem endpoint público/e-mail/MFA ativado. Pipeline39301894535 passou306 backend;39305765482 passou330 no candidato final. |
+| 40 | Comando somente leitura para autenticação/privilégios/configuração/IDs/owners/órfãos/objetos GridFS. Apenas flags/contagens, consultas fixas e orçamento, sem startup/índices/writes/provedor. Casos de dados reais descartáveis e metadados de autenticação controlados; production_certified sempre false. Pipeline39302951715 passou318 backend/40 subtestes,268 frontend/build/navegador; composição39303511998 também passou. |
+| 41 | .dockerignore protege ambiente/chaves/credenciais/logs/backups/caches/fixtures no contexto das imagens. Teste real Docker FROM scratch/network=none, sem executar container, confirmou26 caminhos sintéticos privados ausentes e10 arquivos necessários presentes. Não leu segredo real nem construiu/publicou imagem completa da aplicação. Pipeline39303673532 passou319 backend/40 subtestes,268 frontend/build/navegador; composição39304141131 também passou. |
+| 42 |16 requisições API ativas por worker,30s idle e300s totais de leitura consumida;503 com Retry-After e408 estáticos/privados/CORS; arquivo multipart parcial fechado e slots liberados em falha/cancelamento. Corpo completo desarma timers para streaming. Nove novos testes +13 casos anteriores passaram; pipeline39304509171 e composição39305099991 passaram328 backend/40 subtestes,268 frontend/build/navegador. |
+
+Os timers/limites são cooperativos por worker e não certificam CPU/memória/processo/proxy/socket; não fazem rollback de writes já executados ou controle de jobs. Os controles anteriores #19–#38 continuam na composição, sem duplicação. Main permanece c9e2b65, sem receber este código.
+
+### Resultado operacional e bloqueio concreto
+
+O acesso Railway existente retorna valuesRedacted=true e apenas nomes de variáveis, sem sessão de execução. Não há agente SSH/token CLI aqui. O download do CLI oficial falhou por timeout no proxy de rede; não houve tentativa de expor banco ou cadastrar credencial como atalho. A pesquisa de integrações encontrou MongoDB Atlas compatível com consultas ao banco existente; foi sugerida a instalação/conexão, ainda não confirmada. Não cria cluster nem autoriza rede pública/serviço pago.
+
+Metadados mostram backend com checkSuites=false e MongoDB listado sem volume montado. O destino real de MONGO_URL, credenciais/escopo, persistência, autenticação/rede e storage efetivo continuam não comprovados. Sondas públicas sem credenciais: /api/auth/me do backend nomeado retornou401 sem nosniff/no-store; /api/health e/docs tiveram ReadTimeout, inclusive uma tentativa com25s. Leitura limitada de logs/fluxos não correlacionou esses acessos nem comprovou saúde, peer real, vínculo do banco ou autorização; os timeouts não são declaração de outage.
+
+**Inventário adicional relevante:** o serviço chamado ibiag-frontend usa backend/Dockerfile, healthcheck de API e domínio público, com nomes de variáveis administrativas/banco. É backend legado, não evidência de senha embutida no frontend. A relação do seu banco com o serviço ibiag-backend é desconhecida. Há ainda ibiag-web e ibiag-frontend-fixed com variáveis de frontend e implantações anteriores. Definir frontend/API canônicos, conferir todos os ingressos públicos e corrigir/migrar/desativar legado com validação antes de encerrar; não deletar/reconfigurar serviços por nomes. Sondas anônimas ao backend legado expiraram, sem leitura de registros.
+
+### Próxima ação necessária para encerrar
+
+Acesso de execução autenticado ao backend existente ou conexão de leitura ao banco atual, sem enviar senha/chave em conversa. [STAGE1_OPERATOR_HANDOFF.md](STAGE1_OPERATOR_HANDOFF.md) contém o comando SSH com alvo explícito e auditoria sem deploy. O bootstrap baixa somente três módulos fixados no commit testado883e063, verifica SHA-256 antes de importar, valida os IDs de ambiente, executa Python isolado e limpa apenas arquivos temporários próprios. Três checks locais sem banco/SSH real passaram (alvo ausente, hash incorreto e import isolado sem configuração); não integram a contagem da pipeline nem comprovam a produção.
+
+Executar a auditoria no alvo correto, resolver achados preservando dados, comprovar persistência/storage/proxy e revisar política de conteúdo/malware/capacidade/acesso administrativo; controlar checks/rollback e publicar o SHA aprovado; validar fluxos com duas contas autorizadas e admin, inclusive recuperação. Auditoria independente/MFA ou recuperação pública não foram implementadas por pressuposição. Backups/restore, novos serviços pagos e mudanças destrutivas continuam sujeitos às restrições do usuário.
+
+**Não houve** deploy/restart, modificação de variável/domínio/volume/conta real, migração/purga, pesquisa/API paga ou backup de produção. A execução preparada é somente leitura; o comando separado de recuperação não foi aplicado em conta publicada.
+
+Matriz explícita dos21 requisitos: [STAGE1_CLOSURE_MATRIX.md](STAGE1_CLOSURE_MATRIX.md). Roteiro: [SECURITY_RELEASE_VALIDATION.md](SECURITY_RELEASE_VALIDATION.md). As seções abaixo são históricas; este resultado substitui status/contagens anteriores quando divergirem.
+
+
+
 ## Continuação de encerramento — 19/10/2026, após 15h (Fortaleza)
 
 O pedido de finalizar a etapa 1 foi retomado com auditoria do candidato e main antes de editar. Main continua c9e2b6508c3f791e0b7ec2ba9863a9a0bf5dae6a; a aplicação segue na revisão draft 28, sem deploy.
