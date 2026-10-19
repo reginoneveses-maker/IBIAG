@@ -42,7 +42,7 @@ test("CRM shortcut opens prefilled draft without saving automatically",async()=>
   expect(screen.getByTestId("ord-customer-input").value).toBe("Existing Buyer");
   expect(screen.getByLabelText("Empresa do CRM").value).toBe("crm1");
   expect(api.post).not.toHaveBeenCalled();
-  expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders");
+  await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
 });
 
 test("CRM picker loads beyond first 250 companies",async()=>{
@@ -81,5 +81,6 @@ test("late shortcut response cannot overwrite a manually opened draft",async()=>
   fireEvent.change(screen.getByTestId("ord-customer-input"),{target:{value:"Manual draft"}});
   await act(async()=>resolve({data:lead}));
   expect(screen.getByTestId("ord-customer-input").value).toBe("Manual draft");
+  await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
   expect(screen.getByLabelText("Empresa do CRM").value).toBe("");
 });

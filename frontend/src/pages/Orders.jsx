@@ -26,15 +26,16 @@ export default function Orders() {
     setForm(record?{...empty,...record,items:(record.items||[]).map(x=>({...x}))}:{...empty,id:crypto.randomUUID(),order_date:new Date().toISOString().slice(0,10),items:[],...(lead?{lead_id:lead.id,customer:lead.company,customer_country:lead.country||""}:{})});
     setCanChangeCustomer(!record || record.status === "draft");
     setIsNew(!record);setDialog(true);
-  },[]);
+    setParams(current=>{const next=new URLSearchParams(current);next.delete("lead");return next;},{replace:true});
+  },[setParams]);
   useEffect(()=>{
     if(!requestedLead || user?.role!=="admin")return;
     let active=true;
     const request=++sourceRequest.current;
-    api.get(`/leads/${encodeURIComponent(requestedLead)}`).then(r=>{if(active && request===sourceRequest.current){setSourceLead(r.data);open(null,r.data);setParams(current=>{const next=new URLSearchParams(current);next.delete("lead");return next;},{replace:true});}})
+    api.get(`/leads/${encodeURIComponent(requestedLead)}`).then(r=>{if(active && request===sourceRequest.current){setSourceLead(r.data);open(null,r.data);}})
       .catch(()=>{if(active && request===sourceRequest.current)toast.error("Não foi possível abrir a empresa do CRM. Nenhum pedido foi criado.");});
     return ()=>{active=false;};
-  },[requestedLead,user?.role,open,setParams]);
+  },[requestedLead,user?.role,open]);
   useEffect(()=>{
     if(!dialog || user?.role!=="admin")return;
     let active=true;
