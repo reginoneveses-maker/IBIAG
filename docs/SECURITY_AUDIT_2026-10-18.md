@@ -1,5 +1,18 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Banco privado do Railway — nova evidência operacional, 19/10/2026
+
+Consultas somente leitura de status, DNS e fluxos do serviço ibiag-backend identificaram12 registros de resolução de mongodb.railway.internal, todos NOERROR. Na mesma amostra,69 fluxos de saída na porta27017 tinham destino correspondente aos endereços retornados pelo DNS. Os fluxos estão marcados partial e não identificam peerServiceId. A correlação é evidência de tráfego do backend para o nome privado MongoDB no Railway; não comprova autenticação, sucesso de consultas, nome do banco ou integridade dos registros, nem exclui outros destinos.
+
+O serviço mongodb existente usa imagem mongo:8, está online com uma réplica e não apresenta volumes anexados, proxies TCP públicos nem nomes de variáveis no inventário. A ausência de volume anexado exige confirmar dbPath e montagem efetiva antes de qualquer reinício/redeploy/migração. Não é prova isolada de perda de dados nem autorização para anexar um volume vazio. Não foi realizada alteração de armazenamento.
+
+Uma busca filtrada pelo aviso de controle de acesso retornou zero entradas: isso não confirma autenticação habilitada. Os logs de runtime recentes do backend incluem startup concluído; isso também não substitui os testes autenticados. O status da hospedagem mostra cinco serviços online e zero falhas recentes, mas não certifica as funções da aplicação. Há um patch staged com changes=[]; ele não foi aplicado.
+
+Próximo passo concreto: sessão de execução autorizada no ibiag-backend existente, usando o roteiro STAGE1_OPERATOR_HANDOFF.md para executar o auditor já preparado. Em paralelo, leitura no container mongodb deve confirmar caminho/montagem e configuração efetiva de autenticação, sem reiniciar ou mover dados. Não abrir o banco publicamente nem criar cluster Atlas como alternativa ao diagnóstico. A conexão Atlas atual não forneceu acesso a esse destino privado.
+
+Nenhum registro pessoal, URI, hash, senha ou resposta bruta de log foi publicado. Nenhum deploy, reinício, backup, migração, provisionamento pago ou alteração de rede foi executado. O SHA de aplicação006da6d permanece inalterado e aprovado no CI; a etapa1 continua pendente de evidência operacional.
+
+
 ## Verificação do conector MongoDB — 19/10/2026
 
 A conexão do plugin MongoDB Atlas foi confirmada nesta continuação. Consultas somente de metadados foram executadas: listagem geral retornou zero projetos e zero clusters; a consulta por organização retornou uma organização e um projeto. Ao listar clusters nesse projeto, a API retornou HTTP404, informando que o alvo não é um projeto Atlas e exige a API do Cloud Manager. Esse resultado não demonstra que o banco da IBIAG esteja vazio, ausente ou indisponível; também não identifica o destino MONGO_URL usado pelo backend.
