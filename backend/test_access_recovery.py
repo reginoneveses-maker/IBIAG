@@ -66,6 +66,19 @@ class AccessRecoveryTests(unittest.IsolatedAsyncioTestCase):
         await self.db.users.insert_one({"id":"duplicate-email","email":"member@example.com"})
         with self.assertRaises(recovery.RecoveryRefused): await self.target()
 
+    async def test_legacy_email_case_twins_are_refused_and_regex_characters_are_literal(self):
+        await self.db.users.update_one({"id":"member"},{"$set":{"email":"operator+recovery@example.com"}})
+        await self.db.users.insert_one({"id":"case-twin","email":"OPERATOR+RECOVERY@EXAMPLE.COM","role":"user"})
+        with self.assertRaises(recovery.RecoveryRefused): await self.target()
+        await self.db.users.delete_one({"id":"case-twin"})
+        await self.db.users.update_one({"id":"member"},{"$set":{"email":"dot.user@example.com"}})
+        await self.db.users.insert_one({"id":"different-email","email":"dotXuser@example.com","role":"user"})
+        self.assertEqual((await self.target())["id"],"member")
+        for email in ("x"*321, "bad\x00@example.com"):
+            await self.db.users.update_one({"id":"member"},{"$set":{"email":email}})
+            with self.assertRaises(recovery.RecoveryRefused): await self.target()
+        self.assertNotIn("session_version",await self.db.users.find_one({"id":"member"}))
+
     async def test_password_policy_and_same_password_refused_without_mutation(self):
         record = await self.target()
         for password in ("short", "a"*73, "é"*37, "a\0long-value", "valid-test-password", 42, "\ud800abcdefgh"):
