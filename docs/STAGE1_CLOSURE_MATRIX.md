@@ -53,3 +53,13 @@ Uma busca filtrada pelo aviso de controle de acesso retornou zero entradas: isso
 Próximo passo concreto: sessão de execução autorizada no ibiag-backend existente, usando o roteiro STAGE1_OPERATOR_HANDOFF.md para executar o auditor já preparado. Em paralelo, leitura no container mongodb deve confirmar caminho/montagem e configuração efetiva de autenticação, sem reiniciar ou mover dados. Não abrir o banco publicamente nem criar cluster Atlas como alternativa ao diagnóstico. A conexão Atlas atual não forneceu acesso a esse destino privado.
 
 Nenhum registro pessoal, URI, hash, senha ou resposta bruta de log foi publicado. Nenhum deploy, reinício, backup, migração, provisionamento pago ou alteração de rede foi executado. O SHA de aplicação006da6d permanece inalterado e aprovado no CI; a etapa1 continua pendente de evidência operacional.
+
+## Sondas públicas concluídas — 19/10/2026, continuação
+
+Oito GETs sem credenciais, sem redirects e sem leitura de corpos foram concluídos nos hosts ibiag-backend-production.up.railway.app e ibiag-frontend-production.up.railway.app. Em ambos: /api/health retornou200(application/json); /api/auth/me retornou401(application/json); /docs retornou200(text/html); /openapi.json retornou200(application/json). Todas as oito respostas estavam sem X-Content-Type-Options:nosniff e sem Cache-Control:no-store. Não foi enviado Origin: a ausência de Access-Control-Allow-Origin:* nestas respostas não valida a política CORS.
+
+Assim, os timeouts das sondas anteriores não se repetiram nesta execução; não devem ser tratados como evidência atual de indisponibilidade. As duas superfícies públicas de backend estão acessíveis e expõem documentação/schema anonimamente. O401 comprova apenas a negação desse endpoint nessa condição; não comprova isolamento de contas, permissões em outras rotas ou proteção completa da API.
+
+As correções correspondentes já constam do candidato testado do PR28; não devem ser duplicadas. Permanecem necessárias a liberação controlada do candidato e a repetição destas sondas nos dois ingressos após identificar seu uso efetivo. Não desativar o backend legado sem confirmar consumidores. Antes da liberação, executar a auditoria no backend existente e comprovar persistência do banco privado: metadados não mostram volume anexado e a sessão de execução continua indisponível aqui. A exposição de docs/schema é um requisito de endurecimento ainda não atendido na implantação, sem demonstração de acesso a dados comerciais.
+
+Nenhum login, tentativa de senha, consulta de catálogo/CRM, upload, alteração de conta/dados/configuração, deploy, reinício ou serviço pago foi realizado. Esta continuação acrescenta evidência de produção, não novas funcionalidades nem aprovação de encerramento da etapa1.
