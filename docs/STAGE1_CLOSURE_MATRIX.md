@@ -33,3 +33,11 @@ A pipeline inteira precisa passar no SHA candidato; os comandos e testes operaci
 Hoje o conector oferece metadados, com valuesRedacted=true, e nenhuma sessão de execução. O download do CLI oficial falhou no proxy. É necessário disponibilizar um caminho de execução administrativa no servidor existente, sem enviar senha/chave em chat nem expor o MongoDB publicamente. Isso é limitação concreta de acesso/verificação, não pedido de autorização para repetir tarefas rotineiras.
 
 Serviços pagos, créditos, backups/restaurações e mudanças destrutivas seguem as restrições explícitas do usuário. A etapa 1 permanece aberta até haver comprovação operacional; testes locais/CI não são substitutos.
+
+## Verificação do conector MongoDB — 19/10/2026
+
+A conexão do plugin MongoDB Atlas foi confirmada nesta continuação. Consultas somente de metadados foram executadas: listagem geral retornou zero projetos e zero clusters; a consulta por organização retornou uma organização e um projeto. Ao listar clusters nesse projeto, a API retornou HTTP404, informando que o alvo não é um projeto Atlas e exige a API do Cloud Manager. Esse resultado não demonstra que o banco da IBIAG esteja vazio, ausente ou indisponível; também não identifica o destino MONGO_URL usado pelo backend.
+
+Não foi obtido connectionId nem foram consultados registros, usuários de banco, credenciais ou configurações de rede. Nenhum projeto/cluster foi criado, migrado, atualizado ou reconfigurado. O conector está conectado, mas o acesso ao banco efetivamente usado pela aplicação permanece sem comprovação. Não se deve criar um cluster para contornar essa diferença: é necessário identificar o banco existente e disponibilizar leitura autorizada nesse alvo, ou executar o auditor pelo backend existente conforme STAGE1_OPERATOR_HANDOFF.md.
+
+O PR28 permanece draft no SHA006da6db8953b18e249ad74b49dafcaa4e2e1e64; a pipeline39306286464 foi consultada novamente e permanece concluída com sucesso. Nenhuma alteração de aplicação ou implantação foi realizada nesta verificação. Os bloqueios operacionais de banco/persistência/storage/proxy/fluxos publicados continuam abertos; a indisponibilidade anterior do plugin não é mais o motivo.
