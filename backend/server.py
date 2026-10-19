@@ -2692,111 +2692,6 @@ async def seed_admin():
                 if not await db.users.find_one({"email": admin_email}, {"id": 1}):
                     raise
 
-async def seed_all():
-    await seed_admin()
-
-    # Products & templates & trade & leads seed (kept same as before)
-    # Official IBIAG Ingredients portfolio 2026. Keep demo records out of production.
-    portfolio_version = "IBIAG-2026-10-01"
-    if await db.settings.find_one({"key": "portfolio_version"}) is None:
-        # The previous installation contained demonstration products. Replace them once with the official portfolio.
-        await db.products.delete_many({})
-        prods = [
-            Product(name="Açaí Extract Powder", category="superfruits", moq="100 KG", specs="Powder extract; organic available", sku="IB-001", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Freeze Dried", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-002", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Pulp (8%, 12%, 14% solids)", category="superfruits", moq="Please request", specs="Single strength / puree; organic available", sku="IB-003", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Soft Mix", category="superfruits", moq="Please request", specs="UHT", sku="IB-004", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Açaí Sorbet", category="superfruits", moq="Please request", specs="Organic available", sku="IB-005", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Dry Extract Powder (17%, 21%, 25% Native Vit C)", category="superfruits", moq="20 KG", specs="Powder extract; organic available", sku="IB-006", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Freeze Dried (17%, 30%, 40% Native Vit C)", category="superfruits", moq="10 KG", specs="Freeze dried; organic available", sku="IB-007", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Acerola Juice", category="superfruits", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-008", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Apple Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-009", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Artichoke Extract Powder", category="herbs_roots", moq="100 KG", specs="Extract powder", sku="IB-010", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Babassu Flour", category="specialties", moq="25 KG", specs="Flour", sku="IB-011", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cajá / Cajá Umbu", category="superfruits", moq="Please request", specs="Juice / puree", sku="IB-012", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Camu Camu Extract Powder", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-013", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Camu Camu Freeze Dried Powder", category="superfruits", moq="10 KG", specs="Freeze dried powder; organic available", sku="IB-014", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cashew Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-015", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Cashew Nuts", category="nuts_seeds", moq="7,938 KG", specs="Nuts; organic available", sku="IB-016", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Catuaba", category="herbs_roots", moq="100 KG", specs="Powder / extract / cut", sku="IB-017", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Flour (Degreased Desiccated)", category="specialties", moq="25 KG", specs="Flour", sku="IB-018", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Milk Concentrated", category="specialties", moq="20 KG", specs="Concentrated coconut milk", sku="IB-019", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Pulp Green Integral", category="specialties", moq="20 KG", specs="Integral green coconut pulp; organic available", sku="IB-020", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Coconut Water", category="juices", moq="Please request", specs="Single strength / clarified-concentrated; organic available", sku="IB-021", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Grape Seed Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-022", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Grape Skin Powder", category="superfruits", moq="3 KG", specs="Powder; organic available", sku="IB-023", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Graviola (Soursop)", category="herbs_roots", moq="Please request", specs="Juice / powder / cut", sku="IB-024", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Complex Powder", category="superfruits", moq="5 KG", specs="Powder", sku="IB-025", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Dry Extract 10% Caffeine", category="superfruits", moq="100 KG", specs="Dry extract", sku="IB-026", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Green Coffee Oil", category="specialties", moq="5 KG", specs="Vegetal oil", sku="IB-027", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Extract Powder (10%, 22% Caffeine)", category="superfruits", moq="100 KG", specs="Extract powder; organic available", sku="IB-028", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Fluid Extract (1.2%, 4-6% Caffeine)", category="superfruits", moq="100 KG", specs="Fluid extract; organic available", sku="IB-029", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Powder", category="superfruits", moq="100 KG", specs="Powder; organic available", sku="IB-030", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guaraná Seed", category="nuts_seeds", moq="100 KG", specs="Grains; organic available", sku="IB-031", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Guava", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-032", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Hibiscus Soluble Tea", category="herbs_roots", moq="100 KG", specs="Soluble tea", sku="IB-033", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Jambu (Paracress)", category="herbs_roots", moq="10 KG", specs="Powder / cut", sku="IB-034", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Lime", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-035", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Lithothamnion Algae Powder", category="specialties", moq="25 KG", specs="Mineral algae powder", sku="IB-036", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Mandarin Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-037", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Melon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-038", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Moringa Powder", category="herbs_roots", moq="20 KG", specs="Powder; organic available", sku="IB-039", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Muirapuama", category="herbs_roots", moq="100 KG", specs="Extract / powder / cut", sku="IB-040", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Ora Pro Nobis (Lemon Vine)", category="herbs_roots", moq="10 KG", specs="Powder / freeze dried; organic available", sku="IB-041", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Orange", category="juices", moq="Please request", specs="Single strength / clarified-concentrated / powder; organic available", sku="IB-042", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Papaya Pulp", category="juices", moq="Please request", specs="Pulp; organic available", sku="IB-043", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Passion Fruit Pulp", category="juices", moq="Please request", specs="Pulp", sku="IB-044", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pau D'Arco", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-045", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pfaffia Paniculata (Brazilian Ginseng) Powder", category="herbs_roots", moq="100 KG", specs="Powder / cut", sku="IB-046", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pineapple Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-047", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Pitaya (Dragon Fruit)", category="superfruits", moq="Please request", specs="Juice / powder", sku="IB-048", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Quercetin", category="specialties", moq="100 KG", specs="Powder", sku="IB-049", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Rutin 70%", category="specialties", moq="100 KG", specs="Powder", sku="IB-050", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Strawberry Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-051", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Tamarind Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-052", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Tangerine Juice", category="juices", moq="Please request", specs="Single strength juice", sku="IB-053", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Watermelon Juice", category="juices", moq="Please request", specs="Juice / clarified-concentrated", sku="IB-054", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate 5/10 Green / Roasted", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-055", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Dry Extract 8-10%", category="herbs_roots", moq="100 KG", specs="Dry extract", sku="IB-056", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Leaves and Stems", category="herbs_roots", moq="100 KG", specs="Cut; organic available", sku="IB-057", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026"),
-            Product(name="Yerba Mate Soluble Tea Green / Roasted", category="herbs_roots", moq="100 KG", specs="Soluble tea; organic available", sku="IB-058", certifications=[], description_en="IBIAG commercial portfolio 2026", description_pt="Portfólio comercial IBIAG 2026")
-        ]
-        await db.products.insert_many([p.model_dump() for p in prods])
-        await db.settings.update_one({"key": "portfolio_version"}, {"$set": {"key": "portfolio_version", "value": portfolio_version, "updated_at": now_iso()}}, upsert=True)
-
-    if await db.templates.count_documents({}) == 0:
-        tps = [
-            MessageTemplate(name_pt="Email Introdução", name_en="Introduction Email", category="intro", language="en",
-                subject="Premium Brazilian Ingredients", body="Dear [Contact],\n\nWe are a Brazilian exporter of premium tropical ingredients (Açaí, Acerola, Coconut Water, Brazil Nuts). Would you be open to a 15-min call?\n\nBest,\n[You]"),
-            MessageTemplate(name_pt="Email Introdução", name_en="Introduction Email", category="intro", language="pt",
-                subject="Ingredientes Brasileiros Premium", body="Prezado(a) [Contato],\n\nSomos exportadores brasileiros de ingredientes tropicais premium. Podemos agendar uma call de 15 min?\n\nAtenciosamente,\n[Você]"),
-            MessageTemplate(name_pt="Follow-up", name_en="Follow-up", category="follow_up", language="en",
-                subject="Following up", body="Hi [Contact],\n\nJust checking in on our last conversation. Any questions I can help with?\n\nBest,\n[You]"),
-            MessageTemplate(name_pt="Follow-up", name_en="Follow-up", category="follow_up", language="pt",
-                subject="Retomando contato", body="Olá [Contato],\n\nRetomando nossa conversa. Alguma dúvida em que posso ajudar?\n\nAbraço,\n[Você]"),
-            MessageTemplate(name_pt="Cotação", name_en="Quotation", category="quotation", language="en",
-                subject="Commercial Quotation", body="Product: [X]\nQty: [X] MT\nPrice: USD [X.XX]/kg FOB Santos\nPayment: [Terms]\nDelivery: [X] weeks"),
-            MessageTemplate(name_pt="Cotação", name_en="Quotation", category="quotation", language="pt",
-                subject="Cotação Comercial", body="Produto: [X]\nQtd: [X] TM\nPreço: USD [X,XX]/kg FOB Santos\nPagamento: [Cond.]\nEntrega: [X] semanas"),
-        ]
-        await db.templates.insert_many([t.model_dump() for t in tps])
-
-    # Production safety: purge the legacy demonstration prospecting dataset once.
-    demo_cleanup_version = "prospecting-demo-cleanup-v1"
-    if await db.settings.find_one({"key": demo_cleanup_version}) is None:
-        await db.trade_data.delete_many({})
-        await db.leads.delete_many({"$or": [
-            {"email": {"$regex": "@.*\\.example$", "$options": "i"}},
-            {"source": "trade_data", "company": {"$in": [
-                "Green Nordic Beverages AB", "Bio Cosmétique Paris SAS"
-            ]}}
-        ]})
-        await db.settings.update_one(
-            {"key": demo_cleanup_version},
-            {"$set": {"key": demo_cleanup_version, "value": "done", "updated_at": now_iso()}},
-            upsert=True
-        )
-
 @app.on_event("startup")
 async def startup():
     # Expired revocations are deleted by MongoDB automatically. TTL cleanup
@@ -2805,7 +2700,9 @@ async def startup():
     await db.login_attempts.create_index("expires_at", expireAfterSeconds=0)
     await db.buyer_search_jobs.update_many({"status": {"$in": ["pending", "running"]}}, {"$set": {"status": "interrupted", "updated_at": now_iso()}})
     await db.leads.create_index("discovery_key", unique=True, sparse=True)
-    await seed_all()
+    # Startup is not authorization to replace a catalog or purge legacy CRM.
+    # Keep create-only access bootstrap separate from business migrations.
+    await seed_admin()
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()
