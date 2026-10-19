@@ -7,6 +7,7 @@ from fastapi import HTTPException, UploadFile
 import httpx
 from mongomock_motor import AsyncMongoMockClient
 import upload_limits
+import tabular_imports
 
 with patch.dict(os.environ, {"MONGO_URL":"mongodb://localhost:27017", "DB_NAME":"upload_test",
                              "JWT_SECRET":"test-secret-only-32-characters-long"}):
@@ -36,8 +37,8 @@ class UploadLimitsTests(unittest.IsolatedAsyncioTestCase):
         await db.users.insert_one({"id":"admin","email":"test@example.com","role":"admin"})
         token = server.create_token("admin","test@example.com")
         with patch.object(server,"db",db), patch.object(upload_limits,"MAX_IMPORT_BYTES",16), \
-             patch.object(server.pd,"read_excel",side_effect=AssertionError("parser must not run")), \
-             patch.object(server.pd,"read_csv",side_effect=AssertionError("parser must not run")):
+             patch.object(tabular_imports,"load_workbook",side_effect=AssertionError("parser must not run")), \
+             patch.object(tabular_imports.csv,"reader",side_effect=AssertionError("parser must not run")):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),base_url="http://test",
                                         headers={"Authorization":"Bearer "+token}) as client:
                 for path in ("/api/leads/import", "/api/portfolio/import-xlsx", "/api/portfolio/restore-commissions", "/api/invoices/parse-xml"):

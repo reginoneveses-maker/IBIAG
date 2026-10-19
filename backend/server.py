@@ -12,7 +12,6 @@ from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadF
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 import os, logging, uuid, bcrypt, jwt, requests, io, re, unicodedata
-import pandas as pd
 from comexstat_client import ncm_search, general as comex_general
 from comexstat_market import normalize_markets
 from buyer_discovery import discover_buyers, discover_decision_maker, enrich_company, DISCOVERY_VERSION
@@ -28,6 +27,7 @@ from pymongo.errors import DuplicateKeyError
 from api_security import cors_origins_from, validate_jwt_secret, documentation_options, SecurityResponseMiddleware
 from safe_errors import install_error_handlers, failure_response
 from upload_limits import read_import
+from tabular_imports import read_table
 from invoice_xml import parse_invoice_xml
 from password_inputs import password_bytes, auth_validation_error
 from fastapi.exceptions import RequestValidationError
@@ -1809,11 +1809,7 @@ class PortfolioImportResult(BaseModel):
 async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = True, dry_run: bool = False, user=Depends(get_current_user)):
     """Import the official IBIAG product/supplier matrix. Sheet IBIAG, header row 3."""
     require_admin(user)
-    raw = await read_import(file)
-    try:
-        df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
-    except Exception as e:
-        raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {e}")
+    df = (await read_table(file, sheet_name="IBIAG", header=2)).fillna("")
 
     def clean(v):
         if v is None: return ""
@@ -1922,11 +1918,8 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
 async def restore_portfolio_commissions(file: UploadFile = File(...), dry_run: bool = True, user=Depends(get_current_user)):
     """Restore only commission fields; preserve IDs, prices and document links."""
     require_admin(user)
-    raw = await read_import(file)
-    try:
-        df = pd.read_excel(io.BytesIO(raw), sheet_name="IBIAG", header=2, dtype=object).fillna("")
-    except Exception as exc:
-        raise HTTPException(400, f"Não foi possível ler a aba IBIAG: {exc}")
+    df = (await read_table(file, sheet_name="IBIAG", header=2)).fillna("")
+
     df.columns = [str(c).strip() for c in df.columns]
     if not {"Produto", "Fornecedor", "Comissão"}.issubset(df.columns):
         raise HTTPException(400, "Planilha sem Produto, Fornecedor ou Comissão")
@@ -2026,22 +2019,7 @@ def _norm_company(value: str) -> str:
 
 @api.post("/leads/import", response_model=LeadImportResult)
 async def import_leads(file: UploadFile = File(...), user=Depends(get_current_user)):
-    name = (file.filename or "").lower()
-    raw = await read_import(file)
-    try:
-        if name.endswith(".xlsx") or name.endswith(".xls"):
-            df = pd.read_excel(io.BytesIO(raw))
-        elif name.endswith(".csv"):
-            try:
-                df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
-            except Exception:
-                df = pd.read_csv(io.BytesIO(raw), sep=";")
-        else:
-            raise HTTPException(400, "Use CSV or XLSX")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(400, f"Could not read file: {e}")
+    df = await read_table(file)
 
     df = df.fillna("")
     df.columns = [_norm_col(c) for c in df.columns]
