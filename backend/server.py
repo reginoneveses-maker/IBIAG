@@ -332,6 +332,7 @@ class SalesOrder(BaseModel):
     number: str = ""
     customer: str
     customer_country: str = ""
+    lead_id: str = Field(default="", max_length=200, pattern=r"^[^\x00]*$")
     products: str = ""
     incoterm: str = "FOB"
     total_usd: float = 0
@@ -1211,6 +1212,28 @@ async def save_order_workflow(order, create=False):
             raise HTTPException(409, "Pedido arquivado")
         if previous and int(order.version or 0) != int(previous.get("version") or 0):
             raise HTTPException(409, "Pedido alterado por outra operação. Recarregue antes de salvar.")
+        # Older API clients may omit the new relationship. Never erase it as a
+        # side effect of an unrelated update, nor rewrite a commercial snapshot.
+        if previous and "lead_id" not in order.model_fields_set:
+            order.lead_id = previous.get("lead_id", "")
+        previous_lead = (previous or {}).get("lead_id", "")
+        if previous and previous.get("status") != "draft" and order.lead_id != previous_lead:
+            raise HTTPException(409, "O cliente do CRM só pode ser alterado em rascunho.")
+        if order.lead_id:
+            matches = await db.leads.find({"id": order.lead_id}, {"company": 1, "country": 1}).limit(2).to_list(2)
+            if not matches:
+                raise HTTPException(404, "Empresa do CRM não encontrada")
+            if len(matches) != 1:
+                raise HTTPException(409, "Identificador duplicado no CRM. Revise o cadastro antes de vincular.")
+            lead = matches[0]
+            if previous and previous_lead == order.lead_id:
+                order.customer = previous["customer"]
+                order.customer_country = previous.get("customer_country", "")
+            else:
+                if not isinstance(lead.get("company"), str) or not lead["company"].strip() or not isinstance(lead.get("country", ""), str):
+                    raise HTTPException(400, "Revise nome e país da empresa no CRM antes de vincular.")
+                order.customer = lead["company"]
+                order.customer_country = lead.get("country", "")
         products, orders, purchases = await business_snapshot()
         offers = await db.product_offers.find({}, {"_id": 0}).to_list(None)
         try:
@@ -2178,10 +2201,16 @@ async def assign_lead_owner(lid: str, body: LeadOwnerBody, user=Depends(get_curr
 
 @api.delete("/leads/{lid}")
 async def del_lead(lid: str, user=Depends(get_current_user)):
-    result = await db.leads.delete_one(lead_scope(user, {"id": lid}))
-    if not result.deleted_count: raise HTTPException(404, "Empresa não encontrada")
-    await db.interactions.delete_many({"lead_id": lid})
-    return {"deleted": 1}
+    # Serialize with order saves so deletion cannot race relationship creation.
+    async with business_write_lock() as ensure_owned:
+        await require_lead(db, user, lid)
+        if await db.orders.find_one({"lead_id": lid}, {"_id": 1}):
+            raise HTTPException(409, "Empresa vinculada a pedido não pode ser excluída.")
+        await ensure_owned()
+        result = await db.leads.delete_one(lead_scope(user, {"id": lid}))
+        if not result.deleted_count: raise HTTPException(404, "Empresa não encontrada")
+        await db.interactions.delete_many({"lead_id": lid})
+        return {"deleted": 1}
 
 @api.get("/interactions", response_model=List[Interaction])
 async def list_int(lead_id: Optional[str] = None, user=Depends(get_current_user)):

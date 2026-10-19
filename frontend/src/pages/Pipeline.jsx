@@ -306,6 +306,7 @@ const Pipeline = () => {
               {externalUrl(detailLead?.source_url) && <a className="underline" href={externalUrl(detailLead.source_url)} target="_blank" rel="noreferrer">Fonte da empresa</a>}
               {externalUrl(detailLead?.decision_source_url) && <a className="underline" href={externalUrl(detailLead.decision_source_url)} target="_blank" rel="noreferrer">Fonte do decisor</a>}
             </div>
+            {user?.role === "admin" && <Link className="block underline text-sm" to={`/prospects/orders?lead=${encodeURIComponent(detailLead?.id || "")}`}>Criar pedido para esta empresa</Link>}
             <div className="text-sm">Telefone da empresa: {detailLead?.phone || "Não encontrado"}</div>
             <div className="text-xs">{detailLead?.enrichment_message}</div>
             {detailLead?.contact_source_urls?.map(url=>externalUrl(url)&&<a key={url} className="block underline text-xs" href={externalUrl(url)} target="_blank" rel="noreferrer">Fonte dos contatos: {url}</a>)}
