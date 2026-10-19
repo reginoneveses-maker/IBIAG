@@ -50,3 +50,15 @@ antes das operações. Topologia, timeouts, sanitização de headers e limites d
 terminador real continuam exigindo validação publicada. Validar amostras/fluxos
 autorizados antes de publicar. Somente dados sintéticos foram usados, sem ativar
 serviços pagos, pesquisas externas ou backups.
+
+## Espera do corpo e capacidade por worker
+
+O candidato limita a 16 requisições API ativas por processo, incluindo leitura e resposta. A próxima recebe 503 estático com Retry-After:1, headers privados e CORS exato antes de entrar na aplicação. Slots são liberados em finally, inclusive em falha e cancelamento. Não cria fila ilimitada nem serviço/contador externo; vários workers/réplicas multiplicam esse orçamento e exigem dimensionamento operacional.
+
+A leitura consumida tem orçamento de 30 segundos sem novo bloco e 300 segundos totais desde a entrada no middleware. Um envio em gotejamento não renova o orçamento total. A espera excedida cancela receive e gera exceção multipart compatível com fechamento de temporários, substituindo eventual 400 interno por 408 estático. O orçamento é cooperativo: um receive que não respeite cancelamento ou CPU síncrona bloqueada pode atrasar a interrupção. Não é limite rígido de CPU/tempo de transação. O corpo concluído desarma esses timers para o listener de desconexão de respostas em streaming.
+
+Nove testes adicionais verificam envio parado/em gotejamento, read cancelado, capacidade compartilhada e recuperação de slots, falha/cancelamento externo, listener após corpo completo, resposta/erro após início, configuração inválida e HTTP multipart lento com arquivo forçado a spool em disco e fechado. Não houve carga em produção. Testes de ASGI/HTTPX não comprovam buffers, framing, TLS, limites de socket ou comportamento do proxy real.
+
+As novas recusas não cancelam trabalho já autorizado, fazem rollback ou limitam arquivos já armazenados; o contador é por worker e não quota por usuário/IP. Corpos que a aplicação ignora, cabeçalhos lentos, streams de saída, memória total e concorrência de jobs requerem proteção/capacidade da hospedagem. Validar uploads legítimos nas conexões da operação antes de publicar; não aumentar infraestrutura/limites ou custos automaticamente.
+
+Referência: [asyncio.wait_for no Python 3.11](https://docs.python.org/3.11/library/asyncio-task.html#asyncio.wait_for).
