@@ -18,6 +18,16 @@ const base = "http://127.0.0.1:8765";
     assert(ready, "Test server did not start");
     browser = await chromium.launch({headless:true, args:["--no-sandbox"]});
     const page = await browser.newPage({viewport:{width:1280,height:900}});
+    // Deny external requests before navigation: tests must never contact telemetry
+    // or provider endpoints. Record executable/data requests without their URLs.
+    const externalDataRequests=[];
+    await page.context().route("**/*", route=>{
+      const request=route.request();
+      if(new URL(request.url()).origin === base) return route.continue();
+      if(["script","fetch","xhr","websocket","eventsource"].includes(request.resourceType()))
+        externalDataRequests.push(request.resourceType());
+      return route.abort();
+    });
     const errors=[];page.on("pageerror", e=>errors.push(e.message));
     const login = await page.request.post(base+"/api/auth/login", {data:{email:"test@example.com",password:"browser-test"}});
     assert.equal(login.status(),200);
@@ -199,6 +209,8 @@ const base = "http://127.0.0.1:8765";
     assert.equal((await page.request.get(base+"/api/auth/me",{headers:adminHeaders})).status(),401);
     assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-test"}})).status(),401);
     assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-updated-test"}})).status(),200);
+    assert.deepEqual(externalDataRequests,[],"Portal attempted external scripts/data requests");
+    assert.equal(await page.evaluate(()=>typeof window.posthog),"undefined");
     assert.deepEqual(errors,[]);
     console.log("PASS browser: search → decision → CRM → reload → company documents → folder upload → download → move → reload");
   } finally {
