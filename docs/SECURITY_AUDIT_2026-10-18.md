@@ -1,5 +1,31 @@
 # ExportHub / IBIAG — auditoria e execução de 18/10/2026
 
+## Estado consolidado em 19/10/2026
+
+PRs 35, 36, 37 e 38 implementados e integrados somente à revisão draft 28. Código final 6bf79c498c302f295cded122c33aa8ae098afb65, árvore 47ed8e8be9de36925f2a481a3655897d9642c65f idêntica à árvore local testada. Pipeline do último recurso 39269316708 passou integralmente: 286 testes backend/40 subtestes, 268 frontend/14 suítes, build e navegador. Pipeline final da composição 39269897699 em execução. Main c9e2b65 permanece sem a composição de aplicação; etapa 1 NÃO encerrada.
+
+## Marco de 19/10/2026 — telemetria e startup
+
+O PR 37 removeu o script remoto da plataforma de geração, a inicialização de analytics/gravação de sessão e o handler que suprimia erros de runtime. Pipeline individual 39268585108 e composição 39269033682 passaram integralmente: 278 testes backend/40 subtestes, 268 frontend em 14 suítes, build e navegador. O navegador bloqueia requisições externas antes de navegar e falha em tentativa de script/fetch/XHR externo durante os fluxos; as telas e fotografias locais continuam funcionando. Inspeção local do HTML compilado confirmou somente um bundle JavaScript local. A interceptação é política do teste, não firewall da produção. Fontes/imagens/links externos ainda podem existir. Integrado somente na revisão por 782d2b2; docs/PORTAL_PRIVACY.md. Nenhuma conta do fornecedor ou dado de analytics foi acessado/apagado; não se comprovou coleta ou vazamento anterior.
+
+O PR 38 removeu seed_all e suas purgas/substituições comerciais; o startup chama diretamente o bootstrap de acesso create-only já testado. Dois testes falharam antes da correção, reproduzindo perda de dados sem marcadores e carga inesperada em banco vazio. Quatro cenários depois passaram em mock e são repetidos com MongoDB real: marcadores ausentes/presentes, vínculos/IDs preservados, bootstrap idempotente com índices TTL e falha por usuários duplicados sem exclusão comercial. Integrado somente na revisão por 6bf79c4. Local: 230 backend/40 subtestes passaram, 56 casos de ambiente ignorados; Pipeline individual 39269316708 passou com 286 testes backend/40 subtestes, 268 frontend/14 suítes, build e navegador, incluindo os quatro cenários com MongoDB descartável real. Startup ainda cria índices e marca jobs pending/running como interrupted; leases/múltiplos workers e duplicidades legadas exigem avaliação separada. Instalações vazias precisam de cadastro/importação comercial aprovado; a remoção não recupera dados apagados por código anterior. docs/STARTUP_DATA_SAFETY.md e docs/DEPLOYMENT.md.
+
+### Metadados de hospedagem conferidos em 19/10 — somente leitura
+
+Backend continua vinculado a main e source.checkSuites=false; portanto o gate de checks antes de publicação não está ativo. Os nomes de variáveis do backend não incluem TRUSTED_PROXY_IPS, STORAGE_PROVIDER ou ALLOW_PAID_DISCOVERY; valores não foram consultados. Isso não comprova o peer real, qual storage/banco é usado, origens/flags efetivas ou comportamento publicado. O serviço MongoDB listado usa imagem mongo:8 e não apresenta volume montado nem nomes de variáveis nos metadados retornados. Não há proxy TCP público listado. É necessário identificar o destino real de MONGO_URL e comprovar persistência, autenticação/rede e privilégios: não se pode inferir segurança, perda de dados ou relação desse serviço com a aplicação apenas desses metadados. O CI usa MongoDB 7 descartável, não uma cópia do banco publicado.
+
+Não há alterações staged no ambiente. Nenhuma variável, domínio, volume, bucket, conta, deploy, restart, backup ou serviço pago foi alterado/ativado. Não se deve anexar volume sobre arquivos existentes nem reiniciar/mover banco como teste. O plano de preservação/migração precisa ser revisável antes de qualquer ação e respeitar autorização específica para backups/serviços pagos. A checagem de persistência é bloqueio de liberação e foi acrescentada ao roteiro SECURITY_RELEASE_VALIDATION.md.
+
+A auditoria offline deste marco classificou os 928 candidatos em 842 hashes públicos de integridade de pacotes, 81 ocorrências em testes/fixtures sintéticos, quatro identificadores de teste da UI e uma chave pública de ingestão de analytics. Limites de cobertura permanecem na seção anterior.
+
+
+### Continuidade de requisitos
+
+A recuperação de contexto não encontrou registros verificáveis com os títulos exatos das duas conversas pedidas. Trechos relacionados recuperados reforçam segurança/isolamento e a ordem anteriormente sugerida (segurança → operação única → calculadora/lucro → automações → dashboard → integrações), mas incluem afirmações antigas de assistente que não são evidência de implementação/teste. Não foi encontrada política específica verificável de recuperação de senha/emergência ou canal de e-mail aprovado. A implementação/testes desta continuação têm o repositório e as pipelines como evidência; não foram ativados mecanismos de recuperação ou novos provedores com base em suposições. MFA/auditoria independente e comprovação de storage privado/legados continuam exigindo avaliação, sem substituição por testes unitários.
+
+Os marcos abaixo são históricos; o estado consolidado acima substitui contagens/pendências anteriores quando divergirem.
+
+
 ## Atualização em 19/10/2026 — importações, ingresso da API e auditoria offline
 
 **Código validado deste marco:** PRs [35](https://github.com/reginoneveses-maker/IBIAG/pull/35) e [36](https://github.com/reginoneveses-maker/IBIAG/pull/36), integrados somente à branch de revisão do draft [28](https://github.com/reginoneveses-maker/IBIAG/pull/28). Head 93f32a854f5452f38a488e117fbba878dfb6f9b1. [Pipeline final 39267821670](https://github.com/reginoneveses-maker/IBIAG/actions/runs/39267821670): sucesso completo, 278 testes backend + 40 subtestes (MongoDB descartável real), 266 testes frontend em 13 suítes, build e navegador. Main permanece c9e2b6508c3f791e0b7ec2ba9863a9a0bf5dae6a, sem deploy desta composição.
