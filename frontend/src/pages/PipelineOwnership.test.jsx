@@ -25,12 +25,14 @@ test("ordinary user cannot see assignment control or request user directory",asy
   useAuth.mockReturnValue({user:{id:"alice",role:"user"}});
   mount(); await screen.findByRole("heading",{name:/Existing Company/});
   expect(screen.queryByLabelText("Responsável pelo cadastro")).toBeNull();
+  expect(screen.queryByRole("link",{name:"Criar pedido para esta empresa"})).toBeNull();
   expect(api.get).not.toHaveBeenCalledWith("/auth/users");
 });
 test("administrator explicitly assigns a legacy CRM record",async()=>{
   useAuth.mockReturnValue({user:{id:"admin",role:"admin"}});
   api.patch.mockResolvedValue({data:{...lead,owner_id:"alice"}});
   mount(); const selector=await screen.findByLabelText("Responsável pelo cadastro");
+  expect(screen.getByRole("link",{name:"Criar pedido para esta empresa"}).getAttribute("href")).toBe("/prospects/orders?lead=legacy");
   await screen.findByRole("option",{name:"Alice"});
   fireEvent.change(selector,{target:{value:"alice"}});
   await waitFor(()=>expect(api.patch).toHaveBeenCalledWith("/leads/legacy/owner",{owner_id:"alice"}));
