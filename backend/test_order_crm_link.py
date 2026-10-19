@@ -147,6 +147,12 @@ class OrderCrmLinkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.delete("/api/leads/lead1", headers=self.headers())).status_code, 409)
         self.assertEqual(await self.db.leads.count_documents({"id": "lead1"}), 1)
 
+    async def test_unrelated_user_is_denied_before_competing_for_erp_lock(self):
+        async with server.business_write_lock():
+            response = await self.client.delete("/api/leads/lead1", headers=self.headers("stranger"))
+            self.assertEqual(response.status_code, 404, response.text)
+        self.assertEqual(await self.db.leads.count_documents({"id": "lead1"}), 1)
+
     async def test_concurrent_order_create_and_lead_delete_never_leave_orphan(self):
         results = await asyncio.gather(self.create(), self.client.delete("/api/leads/lead1", headers=self.headers()))
         self.assertTrue(all(r.status_code in {200, 404, 409} for r in results))

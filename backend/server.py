@@ -2201,6 +2201,8 @@ async def assign_lead_owner(lid: str, body: LeadOwnerBody, user=Depends(get_curr
 
 @api.delete("/leads/{lid}")
 async def del_lead(lid: str, user=Depends(get_current_user)):
+    # Reject unrelated CRM users before acquiring a shared ERP write lock.
+    await require_lead(db, user, lid)
     # Serialize with order saves so deletion cannot race relationship creation.
     async with business_write_lock() as ensure_owned:
         await require_lead(db, user, lid)

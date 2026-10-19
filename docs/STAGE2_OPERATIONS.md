@@ -16,13 +16,13 @@ O manual ExportHub_Manual_de_Uso.docx de07/10 descreve outro artefato publicado,
 - Alterar depois o CRM não reescreve a identidade histórica do pedido. Ao salvar novamente com o mesmo vínculo, o servidor preserva nome e país já registrados.
 - Vínculo pode ser trocado/removido apenas se o estado armazenado do pedido for rascunho. Confirmados, embarcados, entregues e cancelados não podem trocar de empresa por este fluxo.
 - Cliente manual continua disponível. Pedidos antigos sem lead_id continuam válidos; clientes antigos que omitem o campo ao atualizar não apagam um vínculo existente. Não há associação por semelhança de nome nem migração automática.
-- Empresas vinculadas a qualquer pedido, inclusive arquivado/cancelado, não podem ser excluídas. A verificação e a gravação de pedidos compartilham a trava existente para evitar referência órfã por concorrência. A autorização de CRM é aplicada antes de informar conflito ao solicitante.
+- Empresas vinculadas a qualquer pedido, inclusive arquivado/cancelado, não podem ser excluídas. A verificação e a gravação de pedidos compartilham a trava existente para evitar referência órfã por concorrência. A autorização de CRM é aplicada antes de adquirir a trava compartilhada e novamente dentro dela antes de informar conflito ao solicitante.
 - A lista carrega empresas em páginas de250, oferece nova tentativa após erro e ignora respostas tardias ao trocar de fluxo/fechar formulário. Link no pedido retorna à ficha existente do CRM.
 - Pedidos e seus valores continuam administrativos; não há concessão de acesso financeiro ao proprietário comum da empresa. Perfis por setor exigem desenho e validação próprios.
 
 ## Validação
 
-backend/test_order_crm_link.py executa as rotas HTTP reais com base isolada: identidade canônica, listagem persistida, referências inválidas/operadores/NUL, permissões, preservação histórica/clientes antigos/versão, transições, cliente manual, exclusão protegida e concorrência. Os mesmos nove cenários são executados também com MongoDB local descartável quando TEST_MONGO_URL é fornecido; somente localhost/127.0.0.1/mongo são permitidos.
+backend/test_order_crm_link.py executa as rotas HTTP reais com base isolada: identidade canônica, listagem persistida, referências inválidas/operadores/NUL, permissões, preservação histórica/clientes antigos/versão, transições, cliente manual, exclusão protegida e concorrência. Os mesmos dez cenários são executados também com MongoDB local descartável quando TEST_MONGO_URL é fornecido; somente localhost/127.0.0.1/mongo são permitidos.
 
 frontend/src/pages/Orders.test.jsx verifica seleção, atalho, paginação, falha/repetição, histórico e resposta tardia. PipelineOwnership.test.jsx verifica o atalho restrito ao admin. O fluxo Chromium existente percorre CRM→rascunho de pedido→recarregar→CRM→documentos e confirma um único pedido e nenhuma conta gerada pelo rascunho. Provedores externos continuam bloqueados/simulados no teste.
 
