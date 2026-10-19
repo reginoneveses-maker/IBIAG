@@ -114,6 +114,7 @@ const base = "http://127.0.0.1:8765";
     assert.equal(await page.getByTestId("ord-customer-input").inputValue(),"ABC-Ingredients");
     assert(await page.getByTestId("ord-customer-input").evaluate(el=>el.readOnly));
     assert.equal(await page.getByLabel("Empresa do CRM",{exact:true}).inputValue(),crmLeadId);
+    await page.waitForURL(url=>!url.searchParams.has("lead"));
     await page.getByTestId("save-order-button").click();
     await page.getByRole("link",{name:"Ver empresa no CRM",exact:true}).waitFor();
     const orderResponse=await page.request.get(base+"/api/orders",{headers:{Authorization:"Bearer "+access_token}});

@@ -11,7 +11,7 @@ const selectClass = "border rounded-md p-2 bg-white w-full text-sm";
 
 export default function Orders() {
   const { user } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const requestedLead = params.get("lead");
   const sourceRequest = useRef(0);
   const [leads, setLeads] = useState([]), [sourceLead, setSourceLead] = useState(null);
@@ -31,10 +31,10 @@ export default function Orders() {
     if(!requestedLead || user?.role!=="admin")return;
     let active=true;
     const request=++sourceRequest.current;
-    api.get(`/leads/${encodeURIComponent(requestedLead)}`).then(r=>{if(active && request===sourceRequest.current){setSourceLead(r.data);open(null,r.data);}})
+    api.get(`/leads/${encodeURIComponent(requestedLead)}`).then(r=>{if(active && request===sourceRequest.current){setSourceLead(r.data);open(null,r.data);setParams(current=>{const next=new URLSearchParams(current);next.delete("lead");return next;},{replace:true});}})
       .catch(()=>{if(active && request===sourceRequest.current)toast.error("Não foi possível abrir a empresa do CRM. Nenhum pedido foi criado.");});
     return ()=>{active=false;};
-  },[requestedLead,user?.role,open]);
+  },[requestedLead,user?.role,open,setParams]);
   useEffect(()=>{
     if(!dialog || user?.role!=="admin")return;
     let active=true;

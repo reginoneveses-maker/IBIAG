@@ -17,7 +17,7 @@ O manual ExportHub_Manual_de_Uso.docx de07/10 descreve outro artefato publicado,
 - Vínculo pode ser trocado/removido apenas se o estado armazenado do pedido for rascunho. Confirmados, embarcados, entregues e cancelados não podem trocar de empresa por este fluxo.
 - Cliente manual continua disponível. Pedidos antigos sem lead_id continuam válidos; clientes antigos que omitem o campo ao atualizar não apagam um vínculo existente. Não há associação por semelhança de nome nem migração automática.
 - Empresas vinculadas a qualquer pedido, inclusive arquivado/cancelado, não podem ser excluídas. A verificação e a gravação de pedidos compartilham a trava existente para evitar referência órfã por concorrência. A autorização de CRM é aplicada antes de adquirir a trava compartilhada e novamente dentro dela antes de informar conflito ao solicitante.
-- A lista carrega empresas em páginas de250, oferece nova tentativa após erro e ignora respostas tardias ao trocar de fluxo/fechar formulário. Link no pedido retorna à ficha existente do CRM.
+- A lista carrega empresas em páginas de250, oferece nova tentativa após erro e ignora respostas tardias ao trocar de fluxo/fechar formulário. O parâmetro do atalho é consumido ao abrir o formulário, evitando reabertura automática na recarga. Link no pedido retorna à ficha existente do CRM.
 - Pedidos e seus valores continuam administrativos; não há concessão de acesso financeiro ao proprietário comum da empresa. Perfis por setor exigem desenho e validação próprios.
 
 ## Validação

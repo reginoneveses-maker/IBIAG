@@ -1,6 +1,6 @@
 import React from "react";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import Orders from "./Orders";
 import { api, useAuth } from "@/AuthContext";
 import { toast } from "sonner";
@@ -12,7 +12,8 @@ jest.mock("@/components/ui/dialog",()=>({
   DialogTitle:({children})=><h2>{children}</h2>,DialogFooter:({children})=><div>{children}</div>
 }));
 const lead={id:"crm1",company:"Existing Buyer",country:"Portugal"};
-const mount=(url="/prospects/orders")=>render(<MemoryRouter initialEntries={[url]}><Orders/></MemoryRouter>);
+function LocationEcho(){const location=useLocation();return <output data-testid="current-route">{location.pathname+location.search}</output>;}
+const mount=(url="/prospects/orders")=>render(<MemoryRouter initialEntries={[url]}><Orders/><LocationEcho/></MemoryRouter>);
 beforeEach(()=>{
   jest.clearAllMocks();
   Object.defineProperty(global,"crypto",{configurable:true,value:{randomUUID:()=>"new-order"}});
@@ -41,6 +42,7 @@ test("CRM shortcut opens prefilled draft without saving automatically",async()=>
   expect(screen.getByTestId("ord-customer-input").value).toBe("Existing Buyer");
   expect(screen.getByLabelText("Empresa do CRM").value).toBe("crm1");
   expect(api.post).not.toHaveBeenCalled();
+  expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders");
 });
 
 test("CRM picker loads beyond first 250 companies",async()=>{
