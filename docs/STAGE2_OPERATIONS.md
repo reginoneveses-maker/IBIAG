@@ -32,10 +32,14 @@ Resultados concretos da execução/CI serão registrados no PR desta entrega. N�
 
 O vínculo adicional reutiliza a calculadora e a tabela de preços existentes. A memória canônica é conferida e preservada no rascunho; mudança da revisão exige nova conferência. Não equivale a cotação comercial aprovada nem confirma venda. Ver SAVED_PRICE_ORDER_DRAFT.md. A etapa1 continua pendente; nenhuma entrega está publicada.
 
+## Terceira entrega: embarque completo manual
+
+Implementação vinculada ao pedido existente, com responsável, rota/modal, datas, estados e histórico limitado. Reutiliza a gravação e os saldos do ERP, sem ativar tracking ou outra cobrança. Ver ORDER_SHIPMENTS.md para contrato, limites e testes. Desenvolvimento não equivale à liberação em produção.
+
 ## Próximas entregas, uma de cada vez
 
 1. Ampliar os vínculos operacionais sobre os cadastros existentes: oportunidade/cotação→pedido, mantendo histórico e aprovação explícita. Cotações não devem criar pedidos/contas implicitamente.
-2. Embarques manuais reais vinculados a pedidos: responsáveis, origem/destino, modal, datas previstas/reais, status e histórico. Sem ativar tracking pago.
+2. Homologar o embarque completo manual vinculado ao pedido; desenhar embarques parciais/devoluções separadamente antes de qualquer ampliação. Sem ativar tracking pago.
 3. Documentos operacionais vinculados ao processo: reutilizar armazenamento/pastas/autorização; emissão de Invoice/Packing List e aprovação precisam de implementação e conferência próprias.
 4. Gestão diária e indicadores derivados dos registros, filtros, alertas internos e histórico permanente. Não apresentar exemplos ou inferências como operação concluída.
 5. Validar fluxo integrado oportunidade→cotação→pedido→embarque→documentação→recebimento e importação/deduplicação/relatórios. Integrações externas somente depois da configuração e homologação autorizadas.
