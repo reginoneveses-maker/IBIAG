@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/AuthContext";
 import { useLang } from "@/i18n";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,11 +12,51 @@ import { toast } from "sonner";
 
 const Tasks = () => {
   const { t } = useLang();
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
+  const [owners, setOwners] = useState([]);
+  const [assigning, setAssigning] = useState({});
   const [form, setForm] = useState({ title: "", description: "", due_date: "" });
 
   const load = () => api.get("/tasks").then(r => setTasks(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    if (user?.role === "admin") {
+      api.get("/auth/users").then(r => { if (active) setOwners(r.data.filter(owner => owner.active !== false)); })
+        .catch(() => { if (active) toast.error("Não foi possível carregar os responsáveis."); });
+    } else setOwners([]);
+    return () => { active = false; };
+  }, [user?.role]);
+
+  const assignOwner = async (task, ownerId) => {
+    if (!ownerId) return;
+    setAssigning(current => ({...current, [task.id]: true}));
+    try {
+      const response = await api.patch(`/tasks/${task.id}/owner`, {owner_id: ownerId});
+      setTasks(current => current.map(item => item.id === task.id ? response.data : item));
+      toast.success("Responsável atualizado.");
+    } catch {
+      toast.error("Não foi possível alterar o responsável.");
+    } finally {
+      setAssigning(current => ({...current, [task.id]: false}));
+    }
+  };
+
+  const ownerControl = task => user?.role === "admin" && (
+    <label className="block text-xs text-[#0F382C]/70 mt-2">
+      Responsável
+      <select aria-label={`Responsável: ${task.title}`} value={task.owner_id || ""}
+        disabled={!!assigning[task.id] || !owners.length}
+        onChange={event => assignOwner(task, event.target.value)}
+        className="block mt-1 rounded border border-[#0F382C]/20 p-1 bg-white">
+        <option value="" disabled>Sem responsável</option>
+        {task.owner_id && !owners.some(owner => owner.id === task.owner_id) &&
+          <option value={task.owner_id}>Responsável indisponível</option>}
+        {owners.map(owner => <option key={owner.id} value={owner.id}>{owner.name || owner.email}</option>)}
+      </select>
+    </label>
+  );
 
   const add = async () => {
     if (!form.title.trim()) return;
@@ -61,6 +102,7 @@ const Tasks = () => {
                 <div className="font-semibold text-[#0F382C]">{x.title}</div>
                 {x.description && <div className="text-sm text-[#0F382C]/70 mt-1 whitespace-pre-wrap">{x.description}</div>}
                 {x.due_date && <div className="text-xs text-amber-700 mt-1 flex items-center gap-1"><Calendar className="w-3 h-3" />{x.due_date}</div>}
+                {ownerControl(x)}
               </div>
               <button onClick={() => del(x.id)} data-testid={`del-task-${x.id}`} className="text-rose-600 hover:bg-rose-50 p-1 rounded"><Trash2 className="w-4 h-4" /></button>
             </CardContent>
@@ -77,6 +119,7 @@ const Tasks = () => {
                   <div className="flex-1">
                     <div className="font-semibold text-[#0F382C] line-through">{x.title}</div>
                     {x.due_date && <div className="text-xs text-[#0F382C]/50">{x.due_date}</div>}
+                    {ownerControl(x)}
                   </div>
                   <button onClick={() => del(x.id)} className="text-rose-600 hover:bg-rose-50 p-1 rounded"><Trash2 className="w-4 h-4" /></button>
                 </CardContent>

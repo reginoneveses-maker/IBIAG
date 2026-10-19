@@ -39,9 +39,9 @@ const ImportCRM = () => {
           <div className="rounded-xl border-2 border-dashed border-[#0F382C]/15 p-8 text-center">
             <Database className="w-10 h-10 mx-auto text-amber-600 mb-3" />
             <div className="font-semibold text-[#0F382C]">Arquivo do CRM atual</div>
-            <div className="text-sm text-[#0F382C]/60 mt-1">CSV ou XLSX · pode conter as 1.500 empresas de uma vez</div>
+            <div className="text-sm text-[#0F382C]/60 mt-1">CSV ou XLSX · até 10.000 linhas por arquivo; divida lotes maiores</div>
             <input
-              type="file" accept=".csv,.xlsx,.xls"
+              type="file" accept=".csv,.xlsx"
               onChange={e => setFile(e.target.files?.[0] || null)}
               className="mt-4 block w-full text-sm"
               data-testid="crm-import-file"

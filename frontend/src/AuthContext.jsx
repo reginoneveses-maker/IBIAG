@@ -7,7 +7,7 @@ export const API = `${BACKEND_URL}/api`;
 export const api = axios.create({ baseURL: API });
 api.interceptors.request.use((cfg) => {
   const t = localStorage.getItem("token");
-  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  if (t && !cfg.headers.Authorization) cfg.headers.Authorization = `Bearer ${t}`;
   return cfg;
 });
 
@@ -21,8 +21,8 @@ export const AuthProvider = ({ children }) => {
     const t = localStorage.getItem("token");
     if (!t) { setLoading(false); return; }
     api.get("/auth/me")
-      .then(r => setUser(r.data))
-      .catch(() => { localStorage.removeItem("token"); })
+      .then(r => { if (localStorage.getItem("token") === t) setUser(r.data); })
+      .catch(() => { if (localStorage.getItem("token") === t) localStorage.removeItem("token"); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -40,12 +40,38 @@ export const AuthProvider = ({ children }) => {
     return r.data.user;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Capture the session before clearing browser state. Explicit headers keep
+    // this request tied to the old session if another login starts meanwhile.
+    const token = localStorage.getItem("token");
     localStorage.removeItem("token");
     setUser(null);
+    if (token) {
+      try {
+        await api.post("/auth/logout", null, {
+          headers: { Authorization: `Bearer ${token}` }, timeout: 10000,
+        });
+        return true;
+      } catch {
+        // Local logout succeeds even offline; remote revocation is unconfirmed.
+        return false;
+      }
+    }
+    return true;
   };
 
-  return <AuthCtx.Provider value={{ user, login, register, logout, loading }}>{children}</AuthCtx.Provider>;
+  const changePassword = async (currentPassword, newPassword) => {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Session ended");
+    await api.post("/auth/password", {current_password: currentPassword, new_password: newPassword},
+      {headers: {Authorization: `Bearer ${token}`}, timeout: 15000});
+    if (localStorage.getItem("token") === token) {
+      localStorage.removeItem("token");
+      setUser(null);
+    }
+  };
+
+  return <AuthCtx.Provider value={{ user, login, register, logout, changePassword, loading }}>{children}</AuthCtx.Provider>;
 };
 
 export const useAuth = () => useContext(AuthCtx);

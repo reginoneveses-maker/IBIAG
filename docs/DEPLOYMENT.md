@@ -7,8 +7,7 @@
 - One central MongoDB database.
 - One central S3-compatible object-storage bucket for documents (AWS S3, Cloudflare R2, MinIO or equivalent).
 - Secrets configured only in the hosting provider / CI, never in Git.
-- Daily database backup to separate storage.
-- Restore test before production launch.
+- Backup/restore and additional services require explicit operator authorization; the backup schedule remains paused. Do not provision infrastructure or incur provider credits automatically.
 
 ## Required production secrets
 
@@ -44,19 +43,25 @@ Backup:
 Frontend build:
 - REACT_APP_BACKEND_URL
 
-## Deployment order
+## Security candidate status
 
-1. Create managed MongoDB.
-2. Create S3-compatible object storage and set `STORAGE_PROVIDER=s3`.
+The stage-1 security composition is a draft review candidate, not a release approval. Follow docs/SECURITY_RELEASE_VALIDATION.md in the audit branch and complete proxy, storage/database privileges, legacy-data and controlled-production checks before deployment. Main currently auto-deploys without waiting for CI; merging is a release action.
+
+Startup creates only the configured administrator when absent; it does not reset an existing password, promote an existing account, seed business tables or run the old catalog/prospecting purges. An empty installation remains empty until the operator supplies approved business data through the existing screens/imports. Existing data and migration markers are preserved. See docs/STARTUP_DATA_SAFETY.md for remaining startup effects.
+
+## Deployment order (only after validation and authorization)
+
+1. Validate the existing MongoDB deployment and least-privilege access. Provision a new paid service only with explicit authorization.
+2. Validate the existing storage backend and permissions. Configure S3 only if separately approved; do not change storage provider implicitly.
 3. Deploy backend container and configure secrets. Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` for the first administrator.
 4. Verify `/api/health`.
 5. Deploy frontend with `REACT_APP_BACKEND_URL` pointing to the backend HTTPS URL.
 6. Configure DNS and TLS.
 7. Run login, product, supplier, document, CRM and buyer-discovery smoke tests.
-8. Run a real database backup.
-9. Restore the backup into an isolated database and verify record counts.
+8. If separately authorized, run a database backup without exposing credentials or writing to unapproved storage.
+9. If separately authorized, restore into an isolated test database and verify records; do not overwrite production.
 10. Only then switch the production domain to the new deployment.
 
 ## Important
 
-The repository is deployment-ready, but external infrastructure and credentials are intentionally not stored in GitHub. Production is not considered live until the steps above are executed and the restore test succeeds.
+The repository contains a candidate requiring validation. Infrastructure, credentials, proxy behavior and real workflows need operational evidence; passing CI alone does not prove production readiness. No backup, paid integration, migration or deployment is authorized merely by this document.

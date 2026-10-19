@@ -30,7 +30,7 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
                 raise server.HTTPException(404, "Arquivo não encontrado")
             return self.objects[path]
         async def delete(path): self.objects.pop(path, None)
-        self.patches = [patch.object(server, "db", self.db), patch.object(server, "put_object", put),
+        self.patches = [patch.dict(os.environ, {"ALLOW_PAID_DISCOVERY":"true"}), patch.object(server, "db", self.db), patch.object(server, "put_object", put),
                         patch.object(server, "get_object", get), patch.object(server, "delete_object", delete)]
         for p in self.patches: p.start()
         token = server.create_token("u", "test@example.com")
@@ -215,8 +215,9 @@ class CompanyDocumentsApiTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failed_database_write_cleans_uploaded_object(self):
         with patch.object(server.db, "documents", self.db.documents) as documents, patch.object(documents, "insert_one", side_effect=RuntimeError("write failed")):
-            with self.assertRaisesRegex(RuntimeError, "write failed"):
-                await self.upload()
+            response = await self.upload()
+            self.assertEqual(response.status_code, 500)
+            self.assertNotIn("write failed", response.text)
         self.assertEqual(self.objects, {})
 
     async def test_paginated_search_and_empty_folder_persist(self):

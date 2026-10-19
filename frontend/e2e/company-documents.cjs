@@ -18,6 +18,16 @@ const base = "http://127.0.0.1:8765";
     assert(ready, "Test server did not start");
     browser = await chromium.launch({headless:true, args:["--no-sandbox"]});
     const page = await browser.newPage({viewport:{width:1280,height:900}});
+    // Deny external requests before navigation: tests must never contact telemetry
+    // or provider endpoints. Record executable/data requests without their URLs.
+    const externalDataRequests=[];
+    await page.context().route("**/*", route=>{
+      const request=route.request();
+      if(new URL(request.url()).origin === base) return route.continue();
+      if(["script","fetch","xhr","websocket","eventsource"].includes(request.resourceType()))
+        externalDataRequests.push(request.resourceType());
+      return route.abort();
+    });
     const errors=[];page.on("pageerror", e=>errors.push(e.message));
     const login = await page.request.post(base+"/api/auth/login", {data:{email:"test@example.com",password:"browser-test"}});
     assert.equal(login.status(),200);
@@ -169,6 +179,38 @@ const base = "http://127.0.0.1:8765";
     await page.reload();
     await page.getByRole("button",{name:"Baixar spec-guarana.pdf",exact:true}).waitFor();
     assert.equal(await page.getByRole("button",{name:"Baixar spec-manga.pdf",exact:true}).count(),0);
+    // Isolated fixture only: administrative suspension must revoke an existing
+    // member session, and reactivation must never resurrect that token.
+    const adminHeaders={Authorization:`Bearer ${access_token}`};
+    const memberCredentials={email:"access-test@example.com",password:"browser-member-test"};
+    const createdAccount=await page.request.post(base+"/api/auth/users",{headers:adminHeaders,data:{...memberCredentials,name:"Access test",role:"user"}});
+    assert.equal(createdAccount.status(),200);
+    const memberLogin=await page.request.post(base+"/api/auth/login",{data:memberCredentials});
+    assert.equal(memberLogin.status(),200);
+    const memberHeaders={Authorization:`Bearer ${(await memberLogin.json()).access_token}`};
+    await page.getByRole("link",{name:"Acesso da equipe",exact:true}).click();
+    await page.getByRole("button",{name:"Suspender conta",exact:true}).click();
+    await page.getByRole("button",{name:"Confirmar suspensão",exact:true}).click();
+    await page.getByRole("button",{name:"Reativar conta",exact:true}).waitFor();
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:memberHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:memberCredentials})).status(),401);
+    await page.getByRole("button",{name:"Reativar conta",exact:true}).click();
+    await page.getByRole("button",{name:"Confirmar reativação",exact:true}).click();
+    await page.getByRole("button",{name:"Suspender conta",exact:true}).waitFor();
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:memberHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:memberCredentials})).status(),200);
+    await page.getByRole("link",{name:"Alterar senha",exact:true}).click();
+    await page.getByLabel("Senha atual",{exact:true}).fill("browser-test");
+    await page.getByLabel("Nova senha",{exact:true}).fill("browser-updated-test");
+    await page.getByLabel("Confirmar nova senha",{exact:true}).fill("browser-updated-test");
+    await page.getByRole("button",{name:"Alterar senha e encerrar sessões",exact:true}).click();
+    await page.waitForURL(base+"/login");
+    assert.equal(await page.evaluate(()=>localStorage.getItem("token")),null);
+    assert.equal((await page.request.get(base+"/api/auth/me",{headers:adminHeaders})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-test"}})).status(),401);
+    assert.equal((await page.request.post(base+"/api/auth/login",{data:{email:"test@example.com",password:"browser-updated-test"}})).status(),200);
+    assert.deepEqual(externalDataRequests,[],"Portal attempted external scripts/data requests");
+    assert.equal(await page.evaluate(()=>typeof window.posthog),"undefined");
     assert.deepEqual(errors,[]);
     console.log("PASS browser: search → decision → CRM → reload → company documents → folder upload → download → move → reload");
   } finally {
