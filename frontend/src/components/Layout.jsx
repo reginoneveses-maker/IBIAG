@@ -46,6 +46,7 @@ const groups = (module, t) => module === "gestao"
         { to: "/gestao/procedimentos", icon: ClipboardList, label: "Procedimentos" },
       ]},
       { title: "Estoque & Logística", items: [
+        { to: "/gestao/embarques", icon: ShoppingCart, label: "Embarques" },
         { to: "/gestao/estoque", icon: Warehouse, label: "Estoque" },
       ]},
     ]
@@ -69,6 +70,7 @@ const groups = (module, t) => module === "gestao"
         { to: "/prospects/orders", icon: ShoppingCart, label: "Pedidos" },
       ]},
       { title: "Estoque & Logística", items: [
+        { to: "/gestao/embarques", icon: ShoppingCart, label: "Embarques" },
         { to: "/prospects/inventory", icon: Boxes, label: "Estoque" },
       ]},
       { title: "Gestão", items: [

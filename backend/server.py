@@ -21,6 +21,7 @@ from document_categories import normalize_document, matches_document, validate_c
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from pricing import decimal_number, calculate_price
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
+from order_shipments import build_shipment, allowed_statuses as shipment_statuses, SUMMARY_FIELDS as SHIPMENT_SUMMARY_FIELDS
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -336,6 +337,7 @@ class SalesOrder(BaseModel):
     source_price_id: str = Field(default="", max_length=200, pattern=r"^[^\x00]*$")
     source_price_revision: str = Field(default="", max_length=64, pattern=r"^(?:[0-9a-f]{64})?$")
     source_price_snapshot: dict = Field(default_factory=dict)
+    shipment: dict = Field(default_factory=dict)
     products: str = ""
     incoterm: str = "FOB"
     total_usd: float = 0
@@ -352,6 +354,26 @@ class SalesOrder(BaseModel):
     finance_paid_date: str = ""
     version: int = 0
     deleted_at: str = ""
+
+class ShipmentInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+    version: int = Field(ge=0)
+    status: Literal["planned", "booked", "in_transit", "arrived", "delivered", "cancelled"]
+    mode: Literal["sea", "air", "road", "rail", "multimodal"]
+    reference: str = Field(min_length=1, max_length=120, pattern=r"^[^\x00]*$")
+    origin: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00]*$")
+    destination: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00]*$")
+    responsible_id: str = Field(min_length=1, max_length=200, pattern=r"^[^\x00]*$")
+    carrier: str = Field(default="", min_length=0, max_length=160, pattern=r"^[^\x00]*$")
+    booking_reference: str = Field(default="", min_length=0, max_length=120, pattern=r"^[^\x00]*$")
+    transport_reference: str = Field(default="", min_length=0, max_length=160, pattern=r"^[^\x00]*$")
+    planned_departure: str = Field(min_length=10, max_length=10, pattern=r"^[^\x00]*$")
+    planned_arrival: str = Field(min_length=10, max_length=10, pattern=r"^[^\x00]*$")
+    actual_departure: str = Field(default="", min_length=0, max_length=10, pattern=r"^[^\x00]*$")
+    actual_arrival: str = Field(default="", min_length=0, max_length=10, pattern=r"^[^\x00]*$")
+    actual_delivery: str = Field(default="", min_length=0, max_length=10, pattern=r"^[^\x00]*$")
+    notes: str = Field(default="", min_length=0, max_length=2000, pattern=r"^[^\x00]*$")
+    change_note: str = Field(min_length=3, max_length=300, pattern=r"^[^\x00]*$")
 
 class FinanceEntry(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -1204,7 +1226,7 @@ def version_query(record):
         return {"id": record["id"], "version": version}
     return {"id": record["id"], "version": {"$in": [None, 0]}}
 
-async def save_order_workflow(order, create=False):
+async def save_order_workflow(order, create=False, shipment_input=None, shipment_actor=None):
     async with business_write_lock() as ensure_owned:
         previous = await db.orders.find_one({"id": order.id}, {"_id": 0})
         if not create and not previous:
@@ -1215,6 +1237,28 @@ async def save_order_workflow(order, create=False):
             raise HTTPException(409, "Pedido arquivado")
         if previous and int(order.version or 0) != int(previous.get("version") or 0):
             raise HTTPException(409, "Pedido alterado por outra operação. Recarregue antes de salvar.")
+        stored_shipment = (previous or {}).get("shipment") or {}
+        if shipment_input is not None:
+            require_admin(shipment_actor)
+            try:
+                # Read the commercial fields from the locked current record,
+                # never from a second pre-lock read or the logistics request.
+                order = SalesOrder(**previous)
+                responsibles = await db.users.find({"id": shipment_input.responsible_id},
+                    {"id": 1, "name": 1, "email": 1, "active": 1, "role": 1}).to_list(2)
+                responsible = responsibles[0] if len(responsibles) == 1 else None
+                order.shipment, order.status = build_shipment(previous,
+                    shipment_input.model_dump(exclude={"version", "change_note"}), shipment_actor,
+                    responsible, shipment_input.change_note, now_iso(), datetime.now(timezone.utc).date())
+            except OverflowError as exc:
+                raise HTTPException(413, str(exc)) from None
+            except (ValueError, TypeError):
+                raise HTTPException(400, "Revise situação, responsável, datas e regras do embarque.") from None
+        else:
+            order.shipment = stored_shipment
+            if stored_shipment and order.status != previous.get("status"):
+                if stored_shipment.get("status") != "cancelled" or order.status not in {"draft", "confirmed", "cancelled"}:
+                    raise HTTPException(409, "Use o fluxo de embarque para alterar a situação deste pedido.")
         if previous:
             stored_source = previous.get("source_price_id", "")
             if "source_price_id" in order.model_fields_set and order.source_price_id != stored_source:
@@ -1320,6 +1364,33 @@ async def create_ord(o: SalesOrder, user=Depends(get_admin_user)):
 async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_admin_user)):
     o.id = oid
     return await save_order_workflow(o)
+
+def shipment_order_view(record):
+    return {**{key: record.get(key) for key in ("id", "number", "customer", "status", "version")},
+            "shipment": record.get("shipment") or {}, "allowed_statuses": shipment_statuses(record)}
+
+@api.get("/orders/{oid}/shipment")
+async def get_order_shipment(oid: str, user=Depends(get_admin_user)):
+    record = await db.orders.find_one({"id": oid}, {"_id": 0})
+    if not record:
+        raise HTTPException(404, "Pedido não encontrado")
+    return shipment_order_view(record)
+
+@api.put("/orders/{oid}/shipment")
+async def put_order_shipment(oid: str, body: ShipmentInput, user=Depends(get_admin_user)):
+    record = await save_order_workflow(SalesOrder(id=oid, customer="", version=body.version),
+                                       shipment_input=body, shipment_actor=user)
+    return shipment_order_view(record)
+
+@api.get("/shipments")
+async def list_shipments(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
+                         status: Optional[Literal["planned", "booked", "in_transit", "arrived", "delivered", "cancelled"]] = None,
+                         archived: bool = False, user=Depends(get_admin_user)):
+    query = {"shipment.status": status if status else {"$exists": True},
+             "deleted_at": {"$nin": [None, ""]} if archived else {"$in": [None, ""]}}
+    projection = {"_id": 0, **{key: 1 for key in ("id", "number", "customer", "status", "version")},
+                  **{"shipment." + key: 1 for key in SHIPMENT_SUMMARY_FIELDS}}
+    return await db.orders.find(query, projection).sort("id", 1).skip(skip).limit(limit).to_list(limit)
 
 @api.delete("/orders/{oid}")
 async def del_ord(oid: str, user=Depends(get_admin_user)):

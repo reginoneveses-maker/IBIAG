@@ -15,6 +15,7 @@ import Tasks from "@/pages/Tasks";
 import AccountAccess from "@/pages/AccountAccess";
 import PasswordChange from "@/pages/PasswordChange";
 import Orders from "@/pages/Orders";
+import Shipments from "@/pages/gestao/Shipments";
 import Inventory from "@/pages/Inventory";
 import ImportCRM from "@/pages/ImportCRM";
 import GestaoHome from "@/pages/gestao/GestaoHome";
@@ -52,6 +53,7 @@ function App() {
                 <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
                 <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
+                <Route path="embarques" element={<AdminOnly><Shipments /></AdminOnly>} />
                 <Route path="pedidos" element={<AdminOnly><Orders /></AdminOnly>} />
                 <Route path="estoque" element={<AdminOnly><Inventory /></AdminOnly>} />
               </Route>

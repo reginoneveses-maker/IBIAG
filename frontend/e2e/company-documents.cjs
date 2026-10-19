@@ -170,6 +170,39 @@ const base = "http://127.0.0.1:8765";
     await page.getByTestId(`delete-price-${prices[0].id}`).click();
     await page.getByText("Cálculo vinculado a pedido não pode ser excluído.",{exact:true}).waitFor();
     assert.equal(await page.getByTestId(`price-row-${prices[0].id}`).count(),1);
+    // Complete manual shipment on the same saved-price order. No provider calls.
+    const shipmentDay=new Date().toISOString().slice(0,10);
+    const confirmation=await page.request.put(base+`/api/orders/${pricedDraft.id}`,{
+      headers:{Authorization:"Bearer "+access_token},data:{...pricedDraft,status:"confirmed",receivable_due_date:shipmentDay}});
+    assert.equal(confirmation.status(),200,await confirmation.text());
+    await page.goto(base+"/prospects/orders");
+    await page.getByTestId(`order-card-${pricedDraft.id}`).getByRole("link",{name:"Registrar embarque",exact:true}).click();
+    await page.getByRole("heading",{name:/Embarque —/}).waitFor();
+    await page.getByLabel("Referência",{exact:true}).fill("SHIP-BROWSER");
+    await page.getByLabel("Origem",{exact:true}).fill("Santos");
+    await page.getByLabel("Destino",{exact:true}).fill("Lisboa");
+    await page.getByRole("combobox",{name:"Responsável",exact:true}).selectOption("u");
+    await page.getByLabel("Saída prevista",{exact:true}).fill(shipmentDay);
+    await page.getByLabel("Chegada prevista",{exact:true}).fill(shipmentDay);
+    for(const [state,dateFields] of [["planned",[]],["booked",[]],["in_transit",["Saída real"]],["arrived",["Chegada real"]],["delivered",["Entrega real"]]]){
+      await page.getByLabel("Situação do embarque",{exact:true}).selectOption(state);
+      for(const title of dateFields)await page.getByLabel(title,{exact:true}).fill(shipmentDay);
+      await page.getByLabel("Motivo da alteração",{exact:true}).fill("Browser validation "+state);
+      const savedShipment=page.waitForResponse(r=>r.url().endsWith(`/api/orders/${pricedDraft.id}/shipment`)&&r.request().method()==="PUT");
+      await page.getByRole("button",{name:"Salvar embarque",exact:true}).click();
+      const saved=await savedShipment;assert.equal(saved.status(),200,await saved.text());
+      await page.waitForFunction(()=>document.querySelector('textarea[maxlength="300"]')?.value==="");
+      const finance=await (await page.request.get(base+"/api/finance",{headers:{Authorization:"Bearer "+access_token}})).json();
+      assert.equal(finance.filter(row=>row.source_order_id===pricedDraft.id).length,1);
+    }
+    assert(await page.getByLabel("Origem",{exact:true}).getAttribute("readonly")!==null);
+    assert(await page.getByLabel("Saída real",{exact:true}).getAttribute("readonly")!==null);
+    await page.getByRole("button",{name:"Fechar",exact:true}).click();
+    await page.reload();
+    await page.getByText("SHIP-BROWSER — ABC-Ingredients",{exact:false}).waitFor();
+    const shipmentStored=await (await page.request.get(base+`/api/orders/${pricedDraft.id}/shipment`,{headers:{Authorization:"Bearer "+access_token}})).json();
+    assert.equal(shipmentStored.status,"delivered");assert.equal(shipmentStored.shipment.history.length,5);
+    assert.equal(shipmentStored.shipment.actual_delivery,shipmentDay);
     await page.goto(base+"/prospects/orders");
     await page.getByTestId(`order-card-${pricedDraft.id}`).getByRole("link",{name:"Ver empresa no CRM",exact:true}).click();
     await page.getByRole("heading",{name:/ABC-Ingredients/}).waitFor();
