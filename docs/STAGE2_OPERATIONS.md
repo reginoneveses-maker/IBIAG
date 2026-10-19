@@ -28,6 +28,10 @@ frontend/src/pages/Orders.test.jsx verifica seleção, atalho, paginação, falh
 
 Resultados concretos da execução/CI serão registrados no PR desta entrega. Não confundir skips locais por falta de MongoDB/Docker com execução real desses casos; a validação publicada com contas autorizadas permanece pendente.
 
+## Segunda entrega: cálculo salvo → pedido
+
+O vínculo adicional reutiliza a calculadora e a tabela de preços existentes. A memória canônica é conferida e preservada no rascunho; mudança da revisão exige nova conferência. Não equivale a cotação comercial aprovada nem confirma venda. Ver SAVED_PRICE_ORDER_DRAFT.md. A etapa1 continua pendente; nenhuma entrega está publicada.
+
 ## Próximas entregas, uma de cada vez
 
 1. Ampliar os vínculos operacionais sobre os cadastros existentes: oportunidade/cotação→pedido, mantendo histórico e aprovação explícita. Cotações não devem criar pedidos/contas implicitamente.

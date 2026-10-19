@@ -84,3 +84,66 @@ test("late shortcut response cannot overwrite a manually opened draft",async()=>
   await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
   expect(screen.getByLabelText("Empresa do CRM").value).toBe("");
 });
+
+const source={source_price_id:"calc1",source_price_revision:"a".repeat(64),source_price_snapshot:{product_name:"Product",quantity:1000,unit:"kg",sale_total_usd:4260},total_usd:4260,
+  items:[{product_id:"p",offer_id:"offer",product_name:"Product",supplier_id:"s",supplier_name:"Supplier",quantity:1000,unit:"kg",unit_price:4.26}]};
+
+test("saved calculation opens a frozen draft and requires explicit customer/save",async()=>{
+  api.get.mockImplementation(path=>Promise.resolve({data:path==="/prices/calc1/order-draft"?source:path==="/leads"?[lead]:path==="/product-offers"?[{id:"offer",product_id:"p",product_name:"Product",supplier_name:"Supplier"}]:[]}));
+  mount("/prospects/orders?price=calc1");
+  await screen.findByTestId("order-price-origin");
+  expect(screen.getByLabelText("Quantidade do item 1").value).toBe("1000");
+  expect(screen.getByLabelText("Preço USD do item 1").value).toBe("4.26");
+  expect(screen.getByLabelText("Quantidade do item 1").disabled).toBe(true);
+  expect(screen.getByLabelText("Situação do pedido").disabled).toBe(true);
+  expect(screen.queryByRole("button",{name:"Adicionar item"})).toBeNull();
+  expect(api.post).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("save-order-button"));
+  expect(api.post).not.toHaveBeenCalled();
+  await screen.findByRole("option",{name:"Existing Buyer · Portugal"});
+  fireEvent.change(screen.getByLabelText("Empresa do CRM"),{target:{value:"crm1"}});
+  fireEvent.click(screen.getByTestId("save-order-button"));
+  await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/orders",expect.objectContaining({source_price_id:"calc1",source_price_revision:"a".repeat(64),lead_id:"crm1",status:"draft",total_usd:4260})));
+  expect(api.post.mock.calls[0][1].source_price_snapshot).toBeUndefined();
+  await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
+});
+
+test("combined CRM and calculation shortcut prepares one draft and consumes both parameters",async()=>{
+  api.get.mockImplementation(path=>Promise.resolve({data:path==="/prices/calc1/order-draft"?source:path==="/leads/crm1"?lead:path==="/leads"?[lead]:[]}));
+  mount("/prospects/orders?lead=crm1&price=calc1");
+  await screen.findByTestId("order-price-origin");
+  expect(screen.getByTestId("ord-customer-input").value).toBe("Existing Buyer");
+  expect(screen.getByLabelText("Quantidade do item 1").value).toBe("1000");
+  await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
+  expect(api.post).not.toHaveBeenCalled();
+});
+
+test("stale calculation rejection preserves the form and never retries creation automatically",async()=>{
+  api.get.mockImplementation(path=>Promise.resolve({data:path==="/prices/calc1/order-draft"?source:path==="/leads"?[lead]:[]}));
+  api.post.mockRejectedValue({response:{status:409,data:{detail:"O cálculo mudou. Confira novamente."}}});
+  mount("/prospects/orders?price=calc1");
+  await screen.findByTestId("order-price-origin");
+  await screen.findByRole("option",{name:"Existing Buyer · Portugal"});
+  fireEvent.change(screen.getByLabelText("Empresa do CRM"),{target:{value:"crm1"}});
+  fireEvent.click(screen.getByTestId("save-order-button"));
+  await waitFor(()=>expect(toast.error).toHaveBeenCalledWith("O cálculo mudou. Confira novamente."));
+  expect(screen.getByTestId("save-order-button")).toBeTruthy();expect(api.post.mock.calls).toHaveLength(1);
+});
+
+test("late calculation lookup cannot replace a manually opened draft",async()=>{
+  let resolve;
+  api.get.mockImplementation(path=>path==="/prices/calc1/order-draft"?new Promise(r=>{resolve=r;}):Promise.resolve({data:[]}));
+  mount("/prospects/orders?price=calc1");fireEvent.click(screen.getByTestId("new-order-button"));
+  fireEvent.change(screen.getByTestId("ord-customer-input"),{target:{value:"Manual price"}});
+  await act(async()=>resolve({data:source}));
+  expect(screen.queryByTestId("order-price-origin")).toBeNull();
+  expect(screen.getByTestId("ord-customer-input").value).toBe("Manual price");
+  await waitFor(()=>expect(screen.getByTestId("current-route").textContent).toBe("/prospects/orders"));
+});
+
+test("invalid calculation explains the required correction without creating or opening an order",async()=>{
+  api.get.mockImplementation(path=>path==="/prices/calc1/order-draft"?Promise.reject({response:{status:400,data:{detail:"Vincule o cálculo a uma oferta de produto e fornecedor antes de criar um pedido."}}}):Promise.resolve({data:[]}));
+  mount("/prospects/orders?price=calc1");
+  await waitFor(()=>expect(toast.error).toHaveBeenCalledWith("Vincule o cálculo a uma oferta de produto e fornecedor antes de criar um pedido."));
+  expect(screen.queryByTestId("save-order-button")).toBeNull();expect(api.post).not.toHaveBeenCalled();
+});
