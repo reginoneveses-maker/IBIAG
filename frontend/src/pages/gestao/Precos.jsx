@@ -3,6 +3,7 @@ import { api } from "@/AuthContext";
 import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, toast, Plus, Trash2, Pencil, fmtBRL } from "@/components/erp";
 import { PriceCalculator, DEFAULT_TAXES, DEFAULT_EXTRAS } from "@/pages/gestao/PriceCalculator";
 import {computePrice, priceNumber, priceMoney, savedPriceForm} from "@/lib/pricing";
+import { Link } from "react-router-dom";
 import { Calculator } from "lucide-react";
 
 const empty = { product_name: "", product_id:"", offer_id:"", quantity:1, supplier_id: "", supplier_name: "", unit: "kg", supplier_price: 0, extras: DEFAULT_EXTRAS, taxes: DEFAULT_TAXES, margin_pct: 30, margin_mode: "margin", currency: "BRL", exchange_rate: 5.2, notes: "" };
@@ -29,7 +30,7 @@ export default function Precos() {
     } catch (e) { toast.error(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Não foi possível salvar o cálculo."); }
     finally { setSaving(false); }
   };
-  const del = async (id) => { await api.delete(`/prices/${id}`); load(); };
+  const del = async (id) => { try { await api.delete(`/prices/${id}`); load(); } catch (e) { toast.error(typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Não foi possível excluir o cálculo."); } };
   const edit = p => setForm(savedPriceForm(p));
 
   return (
@@ -63,6 +64,7 @@ export default function Precos() {
                   <td className="px-4 py-3 text-right font-mono-alt font-bold text-[#0F382C]">{priceMoney(p.sell_price_brl,"BRL",true)}</td>
                   <td className="px-4 py-3 text-right font-mono-alt font-bold text-amber-700">{priceMoney(p.sell_price_usd,"USD",true)}</td>
                   <td className="px-2 py-3 whitespace-nowrap">
+                    {p.offer_id&&!p.calculation_error&&p.sell_price_usd>0?<Link className="text-xs underline mr-2" data-testid={`price-order-${p.id}`} to={`/prospects/orders?price=${encodeURIComponent(p.id)}`}>Criar pedido</Link>:<span className="text-xs mr-2">Revise oferta e câmbio para criar pedido</span>}
                     <Button size="sm" variant="ghost" onClick={() => { edit(p); setDialog(true); }} data-testid={`edit-price-${p.id}`}><Pencil className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => del(p.id)} className="text-rose-600" data-testid={`delete-price-${p.id}`}><Trash2 className="w-3 h-3" /></Button>
                   </td>

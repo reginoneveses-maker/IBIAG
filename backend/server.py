@@ -34,7 +34,7 @@ from password_inputs import password_bytes, auth_validation_error
 from fastapi.exceptions import RequestValidationError
 from crm_access import lead_scope, require_lead, visible_lead_ids, document_scope, private_file_paths, shared_file_scope, authorize_crm_file
 from discovery_permissions import paid_discovery_enabled, require_paid_discovery
-from pydantic import BaseModel, Field, ConfigDict, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, ValidationError, field_validator, model_validator
 from typing import List, Optional, Literal
 from datetime import datetime, timezone, timedelta
 
@@ -333,6 +333,9 @@ class SalesOrder(BaseModel):
     customer: str
     customer_country: str = ""
     lead_id: str = Field(default="", max_length=200, pattern=r"^[^\x00]*$")
+    source_price_id: str = Field(default="", max_length=200, pattern=r"^[^\x00]*$")
+    source_price_revision: str = Field(default="", max_length=64, pattern=r"^(?:[0-9a-f]{64})?$")
+    source_price_snapshot: dict = Field(default_factory=dict)
     products: str = ""
     incoterm: str = "FOB"
     total_usd: float = 0
@@ -1212,6 +1215,26 @@ async def save_order_workflow(order, create=False):
             raise HTTPException(409, "Pedido arquivado")
         if previous and int(order.version or 0) != int(previous.get("version") or 0):
             raise HTTPException(409, "Pedido alterado por outra operação. Recarregue antes de salvar.")
+        if previous:
+            stored_source = previous.get("source_price_id", "")
+            if "source_price_id" in order.model_fields_set and order.source_price_id != stored_source:
+                raise HTTPException(409, "A origem do cálculo não pode ser trocada. Crie outro rascunho.")
+            for key in ("source_price_id", "source_price_revision", "source_price_snapshot"):
+                setattr(order, key, previous.get(key, {} if key.endswith("snapshot") else ""))
+            if stored_source:
+                if [item.model_dump() for item in order.items] != previous.get("items", []):
+                    raise HTTPException(409, "Itens de cálculo vinculado não podem ser alterados. Recalcule e crie outro rascunho.")
+        elif order.source_price_id:
+            if order.status != "draft":
+                raise HTTPException(400, "Pedido a partir de cálculo deve começar em rascunho.")
+            source = await order_price_source(order.source_price_id)
+            if order.source_price_revision != source["source_price_revision"]:
+                raise HTTPException(409, "O cálculo mudou. Abra novamente a origem e confira antes de salvar.")
+            order.items = [OrderItem(**item) for item in source["items"]]
+            order.source_price_snapshot = source["source_price_snapshot"]
+        else:
+            order.source_price_revision = ""
+            order.source_price_snapshot = {}
         # Older API clients may omit the new relationship. Never erase it as a
         # side effect of an unrelated update, nor rewrite a commercial snapshot.
         if previous and "lead_id" not in order.model_fields_set:
@@ -1549,6 +1572,49 @@ async def del_spec(sid: str, user=Depends(get_admin_user)):
     return {"deleted": 1}
 
 # ============ PRICES ============
+async def order_price_source(pid):
+    records = await db.prices.find({"id": pid}, {"_id": 0}).limit(2).to_list(2)
+    if not records:
+        raise HTTPException(404, "Cálculo não encontrado")
+    if len(records) != 1:
+        raise HTTPException(409, "Identificador duplicado de cálculo. Revise o cadastro.")
+    raw = records[0]
+    try:
+        price = PriceEntry(**raw)
+    except (ValidationError, TypeError, ValueError):
+        raise HTTPException(400, "Revise o cálculo salvo antes de criar um pedido.") from None
+    if not price.offer_id:
+        raise HTTPException(400, "Vincule o cálculo a uma oferta de produto e fornecedor antes de criar um pedido.")
+    await validate_price_offer(price)
+    for collection, rid in ((db.product_offers, price.offer_id), (db.products, price.product_id),
+                            (db.suppliers, price.supplier_id)):
+        references = await collection.find({"id": rid}, {"_id": 1}).limit(2).to_list(2)
+        if len(references) != 1:
+            raise HTTPException(409, "Referência ambígua de produto, oferta ou fornecedor. Revise o cadastro.")
+    price = compute_price(price)
+    if price.exchange_rate <= 0 or price.sell_price_usd <= 0 or price.sale_total_usd <= 0:
+        raise HTTPException(400, "Informe câmbio e valor de venda positivos em USD no cálculo.")
+    snapshot = price.model_dump()
+    # Legacy records without timestamps must yield the same revision on every
+    # read. Only persisted timestamps participate, never model defaults (now).
+    snapshot["created_at"] = raw.get("created_at", "")
+    snapshot["updated_at"] = raw.get("updated_at", "")
+    try:
+        revision = hashlib.sha256(json.dumps(snapshot, ensure_ascii=True, sort_keys=True,
+                                            separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Revise os dados do cálculo salvo antes de criar um pedido.") from None
+    return {"source_price_id": pid, "source_price_revision": revision,
+            "source_price_snapshot": snapshot, "total_usd": price.sale_total_usd,
+            "items": [{"product_id": price.product_id, "offer_id": price.offer_id,
+                       "product_name": price.product_name, "supplier_id": price.supplier_id,
+                       "supplier_name": price.supplier_name, "quantity": price.quantity,
+                       "unit": price.unit, "unit_price": price.sell_price_usd}]}
+
+@api.get("/prices/{pid}/order-draft")
+async def price_order_draft(pid: str, user=Depends(get_admin_user)):
+    return await order_price_source(pid)
+
 def compute_price(p: PriceEntry) -> PriceEntry:
     try:
         for key, value in calculate_price(p).items():
@@ -1612,7 +1678,12 @@ async def upd_price(pid: str, p: PriceEntry, user=Depends(get_admin_user)):
 
 @api.delete("/prices/{pid}")
 async def del_price(pid: str, user=Depends(get_admin_user)):
-    r = await db.prices.delete_one({"id": pid}); return {"deleted": r.deleted_count}
+    async with business_write_lock() as ensure_owned:
+        if await db.orders.find_one({"source_price_id": pid}, {"_id": 1}):
+            raise HTTPException(409, "Cálculo vinculado a pedido não pode ser excluído.")
+        await ensure_owned()
+        r = await db.prices.delete_one({"id": pid})
+        return {"deleted": r.deleted_count}
 
 # ============ CASHFLOW ============
 @api.get("/finance/cashflow")
