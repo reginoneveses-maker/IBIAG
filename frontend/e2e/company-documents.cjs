@@ -181,8 +181,7 @@ const base = "http://127.0.0.1:8765";
     await page.getByLabel("Referência",{exact:true}).fill("SHIP-BROWSER");
     await page.getByLabel("Origem",{exact:true}).fill("Santos");
     await page.getByLabel("Destino",{exact:true}).fill("Lisboa");
-    const responsibleId=await page.getByLabel("Responsável",{exact:true}).locator("option").nth(1).getAttribute("value");
-    await page.getByLabel("Responsável",{exact:true}).selectOption(responsibleId);
+    await page.getByRole("combobox",{name:"Responsável",exact:true}).selectOption("u");
     await page.getByLabel("Saída prevista",{exact:true}).fill(shipmentDay);
     await page.getByLabel("Chegada prevista",{exact:true}).fill(shipmentDay);
     for(const [state,dateFields] of [["planned",[]],["booked",[]],["in_transit",["Saída real"]],["arrived",["Chegada real"]],["delivered",["Entrega real"]]]){

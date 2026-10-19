@@ -17,7 +17,7 @@ test("opens deep link and saves only bounded logistics fields with current versi
   api.put.mockResolvedValue({data:{...detail,version:3,shipment,allowed_statuses:["planned","booked","cancelled"]}});
   mount("/gestao/embarques?order=sale");await screen.findByRole("heading",{name:"Embarque — Buyer"});
   fireEvent.change(screen.getByLabelText("Referência"),{target:{value:"SHIP-1"}});
-  fireEvent.change(screen.getByLabelText("Responsável"),{target:{value:"owner"}});
+  fireEvent.change(screen.getByRole("combobox",{name:"Responsável",exact:true}),{target:{value:"owner"}});
   fireEvent.change(screen.getByLabelText("Motivo da alteração"),{target:{value:"Initial plan"}});
   fireEvent.click(screen.getByRole("button",{name:"Salvar embarque"}));
   await waitFor(()=>expect(api.put).toHaveBeenCalledWith("/orders/sale/shipment",expect.objectContaining({version:2,reference:"SHIP-1",responsible_id:"owner",change_note:"Initial plan"})));
