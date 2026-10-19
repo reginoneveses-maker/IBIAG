@@ -30,6 +30,8 @@ limpeza dos campos/sessão e respostas atrasadas. O navegador troca a senha de u
 admin sintético, nega replay/senha antiga e aceita novo login. Não há acesso a
 senhas/contas de produção nem envio de mensagens, custos externos ou backups.
 
-Isto não implementa recuperação de senha esquecida nem recuperação emergencial
-de administrador: esses fluxos precisam identidade e canal autorizados. Os demais
-seeds/migrações de startup continuam exigindo revisão antes de publicar.
+A troca autenticada é separada da recuperação operacional de acesso, documentada
+em OPERATOR_ACCESS_RECOVERY.md. O candidato inclui comando protegido no servidor
+para operador autorizado; não há recuperação pública por e-mail. As purgas/seeds
+comerciais de startup foram removidas no PR 38. A versão publicada e os efeitos
+operacionais sobre índices/jobs ainda exigem validação antes de reiniciar.
