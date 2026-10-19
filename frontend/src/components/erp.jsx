@@ -15,9 +15,9 @@ import { fmtBRL, fmtUSD } from "@/lib/api";
 export const PageHeader = ({ number, title, subtitle, action }) => (
   <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
     <div>
-      <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#0F382C]/60 mb-2">{number}</div>
-      <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#0F382C]">{title}</h1>
-      {subtitle && <p className="text-base text-[#0F382C]/70 mt-1">{subtitle}</p>}
+      <div className="text-xs font-mono-alt uppercase tracking-[0.2em] text-[#102D3A]/60 mb-2">{number}</div>
+      <h1 className="font-display text-3xl sm:text-4xl font-extrabold text-[#102D3A]">{title}</h1>
+      {subtitle && <p className="text-base text-[#102D3A]/70 mt-1">{subtitle}</p>}
     </div>
     {action}
   </div>
@@ -26,8 +26,8 @@ export const PageHeader = ({ number, title, subtitle, action }) => (
 export const SectionBar = ({ title, subtitle, action, testId }) => (
   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4" data-testid={testId}>
     <div>
-      <h2 className="font-display text-lg md:text-xl font-bold text-[#0F382C]">{title}</h2>
-      {subtitle && <p className="text-sm text-[#0F382C]/60">{subtitle}</p>}
+      <h2 className="font-display text-lg md:text-xl font-bold text-[#102D3A]">{title}</h2>
+      {subtitle && <p className="text-sm text-[#102D3A]/60">{subtitle}</p>}
     </div>
     {action}
   </div>
@@ -42,7 +42,7 @@ export const SubTabs = ({ tabs, param = "tab" }) => {
       <div className="flex gap-1 mb-6 overflow-x-auto scrollbar-thin border-b border-[#0F382C]/10" data-testid="sub-tabs">
         {tabs.map(t => (
           <button key={t.key} data-testid={`tab-${t.key}`} onClick={() => setSp({ [param]: t.key })}
-            className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${current.key === t.key ? "border-amber-600 text-[#0F382C]" : "border-transparent text-[#0F382C]/55 hover:text-[#0F382C]"}`}>
+            className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap border-b-2 -mb-px transition-colors ${current.key === t.key ? "border-[#CAD51E] text-[#102D3A]" : "border-transparent text-[#102D3A]/55 hover:text-[#102D3A]"}`}>
             {t.label}
           </button>
         ))}
@@ -63,10 +63,10 @@ export const SupplierTabs = ({ suppliers, active, onChange, onCreate, allLabel =
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5" data-testid="supplier-tabs">
       <button onClick={() => onChange("")} data-testid="supplier-tab-all"
-        className={`px-3 py-1.5 text-sm rounded-full border ${!active ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15"}`}>{allLabel}</button>
+        className={`px-3 py-1.5 text-sm rounded-full border ${!active ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#102D3A] border-[#0F382C]/15"}`}>{allLabel}</button>
       {suppliers.map(s => (
         <button key={s.id} onClick={() => onChange(s.id)} data-testid={`supplier-tab-${s.id}`}
-          className={`px-3 py-1.5 text-sm rounded-full border ${active === s.id ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#0F382C] border-[#0F382C]/15 hover:border-amber-600/50"}`}>{s.name}{counts && ` (${counts[s.id] || 0})`}</button>
+          className={`px-3 py-1.5 text-sm rounded-full border ${active === s.id ? "bg-[#0F382C] text-white border-[#0F382C]" : "bg-white text-[#102D3A] border-[#0F382C]/15 hover:border-amber-600/50"}`}>{s.name}{counts && ` (${counts[s.id] || 0})`}</button>
       ))}
       {adding ? (
         <div className="flex gap-1 items-center">

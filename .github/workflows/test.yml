@@ -63,3 +63,11 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Browser workflow test
         run: npm run test:e2e
+      - name: Visual review screenshots (synthetic fixtures only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ibiag-visual-review
+          path: frontend/e2e/screenshots/*.png
+          if-no-files-found: ignore
+          retention-days: 1
