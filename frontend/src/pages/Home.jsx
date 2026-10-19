@@ -15,10 +15,10 @@ export default function Home() {
   const alerts = (stats?.certs_expiring?.length || 0) + (stats?.certs_expired?.length || 0) + (stats?.contracts_expiring || 0);
 
   return (
-    <div className="min-h-screen bg-[#F9F6F0] grain-bg" data-testid="home-page">
+    <div className="brand-home min-h-screen" data-testid="home-page">
       <Toaster position="top-right" />
-      <header className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-        <IbiagLogo className="w-40 h-auto" />
+      <header className="max-w-6xl mx-auto px-6 h-24 flex items-center justify-between">
+        <IbiagLogo className="w-48 h-auto" />
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 p-1 rounded-full border border-[#104496]/15 bg-white/70" data-testid="language-toggle">
             <button onClick={() => setLang("pt")} data-testid="lang-pt-button" className={`px-3 py-1 text-xs font-semibold rounded-full ${lang === "pt" ? "bg-[#104496] text-white" : "text-[#104496]/70"}`}>PT</button>
@@ -28,12 +28,18 @@ export default function Home() {
           <button onClick={logout} data-testid="logout-button" className="p-2 rounded-lg hover:bg-[#EFECE6] text-[#104496]"><LogOut className="w-4 h-4" /></button>
         </div>
       </header>
-      <main className="max-w-6xl mx-auto px-6 pt-10 pb-20">
-        <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold text-[#104496] tracking-tight max-w-3xl">{t("home_title")}</h1>
-        <p className="text-base md:text-lg text-[#104496]/70 mt-4 max-w-2xl">{t("home_subtitle")}</p>
+      <main className="max-w-6xl mx-auto px-6 pt-3 pb-20">
+        <section className="brand-home-hero" aria-label="Seu espaço de trabalho IBIAG">
+          <div className="brand-home-hero-copy"><span className="brand-eyebrow">IBIAG Ingredients · ExportHub</span>
+            <h1 className="font-display">{t("home_title")}</h1>
+            <p>{t("home_subtitle")}</p>
+            <span className="brand-origin-pill">{lang === "en" ? "Brazilian roots. Global connections." : "Origem brasileira. Conexões globais."}</span>
+          </div>
+          <div className="brand-home-hero-image" aria-hidden="true"><img src="/brand/ibiag-acai.jpg" alt="" /></div>
+        </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-12">
-          <Link to="/gestao" data-testid="module-gestao" className="group relative overflow-hidden rounded-3xl bg-[#104496] text-white p-8 sm:p-10 min-h-[300px] flex flex-col justify-between hover:-translate-y-1 transition-transform">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-7">
+          <Link to="/gestao" data-testid="module-gestao" className="group relative overflow-hidden brand-module brand-module-primary rounded-3xl text-white p-8 sm:p-10 min-h-[280px] flex flex-col justify-between hover:-translate-y-1 transition-transform">
             <div className="absolute -right-12 -top-12 w-56 h-56 rounded-full bg-[#CAD51B]/15 blur-2xl" />
             <div>
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-[#CAD51B]" /></div>
@@ -49,7 +55,7 @@ export default function Home() {
             </div>
           </Link>
 
-          <Link to="/prospects" data-testid="module-prospects" className="group relative overflow-hidden rounded-3xl bg-white border border-[#104496]/10 p-8 sm:p-10 min-h-[300px] flex flex-col justify-between hover:-translate-y-1 hover:border-[#104496]/40 transition-all">
+          <Link to="/prospects" data-testid="module-prospects" className="group relative overflow-hidden brand-module rounded-3xl bg-white border border-[#104496]/10 p-8 sm:p-10 min-h-[280px] flex flex-col justify-between hover:-translate-y-1 hover:border-[#104496]/40 transition-all">
             <div className="absolute -right-12 -bottom-12 w-56 h-56 rounded-full bg-[#104496]/5 blur-2xl" />
             <div>
               <div className="w-12 h-12 rounded-2xl bg-[#104496] flex items-center justify-center"><Leaf className="w-6 h-6 text-white" /></div>

@@ -103,12 +103,12 @@ const Layout = ({ module = "crm" }) => {
     : { name: "Tropical Prospects", sub: "Compradores & CRM", Icon: Leaf, bg: "bg-[#104496]", fg: "text-white" };
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC]">
+    <div className="brand-workspace min-h-screen">
       <Toaster position="top-right" />
 
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 bg-[#104496] text-white flex-col">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-40 w-64 brand-sidebar text-white flex-col">
         <div className="h-20 px-5 flex items-center border-b border-white/10">
-          <Link to="/" className="block bg-white rounded-xl px-3 py-2"><IbiagLogo className="w-44 h-auto" /></Link>
+          <Link to="/" className="block"><IbiagLogo tone="light" className="w-48 h-auto" /></Link>
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-6">
@@ -143,11 +143,11 @@ const Layout = ({ module = "crm" }) => {
       </aside>
 
       <div className="lg:pl-64 min-h-screen">
-        <header className="sticky top-0 z-30 h-16 bg-[#F7F9FC]/90 backdrop-blur-xl border-b border-[#104496]/10">
+        <header className="sticky top-0 z-30 h-16 bg-white/90 backdrop-blur-xl border-b border-[#104496]/10">
           <div className="h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
             <div className="flex items-center gap-2 lg:hidden">
-              <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-white text-[#104496]"><Menu className="w-5 h-5" /></button>
-              <Link to="/" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
+              <button aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={mobileOpen} onClick={() => setMobileOpen(!mobileOpen)} className="p-2 rounded-lg hover:bg-white text-[#104496]"><Menu className="w-5 h-5" /></button>
+              <Link to="/" aria-label="Início" className="p-2 rounded-lg hover:bg-white text-[#104496]"><LayoutGrid className="w-5 h-5" /></Link>
               <div className="font-display font-extrabold text-[#104496]">{brand.name}</div>
             </div>
             <div className="hidden lg:flex items-center gap-2 text-xs text-[#104496]/45">

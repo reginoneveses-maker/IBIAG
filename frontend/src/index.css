@@ -5,8 +5,8 @@
 @tailwind utilities;
 
 :root {
-    --ibiag-blue: #104496;
-    --ibiag-green: #CAD51B;
+    --ibiag-blue: #1B4496;
+    --ibiag-green: #CAD51E;
     --ibiag-blue-dark: #0B3274;
     --ibiag-blue-soft: #EEF3FB;
     --ibiag-green-soft: #F4F7D8;
@@ -21,19 +21,19 @@ body {
     color: #172033;
 }
 
-.font-display { font-family: 'Cabinet Grotesk', 'Outfit', sans-serif; letter-spacing: -0.02em; }
+.font-display { font-family: 'Inter', 'Segoe UI', sans-serif; letter-spacing: -0.02em; }
 .font-mono-alt { font-family: 'JetBrains Mono', monospace; }
 .grain-bg { background-image: radial-gradient(circle at 25% 15%, rgba(202,213,27,.07), transparent 40%), radial-gradient(circle at 75% 85%, rgba(16,68,150,.07), transparent 45%); }
 
 @layer base {
     :root {
-        --background: 216 33% 98%;
+        --background: 68 29% 95%;
         --foreground: 220 29% 15%;
         --card: 0 0% 100%;
         --card-foreground: 220 29% 15%;
         --popover: 0 0% 100%;
         --popover-foreground: 220 29% 15%;
-        --primary: 218 81% 33%;
+        --primary: 220 69% 35%;
         --primary-foreground: 0 0% 100%;
         --secondary: 66 69% 51%;
         --secondary-foreground: 220 29% 15%;
@@ -82,3 +82,68 @@ body {
 
 @keyframes card-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .animate-card-in { animation: card-in .35s ease-out both; }
+
+/* IBIAG presentation identity: original mark, ingredient photography and angled forms. */
+.brand-home, .brand-workspace { background: #f4f5ed; }
+.brand-eyebrow { display: inline-block; color: #1b4496; font-size: .64rem; font-weight: 700; letter-spacing: .19em; text-transform: uppercase; line-height: 1.8; }
+.brand-eyebrow::before { content: ''; display: inline-block; width: 24px; height: 3px; background: #cad51e; vertical-align: middle; margin-right: 10px; }
+.brand-eyebrow-light { color: #f5f6e9; }
+.brand-login { display: grid; grid-template-columns: 1.14fr 1fr; min-height: 100svh; background: #f5f5ed; }
+.brand-login-story { position: relative; isolation: isolate; min-height: 760px; overflow: hidden; color: white; background: #1b4496; }
+.brand-story-photo, .brand-story-shade, .brand-story-chevron { position: absolute; inset: 0; width: 100%; height: 100%; }
+.brand-story-photo { object-fit: cover; object-position: 48% center; z-index: -3; }
+.brand-story-shade { z-index: -2; background: linear-gradient(180deg,rgba(11,38,68,.15) 5%,rgba(12,35,61,.25) 33%,rgba(9,30,54,.92) 100%),linear-gradient(115deg,rgba(27,68,150,.62),transparent 75%); }
+.brand-story-chevron { z-index: -1; background: linear-gradient(140deg,#b6a4f4,#2543a7); opacity: .5; clip-path: polygon(63% 0,100% 0,100% 100%,63% 100%,100% 50%); }
+.brand-story-logo { position: absolute; top: 50px; left: 52px; width: 245px; height: auto; }
+.brand-story-copy { position: absolute; bottom: 56px; left: 52px; right: 42px; max-width: 590px; }
+.brand-story-copy h1 { font-family: 'Inter', 'Segoe UI', sans-serif; font-size: clamp(2.2rem,3.5vw,3.8rem); font-weight: 500; letter-spacing: -.045em; line-height: 1.12; margin: 22px 0; }
+.brand-story-copy p { font-size: 1rem; line-height: 1.8; color: #e1e8ed; }
+.brand-story-signature { border-top: 1px solid #ffffff35; margin-top: 38px; padding-top: 20px; display: flex; justify-content: space-between; max-width: 410px; color: #e0e782; font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; }
+.brand-login-panel { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 70px 48px 100px; }
+.brand-login-form { width: 100%; max-width: 385px; }
+.brand-login-logo { width: 208px; height: auto; margin-bottom: 64px; }
+.brand-login-heading { margin-bottom: 32px; }
+.brand-login-heading h2 { color: #102d3a; font-weight: 600; font-size: 2.15rem; line-height: 1.2; letter-spacing: -.045em; margin: 14px 0; }
+.brand-login-heading p { color: #647175; font-size: .9rem; line-height: 1.8; max-width: 350px; }
+.brand-login-form label { color: #243f49; font-size: .8rem; font-weight: 600; }
+.brand-login-form input { height: 50px; border-radius: 10px; border-color: #d9dfd7; background: white; padding: 0 16px; box-shadow: none; }
+.brand-login-form input:focus-visible { outline: 2px solid #1b4496; outline-offset: 3px; }
+.brand-login-submit { width: 100%; height: 50px; background: #1b4496; color: white; border-radius: 10px; justify-content: space-between; padding: 0 18px; font-weight: 600; box-shadow: 0 5px 15px #1b449612; }
+.brand-login-submit:hover { background: #123778; }
+.brand-access-note { display: flex; justify-content: center; align-items: center; gap: 7px; margin-top: 25px; font-size: .69rem; color: #667276; }
+.brand-login-footer { position: absolute; bottom: 25px; left: 30px; right: 30px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: .6rem; color: #687778; }
+.brand-home-hero { position: relative; overflow: hidden; min-height: 320px; border-radius: 24px; background: #e6e8d9; border: 1px solid #e0e3d3; }
+.brand-home-hero-copy { position: relative; z-index: 1; padding: 42px; width: 65%; }
+.brand-home-hero h1 { font-size: clamp(2.1rem,3.6vw,3.3rem); font-weight: 600; color: #102d3a; line-height: 1.12; letter-spacing: -.05em; max-width: 530px; margin: 18px 0 16px; }
+.brand-home-hero p { font-size: .87rem; line-height: 1.75; color: #53636a; max-width: 500px; }
+.brand-origin-pill { display: inline-flex; border: 1px solid #c6ccae; background: #f5f6e9; padding: 8px 14px; border-radius: 99px; margin-top: 25px; color: #334535; font-size: .62rem; font-weight: 600; letter-spacing: .02em; }
+.brand-home-hero-image { position: absolute; inset: 0 0 0 auto; width: 39%; clip-path: polygon(26% 0,100% 0,100% 100%,0 100%,48% 50%,0 0); background: #1b4496; }
+.brand-home-hero-image img { width: 100%; height: 100%; object-fit: cover; object-position: 58% center; }
+.brand-module { box-shadow: 0 4px 20px #142e4710; }
+.brand-module-primary { background: linear-gradient(130deg,#1b4496,#123467); }
+.brand-sidebar { background: linear-gradient(160deg,#1b4496 0%,#123877 60%,#0c2b60 100%); }
+.brand-sidebar > div:first-child { position: relative; }
+.brand-sidebar > div:first-child::after { content: ''; width: 34px; height: 4px; background: #cad51e; position: absolute; bottom: -2px; left: 20px; }
+.brand-workspace main h1 { color: #102d3a; }
+@media (min-width: 1600px) { .brand-login-story { min-height: 100svh; } .brand-story-copy { bottom: 72px; left: 64px; } .brand-story-logo { left: 64px; top: 64px; } }
+@media (max-width: 1050px) { .brand-login-panel { padding-left: 32px; padding-right: 32px; } .brand-story-copy { left: 32px; right: 25px; } .brand-story-logo { left: 32px; } }
+@media (max-width: 767px) {
+  .brand-login { display: flex; flex-direction: column; }
+  .brand-login-story { min-height: 185px; height: 185px; }
+  .brand-story-photo { object-position: center 48%; }
+  .brand-story-shade { background: linear-gradient(110deg,#143975dd,#16366644); }
+  .brand-story-logo { top: 32px; left: 28px; width: 210px; }
+  .brand-story-copy { bottom: 24px; left: 28px; right: 20px; }
+  .brand-story-copy h1, .brand-story-copy p, .brand-story-signature { display: none; }
+  .brand-eyebrow-light { font-size: .56rem; letter-spacing: .12em; }
+  .brand-login-panel { flex: 1; padding: 35px 28px 80px; }
+  .brand-login-logo { display: none; }
+  .brand-login-heading h2 { font-size: 1.9rem; }
+  .brand-login-heading { margin-bottom: 25px; }
+  .brand-login-footer { left: 28px; right: 28px; bottom: 18px; }
+  .brand-home-hero-copy { width: 100%; padding: 30px 26px; }
+  .brand-home-hero { min-height: 0; }
+  .brand-home-hero-image { position: relative; width: 100%; height: 145px; clip-path: polygon(0 0,90% 0,100% 35%,100% 100%,0 100%); }
+  .brand-home-hero-image img { object-position: center 47%; }
+}
+@media (prefers-reduced-motion: reduce) { .animate-card-in { animation: none; } .brand-module { transition: none; transform: none; } }
