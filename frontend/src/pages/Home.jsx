@@ -50,7 +50,7 @@ export default function Home() {
             <div className="flex items-center justify-between mt-8">
               {alerts > 0 ? (
                 <span data-testid="home-alerts-badge" className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#CAD51B] text-[#104496] px-3 py-1.5 rounded-full"><AlertTriangle className="w-3.5 h-3.5" />{alerts} {t("home_alerts")}</span>
-              ) : <span className="text-xs text-white/50">{stats ? t("home_no_alerts") : ""}</span>}
+              ) : <span className="text-xs text-white/75">{stats ? t("home_no_alerts") : ""}</span>}
               <span className="inline-flex items-center gap-2 text-sm font-semibold group-hover:gap-3 transition-all">{t("open")} <ArrowRight className="w-4 h-4" /></span>
             </div>
           </Link>

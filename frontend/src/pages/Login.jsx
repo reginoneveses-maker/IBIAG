@@ -29,8 +29,9 @@ const Login = () => {
   };
 
   return (
+    <>
+    <Toaster position="top-right" />
     <div className="brand-login" data-testid="login-page">
-      <Toaster position="top-right" />
       <aside className="brand-login-story" aria-label="IBIAG Ingredients: origem brasileira, conexões globais">
         <img className="brand-story-photo" src="/brand/ibiag-acai.jpg" alt="" aria-hidden="true" fetchPriority="high" />
         <div className="brand-story-shade" aria-hidden="true" />
@@ -71,6 +72,7 @@ const Login = () => {
         <footer className="brand-login-footer"><span>Brazilian ingredients. Global connections.</span><span>IBIAG · ExportHub</span></footer>
       </main>
     </div>
+    </>
   );
 };
 
