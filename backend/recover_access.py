@@ -36,13 +36,15 @@ async def recovery_target(db, account_id, expected_role, reason, case_id):
     record = records[0]
     email = record.get("email")
     if (record.get("role", "user") != expected_role or record.get("active", True) is not True
-            or not isinstance(email, str) or not email or email != email.strip().lower()
+            or not isinstance(email, str) or not email or len(email) > 320 or "\x00" in email or email != email.strip().lower()
             or not isinstance(record.get("password_hash"), str)
             or type(record.get("session_version", 0)) is not int or record.get("session_version", 0) < 0
             or not isinstance(record.get("access_recovery_audit", []), list)
             or len(record.get("access_recovery_audit", [])) >= 100):
         raise RecoveryRefused()
-    if await db.users.count_documents({"email": email}, limit=2) != 1:
+    # Login canonicalizes email. A legacy uppercase twin is also ambiguous;
+    # match literally so dots/plus signs never become regex operators.
+    if await db.users.count_documents({"email": {"$regex": "^" + re.escape(email) + "$", "$options": "i"}}, limit=2) != 1:
         raise RecoveryRefused()
     return record
 
