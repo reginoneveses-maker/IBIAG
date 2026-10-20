@@ -18,7 +18,7 @@ for tool in mongosh tar gzip sha256sum timeout flock nohup mktemp df stat find; 
 AVAILABLE=$(df -Pk /tmp | awk 'NR==2 {print $4}')
 [[ $AVAILABLE =~ ^[0-9]+$ && $AVAILABLE -ge 3145728 ]] || fail
 export MONGOSH_DISABLE_TELEMETRY=1
-mongo_check() { timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$1" 2>/dev/null; }
+mongo_check() { timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$1})().catch(()=>quit(2));" 2>/dev/null; }
 # Refuse sharding/replica sets, custom dbpaths, encryption and an existing fsync lock.
 PREFLIGHT='const a=db.getSiblingDB("admin"); const h=await a.runCommand({hello:1}); const c=await a.runCommand({getCmdLineOpts:1}); const s=await a.runCommand({serverStatus:1}); const p=c.parsed||{}; const o=await a.currentOp(); if(h.ok!==1||c.ok!==1||s.ok!==1||h.setName||h.msg==="isdbgrid"||!(await db.version()).startsWith("8.")||(p.storage?.dbPath&&p.storage.dbPath!=="/data/db")||p.security?.enableEncryption||p.security?.kmip||o.fsyncLock||s.storageEngine?.name!=="wiredTiger")quit(2); print("PREFLIGHT_OK");'
 [[ $(mongo_check "$PREFLIGHT") == PREFLIGHT_OK ]] || fail
@@ -41,13 +41,13 @@ flock -w 30 9 || exit 2
 [[ -f $COORD/owner && $(cat "$COORD/owner") == "$EXPECTED_TOKEN" ]] || exit 2
 [[ -f $COORD/armed ]] || exit 0
 STATUS_JS='const s=await db.getSiblingDB("admin").currentOp();print(s.fsyncLock?"LOCK_STATUS_LOCKED":"LOCK_STATUS_UNLOCKED");'
-STATUS=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$STATUS_JS" 2>/dev/null) || exit 2
+STATUS=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$STATUS_JS})().catch(()=>quit(2));" 2>/dev/null) || exit 2
 if [[ $STATUS == LOCK_STATUS_UNLOCKED ]]; then rm -f "$COORD/armed"; exit 0; fi
 [[ $STATUS == LOCK_STATUS_LOCKED && ! -e $COORD/unlock-attempt ]] || exit 2
 # Never retry an uncertain decrement: that could release another operator's lock.
 (set -C; : > "$COORD/unlock-attempt") || exit 2
 JS='const a=db.getSiblingDB("admin");const r=await a.runCommand({fsyncUnlock:1});if(r.ok!==1||Number(r.lockCount)!==0)quit(2); print("UNLOCKED");'
-RESULT=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$JS" 2>/dev/null) || exit 2
+RESULT=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$JS})().catch(()=>quit(2));" 2>/dev/null) || exit 2
 [[ $RESULT == UNLOCKED ]] || exit 2
 rm -f "$COORD/armed"
 exit 0

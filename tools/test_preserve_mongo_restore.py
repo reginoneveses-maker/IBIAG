@@ -20,11 +20,11 @@ ENV=['-e','RAILWAY_PROJECT_ID=c1a9635c-789b-4e42-ac9b-cca4326fab9a',
 def run(*args,check=True,timeout=120):
  return subprocess.run(list(args),capture_output=True,text=True,check=check,timeout=timeout)
 def js(container,code):
- return run('docker','exec',container,'mongosh','--quiet','--norc','--eval',code).stdout.strip()
+ return run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});').stdout.strip()
 def ready(container):
  deadline=time.monotonic()+60
  for _ in range(80):
-  r=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','print((await db.adminCommand({ping:1})).ok)',check=False,timeout=8)
+  r=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{print((await db.adminCommand({ping:1})).ok)})().catch(()=>quit(2));',check=False,timeout=8)
   if r.returncode==0 and r.stdout.strip()=='1':return
   if time.monotonic()>=deadline:break
   time.sleep(.25)

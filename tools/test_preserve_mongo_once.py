@@ -16,6 +16,7 @@ import fcntl,json,os,sys
 from pathlib import Path
 p=Path(os.environ['FAKE_STATE']);f=p.open('a+');fcntl.flock(f,fcntl.LOCK_EX);f.seek(0);s=json.load(f)
 q=sys.argv[-1];result='';code=0
+assert q.startswith('(async()=>{'), 'Mongo commands require an explicit async context'
 if 'LOCK_STATUS_' in q:result='LOCK_STATUS_LOCKED' if s['locked'] else 'LOCK_STATUS_UNLOCKED'
 elif 'PREFLIGHT_OK' in q:
  result='PREFLIGHT_OK' if not s['locked'] else '';code=0 if result else 2
@@ -55,6 +56,12 @@ class PreservationTests(unittest.TestCase):
  def run_copy(self,**changes):
   return subprocess.run(['bash',str(self.script),'--approved-one-off'],env={**self.env,**changes},text=True,capture_output=True,timeout=12)
  def status(self):return json.loads(self.state.read_text())
+ def test_inline_mongo_commands_parse_inside_async_context(self):
+  import re
+  for name in ('PREFLIGHT','STATUS_JS','JS','LOCK'):
+   code=re.search(r"^"+name+r"='([^']*)'",SOURCE,re.M).group(1)
+   r=subprocess.run(['node','--check'],input='(async()=>{'+code+'})().catch(()=>quit(2));',text=True,capture_output=True)
+   self.assertEqual(r.returncode,0,r.stderr)
  def test_success_archive_matches_source_and_unlocks_exactly_once(self):
   r=self.run_copy();self.assertEqual(r.returncode,0,r.stderr);report=json.loads(r.stdout)
   self.assertTrue(report['writes_unlocked']);self.assertFalse(report['restoration_proven'])
