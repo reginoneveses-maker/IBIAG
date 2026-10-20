@@ -105,6 +105,9 @@ def validate_details(record, today, approval=False):
     lines = record["customs"]
     if len(lines) != len(snapshot["items"]) or [line["index"] for line in lines] != list(range(len(lines))):
         raise ValueError("Informe os dados aduaneiros de cada item, na ordem do pedido.")
+    for key in ("payment_terms", "delivery_terms"):
+        if snapshot.get(key) and record[key] != snapshot[key]:
+            raise ValueError("Preserve as condições da cotação aprovada. Revise a venda antes de preparar outro documento.")
     country = snapshot.get("customer_country")
     if country and record["buyer_country"] != country:
         raise ValueError("País do comprador deve coincidir com o pedido.")

@@ -108,6 +108,29 @@ class CommercialInvoiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(r.status_code, expected, r.text)
         self.assertEqual(await self.db.commercial_invoices.count_documents({}), 0)
 
+    async def test_real_approved_quotation_terms_cannot_be_rewritten_in_invoice(self):
+        price=(await self.client.get("/api/prices/price/order-draft",headers=self.headers())).json()
+        quote=await self.client.post("/api/quotations",headers=self.headers(),json={"id":"q-invoice","reference":"COT-INVOICE","lead_id":"lead1","source_price_id":"price","source_price_revision":price["source_price_revision"],"valid_until":"2099-12-31","incoterm":"FOB","payment_terms":"50% prepaid","delivery_terms":"Approved quote delivery","change_note":"Quotation review"})
+        self.assertEqual(quote.status_code,200,quote.text)
+        decision=await self.client.post("/api/quotations/q-invoice/status",headers=self.headers(),json={"version":1,"status":"approved","change_note":"Approve original conditions"})
+        self.assertEqual(decision.status_code,200,decision.text)
+        preview=(await self.client.get("/api/quotations/q-invoice/order-draft",headers=self.headers())).json()
+        order=await self.create_order({**self.body,**preview,"id":"quote-sale"})
+        self.assertEqual(order.status_code,200,order.text)
+        confirmed=await self.client.put("/api/orders/quote-sale",headers=self.headers(),json={**order.json(),"status":"confirmed","order_date":"2026-10-19","receivable_due_date":"2026-11-19"})
+        self.assertEqual(confirmed.status_code,200,confirmed.text)
+        r=await self.create(order_id="quote-sale",source_order_version=confirmed.json()["version"])
+        self.assertEqual(r.status_code,400,r.text)
+        record=await self.invoice(order_id="quote-sale",source_order_version=confirmed.json()["version"],payment_terms="50% prepaid",delivery_terms="Approved quote delivery")
+        details={k:record[k] for k in server.COMMERCIAL_INVOICE_DETAILS}
+        edit=await self.client.put("/api/commercial-invoices/inv1",headers=self.headers(),json={**details,"payment_terms":"Changed afterwards","version":1,"change_note":"Attempt contract change"})
+        self.assertEqual(edit.status_code,400,edit.text)
+        self.assertEqual((await self.decide(record)).status_code,200)
+        text=self.text(await self.pdf())
+        self.assertIn("50% prepaid",text)
+        self.assertIn("Approved quote delivery",text)
+        self.assertNotIn("PRIVATE-COST-CANARY",str(record))
+
     async def test_malformed_legacy_quote_terms_are_never_copied_into_public_snapshot(self):
         await self.db.orders.update_one({"id":"sale"},{"$set":{"source_quote_snapshot":{"payment_terms":{"supplier_price":"PRIVATE-LEGACY-CANARY"}}}})
         r=await self.create()

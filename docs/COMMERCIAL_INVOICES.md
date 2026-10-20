@@ -4,7 +4,7 @@
 
 Em Pedidos, abra Criar / ver Commercial Invoice em uma venda confirmada, embarcada ou entregue. A conferência não grava automaticamente. Se já existir invoice ativa, abre o documento existente. A Central de Documentos e os menus administrativos têm atalho para a área privada de Commercial Invoices.
 
-Confira valores, emitente legal, registro fiscal, endereços, comprador, destinatário, data, local do Incoterm, condições, origem/HS ou NCM por item e representante. Esses dados não são inventados. O nome do comprador, produto, quantidade, preço, Incoterm e total vêm do pedido. País do comprador é preservado quando existe no pedido; quando está ausente, deve ser informado e conferido nesta invoice.
+Confira valores, emitente legal, registro fiscal, endereços, comprador, destinatário, data, local do Incoterm, condições, origem/HS ou NCM por item e representante. Esses dados não são inventados. Condições de pagamento/entrega provenientes de uma cotação aprovada são preservadas, com campos somente leitura e rejeição de alteração também na API. O nome do comprador, produto, quantidade, preço, Incoterm e total vêm do pedido. País do comprador é preservado quando existe no pedido; quando está ausente, deve ser informado e conferido nesta invoice.
 
 Salvar rascunho permite continuar a preparação. Conferir PDF e Baixar PDF usam a rota autenticada; DRAFT identifica cada página do rascunho. Depois de salvar as alterações, informe motivo, confirme a conferência cadastral/comercial/aduaneira e use Aprovar invoice internamente. O servidor verifica os campos obrigatórios, a memória do pedido e se o PDF pode ser renderizado antes de registrar a aprovação. Os valores são em USD; frete e acréscimos precisam estar no cálculo/pedido original e não são somados novamente.
 
@@ -31,7 +31,7 @@ Bloqueia aprovação com alterações não salvas, sem motivo ou sem confirmaç�
 
 ## Testes e revisão
 
-backend/test_commercial_invoices.py executa22 cenários HTTP locais e as mesmas22 variantes em MongoDB descartável quando TEST_MONGO_URL é configurado. Cobre autorização, falsificação, consistência, aprovação/congelamento, concorrência de criação/decisão/alteração/download, cancelamento, limite/tamanho/erro sem vazamento, precisão e ausência de dados internos/ações ativas no PDF. Inclui documento paginado com25 itens, cabeçalho/marca d'água repetidos e nenhum item perdido.
+backend/test_commercial_invoices.py executa23 cenários HTTP locais e as mesmas23 variantes em MongoDB descartável quando TEST_MONGO_URL é configurado. Cobre autorização, falsificação, consistência, aprovação/congelamento, concorrência de criação/decisão/alteração/download, cancelamento, limite/tamanho/erro sem vazamento, precisão e ausência de dados internos/ações ativas no PDF. Inclui documento paginado com25 itens, cabeçalho/marca d'água repetidos e nenhum item perdido.
 
 CommercialInvoices.test.jsx cobre preparação sem gravação, payload mínimo, abertura de invoice existente, motivos/confirmação, dados alterados, conflito sem repetição, prévia privada, descarte de consulta/PDF tardios e recuperação da lista. O fluxo Chromium percorre pedido entregue→invoice→PDF DRAFT→aprovação→PDF aprovado→recarregar e verifica bytes/texto do download, bloqueio de alteração do pedido e ausência de nova conta. Mantém os cenários anteriores de CRM/cotação/embarques/documentos/acesso e bloqueia rede externa.
 
