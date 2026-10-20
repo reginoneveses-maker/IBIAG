@@ -12,6 +12,14 @@ import pandas as pd
 import test_order_crm_link as fixtures
 import server
 
+class CollectionProxy:
+    def __init__(self, collection, **overrides): self.collection=collection; self.overrides=overrides
+    def __getattr__(self, key): return self.overrides.get(key) or getattr(self.collection,key)
+
+class DatabaseProxy:
+    def __init__(self, database, **overrides): self.database=database; self.overrides=overrides
+    def __getattr__(self, key): return self.overrides.get(key) or getattr(self.database,key)
+
 class SampleTests(unittest.IsolatedAsyncioTestCase):
     real_mongo=False
     headers=fixtures.OrderCrmLinkTests.headers
@@ -251,7 +259,8 @@ class SampleTests(unittest.IsolatedAsyncioTestCase):
         for i in range(31):
             self.assertEqual((await self.edit(notes=str(i))).status_code,200)
         before=await self.record()
-        with patch.object(self.db.samples,"replace_one",AsyncMock(return_value=SimpleNamespace(matched_count=0))):
+        proxy=DatabaseProxy(self.db,samples=CollectionProxy(self.db.samples,replace_one=AsyncMock(return_value=SimpleNamespace(matched_count=0))))
+        with patch.object(server,"db",proxy):
             self.assertEqual((await self.edit(notes="Uncommitted proposal")).status_code,409)
         self.assertEqual(await self.record(),before)
         self.assertEqual(await self.db.operation_history.count_documents({"kind":"sample"}),1)
