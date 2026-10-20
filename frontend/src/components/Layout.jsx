@@ -21,6 +21,7 @@ const groups = (module, t) => module === "gestao"
       { title: "Comercial & CRM", items: [
         { to: "/prospects/pipeline", icon: Kanban, label: "Compradores & Pipeline" },
         { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas & follow-ups" },
+        { to: "/gestao/amostras", icon: FlaskConical, label: "Amostras" },
         { to: "/prospects/templates", icon: Mail, label: "Comunicações" },
       ]},
       { title: "Prospecção & Inteligência", items: [
@@ -61,6 +62,7 @@ const groups = (module, t) => module === "gestao"
       { title: "Comercial & CRM", items: [
         { to: "/prospects/pipeline", icon: Kanban, label: "Compradores & Pipeline" },
         { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas & follow-ups" },
+        { to: "/gestao/amostras", icon: FlaskConical, label: "Amostras" },
         { to: "/prospects/templates", icon: Mail, label: "Comunicações" },
       ]},
       { title: "Prospecção & Inteligência", items: [

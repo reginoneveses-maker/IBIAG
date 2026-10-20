@@ -39,7 +39,7 @@ class OperationHistoryTests(unittest.IsolatedAsyncioTestCase):
     def ok(self,response):
         self.assertEqual(response.status_code,200,response.text[:500]);return response.json()
     def identity(self,kind):
-        return {'quotation':('quotations','q1'),'commercial_invoice':('commercial-invoices','inv1'),'packing_list':('packing-lists','pl1'),'shipment':('orders','sale')}[kind]
+        return {'quotation':('quotations','q1'),'commercial_invoice':('commercial-invoices','inv1'),'packing_list':('packing-lists','pl1'),'shipment':('orders','sale'),'sample':('samples','sample-test')}[kind]
     async def current(self,kind):
         collection={'quotation':'quotations','commercial_invoice':'commercial_invoices','packing_list':'packing_lists','shipment':'orders'}[kind]
         return await self.db[collection].find_one({'id':self.identity(kind)[1]},{'_id':0})

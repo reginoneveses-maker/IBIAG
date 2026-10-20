@@ -18,6 +18,7 @@ from buyer_discovery import discover_buyers, discover_decision_maker, enrich_com
 from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
+from sample_requests import SampleCreate, SampleEdit, SampleDecision, TERMS as SAMPLE_TERMS, IDENTITY as SAMPLE_IDENTITY, RESULT as SAMPLE_RESULT, SUMMARY as SAMPLE_SUMMARY, FROZEN_AFTER_SEND, TRANSITIONS as SAMPLE_TRANSITIONS, validate_sample, transition as sample_transition, sample_event
 from operation_history import prepare_history, history_fields, history_page, HistoryError, HistoryConflict, InvalidCursor
 from operations_dashboard import operation_rows, summarize as summarize_operations, calendar as operation_calendar, ORDER_FIELDS as OPERATION_ORDER_FIELDS, DOC_FIELDS as OPERATION_DOC_FIELDS
 from zoneinfo import ZoneInfo
@@ -1161,6 +1162,7 @@ async def del_sup(sid: str, user=Depends(get_admin_user)):
             (db.product_offers, {"supplier_id": sid}),
             (db.purchases, {"supplier_id": sid}),
             (db.orders, {"items.supplier_id": sid}),
+            (db.samples, {"supplier_id": sid}),
             (db.quotations, {"items.supplier_id": sid}),
             (db.contracts, {"supplier_id": sid}),
             (db.certifications, {"supplier_id": sid}),
@@ -2239,6 +2241,124 @@ async def cashflow(months: int = 12, currency: str = "BRL", period: str = "histo
     invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
     return cashflow_rows(entries, invoices, keys, currency)
 
+
+# ============ SAMPLE REQUESTS (administrative, no stock/finance writes) ============
+async def sample_unique(collection, rid, label):
+    matches = await collection.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
+    if not matches: raise HTTPException(404, label + " não encontrado.")
+    if len(matches)!=1: raise HTTPException(409, label + " ambíguo. Revise o cadastro.")
+    return matches[0]
+
+async def sample_record(sid):
+    if not sid or len(sid)>200 or any(ord(c)<32 for c in sid): raise HTTPException(422, "Identificador inválido.")
+    record=await sample_unique(db.samples,sid,"Registro de amostra")
+    if type(record.get("version")) is not int or record["version"]<1 or record.get("status") not in SAMPLE_TRANSITIONS:
+        raise HTTPException(409,"Amostra inconsistente. Solicite revisão administrativa.")
+    return record
+
+async def sample_references(values):
+    lead=await sample_unique(db.leads,values["lead_id"],"Cliente")
+    product=await sample_unique(db.products,values["product_id"],"Produto")
+    def label(record,key,limit):
+        value=record.get(key,"")
+        if not isinstance(value,str) or not value.strip() or len(value)>limit or any(ord(c)<32 for c in value):
+            raise HTTPException(400,"Confira os nomes e identificadores do cadastro antes de registrar a amostra.")
+        return value.strip()
+    country=lead.get("country","")
+    if not isinstance(country,str) or len(country)>100 or any(ord(c)<32 for c in country):
+        raise HTTPException(400,"Confira o país da empresa.")
+    source={"customer":label(lead,"company",300),"customer_country":country,
+            "product_name":label(product,"name",300),"catalog_unit":product.get("unit") or "",
+            "supplier_id":"","supplier_name":""}
+    if not isinstance(source["catalog_unit"],str) or len(source["catalog_unit"])>40:
+        raise HTTPException(400,"Confira a unidade do produto.")
+    if values.get("offer_id"):
+        offer=await sample_unique(db.product_offers,values["offer_id"],"Oferta")
+        if offer.get("product_id")!=values["product_id"] or offer.get("active",True) is not True or not offer.get("supplier_id"):
+            raise HTTPException(400,"Selecione uma oferta ativa deste produto e com fornecedor cadastrado.")
+        supplier=await sample_unique(db.suppliers,offer["supplier_id"],"Fornecedor")
+        source.update(supplier_id=supplier["id"],supplier_name=label(supplier,"name",300))
+    return source
+
+def sample_view(record):
+    today=datetime.now(ZoneInfo("America/Fortaleza")).date().isoformat()
+    fields=SAMPLE_TERMS+SAMPLE_IDENTITY+SAMPLE_RESULT+("version","created_at","updated_at","history","history_archive")
+    return {**{key:record[key] for key in fields if key in record},
+            "allowed_statuses":list(SAMPLE_TRANSITIONS[record["status"]]),
+            "can_edit":record["status"] not in {"evaluated","cancelled"},
+            "delivery_overdue":record["status"]=="sent" and bool(record.get("expected_delivery")) and record["expected_delivery"]<today,
+            "feedback_overdue":record["status"]=="delivered" and bool(record.get("follow_up_on")) and record["follow_up_on"]<today}
+
+def checked_sample_event(values,previous,user,note):
+    try:
+        validate_sample(values,datetime.now(ZoneInfo("America/Fortaleza")).date())
+        return sample_event(values,previous,user,note,now_iso())
+    except OverflowError as exc: raise HTTPException(413,str(exc)) from None
+    except (ValueError,TypeError) as exc: raise HTTPException(400,str(exc)) from None
+
+@api.get("/samples")
+async def list_samples(skip: int=Query(0,ge=0),limit: int=Query(50,ge=1,le=250),
+    status: Optional[Literal["requested","preparing","sent","delivered","evaluated","cancelled"]]=None,
+    lead_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),
+    product_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),user=Depends(get_admin_user)):
+    query={}
+    if status: query["status"]=status
+    if lead_id: query["lead_id"]=lead_id
+    if product_id: query["product_id"]=product_id
+    return await db.samples.find(query,{"_id":0,**{key:1 for key in SAMPLE_SUMMARY}}).sort("id",1).skip(skip).limit(limit).to_list(limit)
+
+@api.get("/samples/{sid}")
+async def get_sample(sid: str,user=Depends(get_admin_user)):
+    return sample_view(await sample_record(sid))
+
+@api.post("/samples")
+async def create_sample(body: SampleCreate,user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        if await db.samples.find_one({"$or":[{"id":body.id},{"reference":body.reference}]},{"_id":1}):
+            raise HTTPException(409,"Amostra ou referência já registrada. Confira a lista antes de repetir.")
+        values=body.model_dump(exclude={"change_note"})
+        values.update(await sample_references(values),status="requested",sent_on="",delivered_on="",
+                      evaluated_on="",feedback_result="",feedback="")
+        record=checked_sample_event(values,None,user,body.change_note)
+        await ensure_owned()
+        try: await db.samples.insert_one({**record,"_id":record["id"]})
+        except DuplicateKeyError: raise HTTPException(409,"Amostra já registrada. Confira a lista.") from None
+        return sample_view(record)
+
+@api.put("/samples/{sid}")
+async def edit_sample(sid: str,body: SampleEdit,user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous=await sample_record(sid)
+        if previous["version"]!=body.version: raise HTTPException(409,"Amostra alterada. Recarregue antes de salvar.")
+        if previous["status"] in {"evaluated","cancelled"}: raise HTTPException(409,"Amostra encerrada não pode ser editada.")
+        values={**previous,**body.model_dump(exclude={"version","change_note"})}
+        if previous["status"] in {"sent","delivered"} and any(values[k]!=previous[k] for k in FROZEN_AFTER_SEND):
+            raise HTTPException(409,"Quantidade, lote, embalagem e destinatário ficam preservados após o envio.")
+        if previous["status"] in {"requested","preparing"}: await sample_references(previous)
+        prepared=await compact_operation_history("sample",sid,previous,previous["version"],ensure_owned)
+        values.update(history_fields(prepared))
+        record=checked_sample_event(values,prepared,user,body.change_note)
+        await ensure_owned()
+        saved=await db.samples.replace_one(version_query(previous),{"_id":sid,**record})
+        if not saved.matched_count: raise HTTPException(409,"Amostra alterada. Recarregue antes de salvar.")
+        return sample_view(record)
+
+@api.post("/samples/{sid}/status")
+async def decide_sample(sid: str,body: SampleDecision,user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous=await sample_record(sid)
+        if previous["version"]!=body.version: raise HTTPException(409,"Amostra alterada. Recarregue antes de decidir.")
+        try: values=sample_transition(previous,body)
+        except ValueError as exc: raise HTTPException(400,str(exc)) from None
+        if body.status=="sent": await sample_references(previous)
+        prepared=await compact_operation_history("sample",sid,previous,previous["version"],ensure_owned)
+        values.update(history_fields(prepared))
+        record=checked_sample_event(values,prepared,user,body.change_note)
+        await ensure_owned()
+        saved=await db.samples.replace_one(version_query(previous),{"_id":sid,**record})
+        if not saved.matched_count: raise HTTPException(409,"Amostra alterada. Recarregue antes de decidir.")
+        return sample_view(record)
+
 async def compact_operation_history(kind, rid, container, version, ensure_owned):
     try: return await prepare_history(db.operation_history, kind, rid, container, version, ensure_owned)
     except HistoryConflict as exc: raise HTTPException(409, str(exc)) from None
@@ -2246,12 +2366,13 @@ async def compact_operation_history(kind, rid, container, version, ensure_owned)
     except (TypeError, ValueError): raise HTTPException(400, "Histórico inconsistente. Solicite revisão administrativa; nenhuma revisão foi descartada.") from None
 
 @api.get("/operations-history/{kind}/{rid}")
-async def get_operation_history(kind: Literal["quotation", "commercial_invoice", "packing_list", "shipment"], rid: str, response: Response,
+async def get_operation_history(kind: Literal["quotation", "commercial_invoice", "packing_list", "shipment", "sample"], rid: str, response: Response,
     limit: int = Query(20, ge=1, le=50), cursor: str = Query("", max_length=2048), user=Depends(get_admin_user)):
     if not rid or len(rid)>200 or "\x00" in rid: raise HTTPException(422, "Identificador inválido.")
     if kind == "quotation": record = await quote_record(rid)
     elif kind == "commercial_invoice": record = await invoice_record(rid)
     elif kind == "packing_list": record = await packing_record(rid)
+    elif kind == "sample": record = await sample_record(rid)
     else:
         matches = await db.orders.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
         if not matches: raise HTTPException(404, "Pedido não encontrado.")
@@ -2417,7 +2538,7 @@ async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_admin
 async def delete_product_offer(oid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
-        if await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}) or await db.quotations.find_one({"items.offer_id": oid}):
+        if await db.samples.find_one({"offer_id": oid}) or await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}) or await db.quotations.find_one({"items.offer_id": oid}):
             raise HTTPException(400, "Oferta vinculada não pode ser excluída. Marque-a como inativa.")
         await ensure_owned()
         r = await db.product_offers.delete_one({"id": oid})
@@ -2483,6 +2604,7 @@ async def del_product(pid: str, user=Depends(get_admin_user)):
         checks = [
             (db.product_offers, {"product_id": pid}),
             (db.orders, {"items.product_id": pid}),
+            (db.samples, {"product_id": pid}),
             (db.quotations, {"items.product_id": pid}),
             (db.purchases, {"product_id": pid}),
             (db.documents, {"product_id": pid}),
@@ -2529,7 +2651,7 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
         return PortfolioImportResult(products=len(product_names), suppliers=len(supplier_names), offers=len(rows), source_rows=len(rows))
 
     async with business_write_lock() as ensure_owned:
-        if replace and (await db.quotations.find_one({}) or await db.orders.find_one({"items.0": {"$exists": True}}) or await db.purchases.find_one({"product_id": {"$nin": [None, ""]}})):
+        if replace and (await db.samples.find_one({}) or await db.quotations.find_one({}) or await db.orders.find_one({"items.0": {"$exists": True}}) or await db.purchases.find_one({"product_id": {"$nin": [None, ""]}})):
             raise HTTPException(400, "Portfólio com operações vinculadas não pode ser substituído. Use importação incremental.")
         await ensure_owned()
         if replace:
@@ -2879,6 +3001,8 @@ async def del_lead(lid: str, user=Depends(get_current_user)):
         await require_lead(db, user, lid)
         if await db.orders.find_one({"lead_id": lid}, {"_id": 1}):
             raise HTTPException(409, "Empresa vinculada a pedido não pode ser excluída.")
+        if await db.samples.find_one({"lead_id": lid}, {"_id": 1}):
+            raise HTTPException(409, "Empresa vinculada a amostra não pode ser excluída.")
         if await db.quotations.find_one({"lead_id": lid}, {"_id": 1}):
             raise HTTPException(409, "Empresa vinculada a cotação não pode ser excluída.")
         await ensure_owned()

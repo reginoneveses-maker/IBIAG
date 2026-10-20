@@ -4,7 +4,7 @@ on:
   push:
     branches: ["feature/buyer-intelligence-foundation", "main"]
   pull_request:
-    branches: ["main", "security/stage1-integration-review-20261018", "operations/**", "design/**"]
+    branches: ["main", "security/stage1-integration-review-20261018", "local/**", "operations/**", "design/**"]
 
 jobs:
   backend:

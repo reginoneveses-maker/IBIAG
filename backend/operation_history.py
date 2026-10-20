@@ -14,7 +14,7 @@ import time
 from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
-KINDS = {'quotation','commercial_invoice','packing_list','shipment'}
+KINDS = {'quotation','commercial_invoice','packing_list','shipment','sample'}
 ROTATE_EVENTS = 32
 ROTATE_BYTES = 96*1024
 MAX_RECORD_BYTES = 256*1024

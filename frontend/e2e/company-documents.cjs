@@ -458,6 +458,44 @@ const base = "http://127.0.0.1:8765";
     await timeline.getByRole("button",{name:"Atualizar histórico",exact:true}).click();await timeline.getByRole("button",{name:"Carregar eventos anteriores",exact:true}).waitFor();assert.equal(await timeline.locator("article").count(),20);
     assert.equal((await (await page.request.get(base+"/api/finance",{headers:{Authorization:"Bearer "+access_token}})).json()).length,1);
     await page.getByRole("button",{name:"Fechar",exact:true}).click();
+    // Samples use the isolated fixture and must not move stock or create sales/finance.
+    const sampleHeaders={Authorization:"Bearer "+access_token};
+    const sampleRead=async path=>{const r=await page.request.get(base+"/api/"+path,{headers:sampleHeaders});assert.equal(r.status(),200);return r.json();};
+    const sampleBefore={products:await sampleRead("products"),orders:await sampleRead("orders"),finance:await sampleRead("finance")};
+    const sampleLead=(await sampleRead("leads"))[0];
+    await page.goto(base+"/gestao/amostras");
+    await page.getByRole("button",{name:"Nova amostra",exact:true}).click();
+    await page.getByLabel("Empresa do CRM",{exact:true}).selectOption(sampleLead.id);
+    await page.getByLabel("Produto da amostra",{exact:true}).selectOption("photo-0");
+    await page.getByLabel("Oferta e fornecedor",{exact:true}).selectOption("price-offer-a");
+    await page.getByLabel("Quantidade da amostra",{exact:true}).fill("25,5");
+    await page.getByLabel("Embalagem da amostra",{exact:true}).fill("Pouch");
+    await page.getByLabel("Destinatário",{exact:true}).fill("Fixture buyer");
+    await page.getByLabel("Endereço de entrega",{exact:true}).fill("Fixture address");
+    await page.getByLabel("País da entrega",{exact:true}).fill("Portugal");
+    await page.getByLabel("Transportadora ou responsável pela entrega",{exact:true}).fill("Fixture courier");
+    await page.getByLabel("Motivo do registro ou decisão",{exact:true}).fill("Fixture request");
+    await page.getByRole("button",{name:"Salvar amostra",exact:true}).click();
+    await page.getByRole("button",{name:"Iniciar preparação",exact:true}).waitFor();
+    const sampleDate=new Date().toLocaleDateString("en-CA",{timeZone:"America/Fortaleza"});
+    for(const [label,dated] of [["Iniciar preparação",false],["Registrar envio",true],["Registrar entrega",true],["Registrar avaliação",true]]){
+      await page.getByLabel("Motivo do registro ou decisão",{exact:true}).fill("Fixture "+label);
+      if(dated)await page.getByLabel("Data real da próxima etapa",{exact:true}).fill(sampleDate);
+      if(label==="Registrar avaliação"){
+        await page.getByLabel("Resultado do comprador",{exact:true}).selectOption("approved");
+        await page.getByLabel("Retorno do comprador",{exact:true}).fill("Fixture approval");
+      }
+      await page.getByLabel("Conferi os dados desta etapa",{exact:true}).check();
+      await page.getByRole("button",{name:label,exact:true}).click();
+      await page.getByRole("button",{name:label,exact:true}).waitFor({state:"detached"});
+    }
+    assert(await page.getByLabel("Quantidade da amostra",{exact:true}).isDisabled());
+    await capture("sample-evaluated-desktop.png");
+    await page.setViewportSize({width:390,height:844});await assertNoOverflow();await capture("sample-evaluated-mobile.png");await page.setViewportSize({width:1440,height:1000});
+    await page.getByRole("button",{name:"Fechar",exact:true}).click();
+    assert.deepEqual(await sampleRead("products"),sampleBefore.products);
+    assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
+    assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
     // Isolated fixture only: administrative suspension must revoke an existing
     // member session, and reactivation must never resurrect that token.
     const adminHeaders={Authorization:`Bearer ${access_token}`};
