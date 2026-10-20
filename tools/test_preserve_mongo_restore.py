@@ -22,10 +22,15 @@ def run(*args,check=True,timeout=120):
 def js(container,code):
  return run('docker','exec',container,'mongosh','--quiet','--norc','--eval',code).stdout.strip()
 def ready(container):
+ deadline=time.monotonic()+60
  for _ in range(80):
-  r=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','print(db.adminCommand({ping:1}).ok)',check=False,timeout=8)
+  r=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','print((await db.adminCommand({ping:1})).ok)',check=False,timeout=8)
   if r.returncode==0 and r.stdout.strip()=='1':return
+  if time.monotonic()>=deadline:break
   time.sleep(.25)
+ print('Synthetic fixture startup status:',run('docker','inspect','--format','{{json .State}}',container,check=False).stdout)
+ print('Synthetic fixture startup logs:',run('docker','logs','--tail','25',container,check=False).stdout)
+ print('Synthetic readiness response:',r.returncode,r.stdout,r.stderr)
  raise RuntimeError('Synthetic fixture did not start')
 
 def main():
