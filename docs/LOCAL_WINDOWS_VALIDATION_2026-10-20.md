@@ -38,3 +38,16 @@ Começa com base vazia, sem importar os dados da Railway. Não acessou banco rea
 Persistência do Docker não protege contra perda do disco, reset/desinstalação do Docker ou remoção do volume. Administradores locais podem acessar disco/Docker. Integrações externas exigem internet e configuração. Compartilhamento futuro exige migração validada, HTTPS e permissões, não apenas abrir a porta local.
 
 A validação automatizada demonstra o pacote testado, não conclusão do escopo total do ExportHub ou do esboço comparativo.
+
+## Correção após primeira abertura no computador do usuário
+
+A captura do usuário mostrou erro nativo do Docker "no such volume" antes de criar a configuração. O iniciador anterior usava volume inspect com redirecionamento de stderr e ErrorActionPreference=Stop; no Windows PowerShell5.1 a ausência esperada do volume virou erro terminante. O teste anterior com função simulada não reproduzia stderr nativo.
+
+Corrigido: usar volume ls --format '{{.Name}}', que conclui com saída vazia em instalação nova. Falha da consulta bloqueia criação de configuração; volume existente sem configuração continua protegido. Não cria volume manualmente, não apaga dados e não modifica credenciais existentes.
+
+Pacote corrigido: commit79a885f37e605c65aaec3ca2cd5c6be208c81bae.
+Download: https://github.com/reginoneveses-maker/IBIAG/archive/79a885f37e605c65aaec3ca2cd5c6be208c81bae.zip .
+
+Validação Windows final: job118815317048 no workflow39476966137 concluído SUCCESS. Teste adicional usa docker.cmd nativo em processos PowerShell5.1 separados: primeira instalação vazia passa; existência de volume e falha de listagem recusam criação de configuração. Testes anteriores de ACL/parar/abrir também passaram. O teste teve duas correções no próprio harness para propagar o exit do filho e retornar sucesso após falhas esperadas; não foram suprimidas as verificações de preservação.
+
+A montagem Linux e a regressão geral desse novo SHA ainda estavam em execução na emissão deste adendo. A alteração de funcionamento é exclusiva do iniciador Windows; aplicação/compose/contêineres continuam com o código já validado acima. O novo pacote ainda precisa ser aberto no computador do usuário. A captura não comprova criação do banco nem instalação concluída.
