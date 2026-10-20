@@ -1,0 +1,27 @@
+name: Validate one-off preservation tooling (synthetic only)
+on:
+  pull_request:
+    branches: ["operations/**"]
+    paths:
+      - "tools/preserve_mongo_once.sh"
+      - "tools/test_preserve_mongo*.py"
+      - ".github/workflows/preservation-check.yml"
+jobs:
+  preservation:
+    # Mongo8 refuses kernel6.19+ (SERVER-121912). Use the supported LTS runner;
+    # never disable the vendor guard or change the production database for a test.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Syntax and failure/recovery checks
+        run: |
+          bash -n tools/preserve_mongo_once.sh
+          python tools/test_preserve_mongo_once.py
+      - name: Restore the synthetic copy in an independent MongoDB8 container
+        # The image owns restored files as uid999; root is needed only to clean
+        # up the runner's synthetic bind mount, never a production filesystem.
+        run: sudo "$(command -v python)" tools/test_preserve_mongo_restore.py
