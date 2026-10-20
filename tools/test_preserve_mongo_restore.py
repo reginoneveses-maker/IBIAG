@@ -79,6 +79,14 @@ def main():
   assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
   js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{source_writable:true}})')
   assert js(source,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).source_writable===true)')=='true'
+  run('docker','exec',source,'mkdir','-p','/tmp/fail-copy-bin')
+  with tempfile.TemporaryDirectory() as d:
+   stub=Path(d)/'cp';stub.write_text('#!/bin/sh\nexit 2\n');stub.chmod(0o755)
+   run('docker','cp',str(stub),source+':/tmp/fail-copy-bin/cp')
+  failed_copy=run('docker','exec',*ENV,'-e','PATH=/tmp/fail-copy-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
+  assert failed_copy.returncode!=0 and 'phase=COPY code=2' in failed_copy.stderr
+  assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
+  js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{copy_failure_recovered:true}})')
   # A pre-existing lock belongs to another operation and must not be released.
   js(source,'await db.getSiblingDB("admin").runCommand({fsync:1,lock:true})')
   refused=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
@@ -88,8 +96,8 @@ def main():
   run('docker','exec',source,'mkdir','-p','/tmp/slow-bin')
   with tempfile.TemporaryDirectory() as d:
    variant=Path(d)/'guard.sh';variant.write_text((ROOT/'preserve_mongo_once.sh').read_text().replace('sleep 150','sleep 8'))
-   stub=Path(d)/'tar';stub.write_text('#!/bin/sh\nsleep 60\nexit 2\n');stub.chmod(0o755)
-   run('docker','cp',str(variant),source+':/tmp/guard.sh');run('docker','cp',str(stub),source+':/tmp/slow-bin/tar')
+   stub=Path(d)/'cp';stub.write_text('#!/bin/sh\nsleep 60\nexit 2\n');stub.chmod(0o755)
+   run('docker','cp',str(variant),source+':/tmp/guard.sh');run('docker','cp',str(stub),source+':/tmp/slow-bin/cp')
   run('docker','exec','-d',*ENV,'-e','PATH=/tmp/slow-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','-c','echo $$ > /tmp/parent.pid; exec bash /tmp/guard.sh --approved-one-off > /tmp/guard.log 2>&1')
   locked=False;deadline=time.monotonic()+8
   while time.monotonic()<deadline:
@@ -106,7 +114,7 @@ def main():
   else:raise AssertionError('Detached guard did not release real Mongo lock')
   js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{guard_recovered:true}})')
   assert js(source,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).guard_recovered===true)')=='true'
-  print('PASS: MongoDB8 independent restored BSON/index/GridFS and writes; archive failure unlocked; existing lock preserved; real lock released by deadline after parent SIGKILL')
+  print('PASS: MongoDB8 independent restored BSON/index/GridFS and writes; staging failure unlocked; archive failure after unlock; existing lock preserved; real lock released by deadline after parent SIGKILL')
  finally:
   for name in (clone,source):run('docker','rm','-fv',name,check=False)
 

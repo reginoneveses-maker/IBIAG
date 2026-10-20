@@ -14,14 +14,18 @@ fail() { printf 'PRESERVATION_NOT_CONFIRMED phase=%s code=%s\n' "$PHASE" "$LAST_
 [[ ${1:-} == --approved-one-off ]] || fail
 [[ ${RAILWAY_PROJECT_ID:-} == c1a9635c-789b-4e42-ac9b-cca4326fab9a && ${RAILWAY_ENVIRONMENT_ID:-} == fcab95f8-3e30-4da9-8e0b-d9b7f94747ce && ${RAILWAY_SERVICE_ID:-} == 9cc0395c-7601-451b-a6fa-1511ab168158 ]] || fail
 PHASE=TOOLS
-for tool in mongosh tar gzip sha256sum timeout flock nohup mktemp df stat find; do command -v "$tool" >/dev/null || fail; done
+for tool in mongosh cp du tar gzip sha256sum timeout flock nohup mktemp df stat find; do command -v "$tool" >/dev/null || fail; done
 PHASE=SOURCE
 [[ -d $DATA_PATH && ! -L $DATA_PATH && -f $DATA_PATH/WiredTiger ]] || fail
 [[ -z $(find "$DATA_PATH" -type l -print -quit) ]] || fail
-# Require 3GiB free, cap the archive at 2GiB. No size estimate from host-wide df.
+# Bound source to 2GiB apparent bytes; reserve staging + archive + 512MiB.
+# Host-wide free space is a capacity check, never the database size.
 PHASE=SPACE
 AVAILABLE=$(df -Pk /tmp | awk 'NR==2 {print $4}')
-[[ $AVAILABLE =~ ^[0-9]+$ && $AVAILABLE -ge 3145728 ]] || fail
+SOURCE_SIZE=$(du -sb "$DATA_PATH" | awk '{print $1}')
+[[ $SOURCE_SIZE =~ ^[0-9]+$ && $SOURCE_SIZE -gt 0 && $SOURCE_SIZE -le 2147483648 ]] || fail
+REQUIRED_KB=$(( (SOURCE_SIZE + 1023) / 1024 + 2097152 + 524288 ))
+[[ $AVAILABLE =~ ^[0-9]+$ && $AVAILABLE -ge $REQUIRED_KB ]] || fail
 export MONGOSH_DISABLE_TELEMETRY=1
 mongo_check() { timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$1})().catch(()=>quit(2));" </dev/null 2>/dev/null; }
 # Refuse sharding/replica sets, custom dbpaths, encryption and an existing fsync lock.
@@ -76,6 +80,7 @@ cleanup() {
     rm -f "$COORD/release.sh" "$COORD/release.mutex" "$COORD/expired" "$COORD/owner" "$COORD/unlock-attempt" "$COORD/lock-confirmed"
     rmdir "$COORD" 2>/dev/null || true
   fi
+  if [[ -n $WORK ]]; then rm -rf -- "$WORK/snapshot"; fi
   if [[ $DONE != 1 && -n $WORK ]]; then rm -f "$WORK/data.tar.gz.partial" "$WORK/data.tar.gz"; rmdir "$WORK" 2>/dev/null || true; fi
   if [[ $DONE != 1 ]]; then printf 'PRESERVATION_NOT_CONFIRMED phase=%s cleanup=returned\n' "$PHASE" >&2; fi
   exit "$status"
@@ -93,13 +98,16 @@ if [[ $LOCK_RESULT == PREEXISTING_LOCK ]]; then rm -f "$COORD/armed"; fail; fi
 [[ $LOCK_RESULT =~ ^OWNED_LOCK_[1-9][0-9]*$ ]] || fail
 touch "$COORD/lock-confirmed"
 [[ $LOCK_RESULT == OWNED_LOCK_1 ]] || fail
-# Copy the complete dbpath, including journal, while writes are blocked. No mongodump
-# reads behind queued writes. Any tar warning/nonzero exit invalidates the copy.
-PHASE=ARCHIVE
-(ulimit -f 2097152; timeout --signal=TERM --kill-after=5s 110s tar -czf "$WORK/data.tar.gz.partial" -C "$DATA_PATH" .) 2>/dev/null || { LAST_STATUS=$?; fail; }
+# MongoDB documents cp under fsyncLock as safe despite physical journal/checkpoint
+# changes. Stage all files while locked; tar reads only that static copy AFTER unlock.
+PHASE=COPY
+mkdir -m 700 "$WORK/snapshot"
+(ulimit -f 2097152; timeout --signal=TERM --kill-after=5s 80s cp -a --reflink=never --sparse=always "$DATA_PATH/." "$WORK/snapshot/") </dev/null 2>/dev/null || { LAST_STATUS=$?; fail; }
 [[ ! -e $COORD/expired ]] || fail
 PHASE=UNLOCK
 bash "$COORD/release.sh" "$TOKEN" || fail
+PHASE=ARCHIVE
+(ulimit -f 2097152; timeout --signal=TERM --kill-after=5s 110s tar -czf "$WORK/data.tar.gz.partial" -C "$WORK/snapshot" .) </dev/null 2>/dev/null || { LAST_STATUS=$?; fail; }
 # Validate only after returning the database to writers. Never print archive contents.
 PHASE=INTEGRITY
 gzip -t "$WORK/data.tar.gz.partial" 2>/dev/null || fail

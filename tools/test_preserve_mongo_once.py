@@ -35,10 +35,21 @@ sys.exit(code)
 FAKE_TAR = r'''#!/usr/bin/env python3
 import os,sys,time
 if '-czf' in sys.argv:
- if os.environ.get('SLOW_TAR'):time.sleep(2)
+ import json
+ assert not json.loads(open(os.environ['FAKE_STATE']).read())['locked'], 'Compression must run after unlock'
+ assert sys.argv[sys.argv.index('-C')+1].endswith('/snapshot'), 'Compress static staging only'
  if os.environ.get('FAIL_TAR'):
   print('CONFIDENTIAL-RECORD-CANARY',file=sys.stderr);sys.exit(2)
 os.execv(os.environ['REAL_TAR'],[os.environ['REAL_TAR'],*sys.argv[1:]])
+'''
+
+FAKE_CP = r'''#!/usr/bin/env python3
+import os,sys,time,json
+assert json.loads(open(os.environ['FAKE_STATE']).read())['locked'], 'Staging requires lock'
+if os.environ.get('SLOW_CP'):time.sleep(2)
+if os.environ.get('FAIL_CP'):
+ print('CONFIDENTIAL-PATH-CANARY',file=sys.stderr);sys.exit(2)
+os.execv(os.environ['REAL_CP'],[os.environ['REAL_CP'],*sys.argv[1:]])
 '''
 
 class PreservationTests(unittest.TestCase):
@@ -48,12 +59,12 @@ class PreservationTests(unittest.TestCase):
   (data/'payload').write_bytes(bytes(range(256))*200)
   self.coord=self.root/'coord';self.state=self.root/'state.json';self.state.write_text(json.dumps({'locked':False,'locks':0,'unlocks':0}))
   bindir=self.root/'bin';bindir.mkdir()
-  for name,content in [('mongosh',FAKE_MONGO),('tar',FAKE_TAR),('df','#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 99999999 1 99999998 1%% /\\n"\n')]:
+  for name,content in [('mongosh',FAKE_MONGO),('tar',FAKE_TAR),('cp',FAKE_CP),('df','#!/bin/sh\nprintf "Filesystem 1024-blocks Used Available Capacity Mounted\\nfixture 99999999 1 99999998 1%% /\\n"\n')]:
    p=bindir/name;p.write_text(content);p.chmod(0o700)
   # Only the synthetic copy changes locations/deadlines. The reviewed production source stays fixed.
   self.script=self.root/'run.sh'
   self.script.write_text(SOURCE.replace('DATA_PATH=/data/db','DATA_PATH='+str(data)).replace('/tmp/ibiag-preserve-active',str(self.coord)).replace('/tmp/ibiag-preserve-XXXXXXXX',str(self.root/'copy-XXXXXXXX')).replace('sleep 150','sleep 0.6'))
-  self.env={**os.environ,'PATH':str(bindir)+os.pathsep+os.environ['PATH'],'FAKE_STATE':str(self.state),'REAL_TAR':shutil.which('tar'),
+  self.env={**os.environ,'PATH':str(bindir)+os.pathsep+os.environ['PATH'],'FAKE_STATE':str(self.state),'REAL_TAR':shutil.which('tar'),'REAL_CP':shutil.which('cp'),
    'RAILWAY_PROJECT_ID':'c1a9635c-789b-4e42-ac9b-cca4326fab9a','RAILWAY_ENVIRONMENT_ID':'fcab95f8-3e30-4da9-8e0b-d9b7f94747ce','RAILWAY_SERVICE_ID':'9cc0395c-7601-451b-a6fa-1511ab168158'}
  def run_copy(self,**changes):
   return subprocess.run(['bash',str(self.script),'--approved-one-off'],env={**self.env,**changes},text=True,capture_output=True,timeout=12)
@@ -76,6 +87,11 @@ class PreservationTests(unittest.TestCase):
   self.assertIn('phase=ARCHIVE code=2',r.stderr);self.assertIn('cleanup=returned',r.stderr)
   self.assertNotIn('CANARY',r.stderr);self.assertFalse(self.status()['locked']);self.assertEqual(self.status()['unlocks'],1)
   self.assertFalse(list(self.root.glob('copy-*/data.tar.gz*')))
+ def test_staging_copy_failure_unlocks_and_removes_only_private_staging(self):
+  r=self.run_copy(FAIL_CP='1');self.assertNotEqual(r.returncode,0)
+  self.assertIn('phase=COPY code=2',r.stderr);self.assertNotIn('CANARY',r.stderr)
+  self.assertEqual(self.status()['unlocks'],1);self.assertFalse(self.status()['locked'])
+  self.assertTrue((self.root/'data/WiredTiger').exists());self.assertFalse(list(self.root.glob('copy-*/snapshot')))
  def test_confirmed_own_lock_requires_unlock_even_if_status_helper_would_say_false(self):
   r=self.run_copy(FALSE_STATUS='1');self.assertEqual(r.returncode,0,r.stderr)
   self.assertFalse(self.status()['locked']);self.assertEqual(self.status()['unlocks'],1)
@@ -89,10 +105,10 @@ class PreservationTests(unittest.TestCase):
  def test_existing_lock_is_preserved_and_copy_refused(self):
   self.state.write_text(json.dumps({'locked':True,'locks':1,'unlocks':0}));r=self.run_copy();self.assertNotEqual(r.returncode,0);self.assertTrue(self.status()['locked']);self.assertEqual(self.status()['unlocks'],0)
  def test_failed_unlock_keeps_recovery_marker_and_refuses_new_copy(self):
-  r=self.run_copy(FAIL_UNLOCK='1',FAIL_TAR='1');self.assertEqual(r.returncode,3);self.assertIn('MANUAL_UNLOCK_REQUIRED',r.stderr);self.assertNotIn('CANARY',r.stderr)
+  r=self.run_copy(FAIL_UNLOCK='1',FAIL_CP='1');self.assertEqual(r.returncode,3);self.assertIn('MANUAL_UNLOCK_REQUIRED',r.stderr);self.assertNotIn('CANARY',r.stderr)
   self.assertTrue((self.coord/'armed').exists());self.assertTrue(self.status()['locked'])
  def test_deadline_guard_releases_after_parent_is_killed(self):
-  p=subprocess.Popen(['bash',str(self.script),'--approved-one-off'],env={**self.env,'SLOW_TAR':'1'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  p=subprocess.Popen(['bash',str(self.script),'--approved-one-off'],env={**self.env,'SLOW_CP':'1'},stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   deadline=time.monotonic()+3
   while time.monotonic()<deadline and not self.status()['locked']:time.sleep(.01)
   self.assertTrue(self.status()['locked']);p.kill();p.wait(timeout=3)
