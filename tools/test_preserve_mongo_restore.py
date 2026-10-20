@@ -20,7 +20,10 @@ ENV=['-e','RAILWAY_PROJECT_ID=c1a9635c-789b-4e42-ac9b-cca4326fab9a',
 def run(*args,check=True,timeout=120):
  return subprocess.run(list(args),capture_output=True,text=True,check=check,timeout=timeout)
 def js(container,code):
- return run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});',timeout=25).stdout.strip()
+ result=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});',check=False,timeout=25)
+ if result.returncode:
+  raise RuntimeError('Synthetic fixture JS failed: '+result.stdout.strip()+' '+result.stderr.strip())
+ return result.stdout.strip()
 def ready(container):
  deadline=time.monotonic()+60
  for _ in range(80):
@@ -59,7 +62,7 @@ def main():
    (data/'mongod.lock').unlink(missing_ok=True)
    run('docker','run','-d','--name',clone,'--network','none','-v',str(data)+':/data/db',IMAGE)
    ready(clone)
-   verified=js(clone,'const d=db.getSiblingDB("preservation_fixture");const x=await d.items.findOne({_id:"synthetic"});print(Boolean(x&&x.before===true&&!x.after&&x.quantity.toString()==="123.450"&&x.at.toISOString()==="2026-01-02T03:04:05.000Z"&&x.payload.base64()==="AAECAwQF"&&(await d.items.getIndexes()).some(i=>i.unique&&i.key.before===1)&&(await d.getCollection("fs.files").countDocuments({filename:"synthetic.bin"}))===1&&(await d.getCollection("fs.chunks").findOne({n:0})).data.base64()==="AAECAwQF"));')
+   verified=js(clone,'const d=db.getSiblingDB("preservation_fixture");const x=await d.items.findOne({_id:"synthetic"});print(Boolean(x&&x.before===true&&!x.after&&x.quantity.toString()==="123.450"&&x.at.toISOString()==="2026-01-02T03:04:05.000Z"&&EJSON.serialize(x.payload).$binary.base64==="AAECAwQF"&&(await d.items.getIndexes()).some(i=>i.unique&&i.key.before===1)&&(await d.getCollection("fs.files").countDocuments({filename:"synthetic.bin"}))===1&&EJSON.serialize((await d.getCollection("fs.chunks").findOne({n:0})).data).$binary.base64==="AAECAwQF"));')
    assert verified=='true','Synthetic restored data/index/types/GridFS did not match'
    js(clone,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{clone_writable:true}})')
    assert js(clone,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).clone_writable===true)')=='true'
