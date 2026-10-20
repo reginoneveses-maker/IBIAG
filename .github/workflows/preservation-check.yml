@@ -8,7 +8,9 @@ on:
       - ".github/workflows/preservation-check.yml"
 jobs:
   preservation:
-    runs-on: ubuntu-latest
+    # Mongo8 refuses kernel6.19+ (SERVER-121912). Use the supported LTS runner;
+    # never disable the vendor guard or change the production database for a test.
+    runs-on: ubuntu-22.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4

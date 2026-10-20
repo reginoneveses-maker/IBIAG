@@ -26,6 +26,8 @@ def ready(container):
  for _ in range(80):
   r=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{print((await db.adminCommand({ping:1})).ok)})().catch(()=>quit(2));',check=False,timeout=8)
   if r.returncode==0 and r.stdout.strip()=='1':return
+  state=run('docker','inspect','--format','{{.State.Running}}',container,check=False).stdout.strip()
+  if state=='false':break
   if time.monotonic()>=deadline:break
   time.sleep(.25)
  print('Synthetic fixture startup status:',run('docker','inspect','--format','{{json .State}}',container,check=False).stdout)
