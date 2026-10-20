@@ -49,6 +49,7 @@ const groups = (module, t) => module === "gestao"
       ]},
       { title: "Estoque & Logística", items: [
         { to: "/gestao/operacao", icon: ShoppingCart, label: "Operação do dia" },
+        { to: "/gestao/dossie", icon: FolderArchive, label: "Dossiês de pedidos" },
         { to: "/gestao/packing-lists", icon: ShoppingCart, label: "Packing Lists" },
         { to: "/gestao/invoices-comerciais", icon: ShoppingCart, label: "Commercial Invoices" },
         { to: "/gestao/cotacoes", icon: ShoppingCart, label: "Cotações" },
