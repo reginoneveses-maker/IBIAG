@@ -31,6 +31,7 @@ exit /b 0
 function Invoke-RestMethod { param($Uri, $TimeoutSec); return @{status="ok"; database="ok"} }
 function Start-Process { param($FilePath) }
 & (Join-Path $PSScriptRoot "local\Start-IBIAG.ps1") -Action Start
+exit $LASTEXITCODE
 '@
     [IO.File]::WriteAllText((Join-Path $Root "run.ps1"), $Wrapper, [Text.Encoding]::ASCII)
     $env:PATH = (Join-Path $Root "bin") + ";" + $OldPath
