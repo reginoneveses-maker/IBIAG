@@ -28,8 +28,10 @@ A cópia só ganha nome final após desbloqueio confirmado e verificações gzip
 
 ## Validação prevista e executada
 
-Oito testes locais com arquivos sintéticos e Mongo simulado passaram: cópia byte a byte/hashes; erro de arquivo com desbloqueio e sem vazamento; alvo/aceite explícito; lock anterior preservado; falha de unlock conserva marcador; guard após SIGKILL; token antigo não libera novo owner. Nenhum dado real, rede Railway ou lock real foi usado localmente.
+Nove testes locais com arquivos sintéticos e Mongo simulado passaram: cópia byte a byte/hashes; erro de arquivo com desbloqueio e sem vazamento; alvo/aceite explícito; lock anterior preservado; falha de unlock conserva marcador; guard após SIGKILL; token antigo não libera novo owner; stdin com CRLF final do Windows. Nenhum dado real, rede Railway ou lock real foi usado localmente.
 
 A workflow preservation-check.yml não tem cron nem backup de aplicação: executa somente em PR com alteração da ferramenta. Cria containers Mongo8 descartáveis sem rede, grava fixture sintética, faz cópia física, restaura em outro container e confere tipos BSON, índice unique, bytes de GridFS, ausência de alteração posterior à cópia e escrita normal na réplica restaurada. Também força erro de tar para confirmar desbloqueio no Mongo real e recusa lock preexistente sem liberá-lo. Resultado da CI será registrado no PR antes de fornecer comando de execução.
 
 A ferramenta não torna o banco autenticado, persistente ou a etapa1 concluída. Corrigir esses achados e revalidar proxy/titularidade/contas continua necessário.
+
+A primeira execução CI encontrou timeout da escrita posterior à cópia sintética: acesso encadeado ao resultado assíncrono de currentOp havia produzido confirmação incorreta de desbloqueio. O procedimento não foi fornecido/executado em produção. As chamadas Mongo da ferramenta e verificações de estado passaram a usar await explícito, incluindo await antes de acessar fsyncLock; a escrita real posterior continua sendo condição obrigatória do teste. A validação final será discriminada no PR, sem tratar a tentativa falha como sucesso.

@@ -37,7 +37,7 @@ def main():
   run('docker','cp',str(ROOT/'preserve_mongo_once.sh'),source+':/tmp/preserve.sh')
   result=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',timeout=220)
   info=json.loads(result.stdout);assert info['copy_created'] and info['writes_unlocked'] and not info['restoration_proven']
-  assert js(source,'print(db.getSiblingDB("admin").currentOp().fsyncLock===true)')=='false'
+  assert js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='false'
   js(source,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{after:true}});')
   with tempfile.TemporaryDirectory(prefix='ibiag-synthetic-restore-') as directory:
    folder=Path(directory);archive=folder/'synthetic.tar.gz';data=folder/'data';data.mkdir()
@@ -52,10 +52,10 @@ def main():
    (data/'mongod.lock').unlink(missing_ok=True)
    run('docker','run','-d','--name',clone,'--network','none','-v',str(data)+':/data/db',IMAGE)
    ready(clone)
-   verified=js(clone,'const d=db.getSiblingDB("preservation_fixture");const x=d.items.findOne({_id:"synthetic"});print(Boolean(x&&x.before===true&&!x.after&&x.quantity.toString()==="123.450"&&x.at.toISOString()==="2026-01-02T03:04:05.000Z"&&x.payload.base64()==="AAECAwQF"&&d.items.getIndexes().some(i=>i.unique&&i.key.before===1)&&d.getCollection("fs.files").countDocuments({filename:"synthetic.bin"})===1&&d.getCollection("fs.chunks").findOne({n:0}).data.base64()==="AAECAwQF"));')
+   verified=js(clone,'const d=db.getSiblingDB("preservation_fixture");const x=await d.items.findOne({_id:"synthetic"});print(Boolean(x&&x.before===true&&!x.after&&x.quantity.toString()==="123.450"&&x.at.toISOString()==="2026-01-02T03:04:05.000Z"&&x.payload.base64()==="AAECAwQF"&&(await d.items.getIndexes()).some(i=>i.unique&&i.key.before===1)&&(await d.getCollection("fs.files").countDocuments({filename:"synthetic.bin"}))===1&&(await d.getCollection("fs.chunks").findOne({n:0})).data.base64()==="AAECAwQF"));')
    assert verified=='true','Synthetic restored data/index/types/GridFS did not match'
    js(clone,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{clone_writable:true}})')
-   assert js(clone,'print(db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"}).clone_writable===true)')=='true'
+   assert js(clone,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).clone_writable===true)')=='true'
    run('docker','rm','-fv',clone)
   # Fault injection into a disposable container: archive failure must unlock live Mongo.
   run('docker','exec',source,'mkdir','-p','/tmp/fail-bin')
@@ -64,12 +64,12 @@ def main():
    run('docker','cp',str(stub),source+':/tmp/fail-bin/tar')
   failed=run('docker','exec',*ENV,'-e','PATH=/tmp/fail-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
   assert failed.returncode!=0 and 'copy_created' not in failed.stdout
-  assert js(source,'print(db.getSiblingDB("admin").currentOp().fsyncLock===true)')=='false'
+  assert js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='false'
   js(source,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{source_writable:true}})')
   # A pre-existing lock belongs to another operation and must not be released.
   js(source,'db.getSiblingDB("admin").runCommand({fsync:1,lock:true})')
   refused=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
-  assert refused.returncode!=0 and js(source,'print(db.getSiblingDB("admin").currentOp().fsyncLock===true)')=='true'
+  assert refused.returncode!=0 and js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='true'
   js(source,'db.getSiblingDB("admin").runCommand({fsyncUnlock:1})')
   print('PASS: synthetic MongoDB8 copy/restored data, BSON types, unique index, GridFS bytes; independent clone writable; archive failure unlocked; existing lock preserved')
  finally:

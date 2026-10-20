@@ -68,6 +68,9 @@ class PreservationTests(unittest.TestCase):
   self.assertFalse(list(self.root.glob('copy-*/data.tar.gz*')))
  def test_target_mismatch_never_locks_or_creates_copy(self):
   r=self.run_copy(RAILWAY_SERVICE_ID='wrong');self.assertNotEqual(r.returncode,0);self.assertEqual(self.status()['locks'],0);self.assertFalse(self.coord.exists())
+ def test_windows_raw_stdin_trailing_crlf_is_accepted_without_false_failure(self):
+  r=subprocess.run(['bash','-s','--','--approved-one-off'],input=self.script.read_text()+'\r\n',env=self.env,text=True,capture_output=True,timeout=12)
+  self.assertEqual(r.returncode,0,r.stderr);self.assertTrue(json.loads(r.stdout)['writes_unlocked']);self.assertFalse(self.coord.exists())
  def test_explicit_one_off_ack_required_before_any_side_effect(self):
   r=subprocess.run(['bash',str(self.script)],env=self.env,capture_output=True,text=True);self.assertEqual(r.returncode,2);self.assertEqual(self.status()['locks'],0)
  def test_existing_lock_is_preserved_and_copy_refused(self):
