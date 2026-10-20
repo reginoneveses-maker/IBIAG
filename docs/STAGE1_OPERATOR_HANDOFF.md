@@ -57,3 +57,27 @@ Uma busca filtrada pelo aviso de controle de acesso retornou zero entradas: isso
 Próximo passo concreto: sessão de execução autorizada no ibiag-backend existente, usando o roteiro STAGE1_OPERATOR_HANDOFF.md para executar o auditor já preparado. Em paralelo, leitura no container mongodb deve confirmar caminho/montagem e configuração efetiva de autenticação, sem reiniciar ou mover dados. Não abrir o banco publicamente nem criar cluster Atlas como alternativa ao diagnóstico. A conexão Atlas atual não forneceu acesso a esse destino privado.
 
 Nenhum registro pessoal, URI, hash, senha ou resposta bruta de log foi publicado. Nenhum deploy, reinício, backup, migração, provisionamento pago ou alteração de rede foi executado. O SHA de aplicação006da6d permanece inalterado e aprovado no CI; a etapa1 continua pendente de evidência operacional.
+
+## Alternativa autocontida, revisada em 20/10/2026
+
+Para evitar depender de download externo dentro do backend, preferir [readonly_audit_bundle.py](../tools/readonly_audit_bundle.py). O arquivo inclui exatamente os três módulos revisados do commit883e063a760d5b2ceb15f91a37fcea24acdae783; verifica seus hashes antes de importar. O bootstrap anterior continua disponível como alternativa. SHA-256 do bundle: `282abee0e1dfc055b1e37f385520eeb2f7dc4dcf7fe3ebea6006c54faa2cc9a3`.
+
+Depois de obter SESSION_READY, baixar e revisar esse arquivo no computador do operador. PowerShell:
+
+~~~powershell
+Get-Content -Raw -Encoding UTF8 .\readonly_audit_bundle.py | railway ssh --project c1a9635c-789b-4e42-ac9b-cca4326fab9a --environment fcab95f8-3e30-4da9-8e0b-d9b7f94747ce --service ecbfc64a-75d8-47b2-9b25-b2f7467e77e6 -- python -I -B -
+~~~
+
+Bash:
+
+~~~sh
+railway ssh --project c1a9635c-789b-4e42-ac9b-cca4326fab9a --environment fcab95f8-3e30-4da9-8e0b-d9b7f94747ce --service ecbfc64a-75d8-47b2-9b25-b2f7467e77e6 -- python -I -B - < readonly_audit_bundle.py
+~~~
+
+A documentação oficial de railway ssh foi consultada novamente em20/10: comandos com entrada por pipe executam sem PTY. Ainda não houve execução SSH ao backend publicado. O arquivo recusa alvo sem os três IDs esperados; não completar IDs manualmente para passar a verificação. Usa somente credenciais já existentes no ambiente, sem imprimi-las, baixar bibliotecas, carregar .env ou importar server/startup. Cria apenas arquivos temporários privados dos módulos verificados e os remove ao terminar. Não altera banco, volumes, serviços, rede ou backups.
+
+A saída desta alternativa contém somente flags booleanas de configuração/autenticação/achados e identificadores fixos de verificações pendentes. Contagens, nomes de registros e detalhes de conexão são omitidos. production_certified permanece false, inclusive quando as verificações automatizadas passam. Códigos0/1/2 conservam o significado acima. Não colar saída bruta de outros comandos que contenha variáveis, tokens, URIs ou dados da empresa.
+
+Cinco testes independentes em tools/test_readonly_audit_bundle.py passaram localmente: hashes e conjunto exato de módulos; adulteração recusada; alvo ausente recusado; execução via stdin com Python isolado sem configuração de banco falha com mensagem estática; resumo converte contagens em flags e rejeita identificadores arbitrários. São testes sem DB/SSH real, separados da pipeline da aplicação, e não comprovam produção.
+
+O inventário somente leitura foi repetido nesta continuação: backend e Mongo estão online, volumes=[] e staged=null. A falta de volume associado ao Mongo permanece uma pendência de diagnóstico de dbPath/montagem. Não reiniciar/reimplantar o banco, anexar volume vazio, abrir proxy público ou apontar para outro banco como atalho. Nenhuma mudança de infraestrutura foi executada.
