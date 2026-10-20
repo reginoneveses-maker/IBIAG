@@ -1,0 +1,43 @@
+name: IBIAG Local Installation
+on:
+  pull_request:
+    branches: ["operations/**", "local/**"]
+jobs:
+  local-containers:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install isolated browser checker
+        run: |
+          npm install --prefix /tmp/ibiag-local-browser playwright@1.51.1
+          /tmp/ibiag-local-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Build, authenticate and preserve data across container recreation
+        env:
+          LOCAL_PLAYWRIGHT_PATH: /tmp/ibiag-local-browser/node_modules/playwright
+        run: python tools/check_local_install.py
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse Windows PowerShell 5.1 launcher
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "local/Start-IBIAG.ps1"), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw "PowerShell parser rejected launcher." }
+          Write-Host "Windows PowerShell syntax passed."
+      - name: Exercise launcher on Windows with disposable mocked Docker
+        shell: powershell
+        run: ./local/test-launcher.ps1
+      - name: First install and preservation guard with native Windows Docker shim
+        shell: powershell
+        run: ./local/test-native-volume-check.ps1
