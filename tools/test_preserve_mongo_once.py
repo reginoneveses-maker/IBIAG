@@ -15,6 +15,8 @@ FAKE_MONGO = r'''#!/usr/bin/env python3
 import fcntl,json,os,sys
 from pathlib import Path
 p=Path(os.environ['FAKE_STATE']);f=p.open('a+');fcntl.flock(f,fcntl.LOCK_EX);f.seek(0);s=json.load(f)
+# A child must never consume its parent's bash -s input.
+assert sys.stdin.read() == '', 'Mongo stdin must be detached'
 q=sys.argv[-1];result='';code=0
 assert q.startswith('(async()=>{'), 'Mongo commands require an explicit async context'
 if 'LOCK_STATUS_' in q:result='LOCK_STATUS_LOCKED' if s['locked'] and not os.environ.get('FALSE_STATUS') else 'LOCK_STATUS_UNLOCKED'
@@ -71,6 +73,7 @@ class PreservationTests(unittest.TestCase):
   self.assertEqual(self.status(),{'locked':False,'locks':1,'unlocks':1});self.assertFalse(self.coord.exists())
  def test_archive_error_unlocks_and_never_reports_success_or_record_names(self):
   r=self.run_copy(FAIL_TAR='1');self.assertNotEqual(r.returncode,0);self.assertEqual(r.stdout,'')
+  self.assertIn('phase=ARCHIVE code=2',r.stderr);self.assertIn('cleanup=returned',r.stderr)
   self.assertNotIn('CANARY',r.stderr);self.assertFalse(self.status()['locked']);self.assertEqual(self.status()['unlocks'],1)
   self.assertFalse(list(self.root.glob('copy-*/data.tar.gz*')))
  def test_confirmed_own_lock_requires_unlock_even_if_status_helper_would_say_false(self):

@@ -17,8 +17,8 @@ ENV=['-e','RAILWAY_PROJECT_ID=c1a9635c-789b-4e42-ac9b-cca4326fab9a',
      '-e','RAILWAY_ENVIRONMENT_ID=fcab95f8-3e30-4da9-8e0b-d9b7f94747ce',
      '-e','RAILWAY_SERVICE_ID=9cc0395c-7601-451b-a6fa-1511ab168158']
 
-def run(*args,check=True,timeout=120):
- return subprocess.run(list(args),capture_output=True,text=True,check=check,timeout=timeout)
+def run(*args,check=True,timeout=120,input=None):
+ return subprocess.run(list(args),capture_output=True,text=True,check=check,timeout=timeout,input=input)
 def js(container,code):
  result=run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});',check=False,timeout=25)
  if result.returncode:
@@ -45,7 +45,8 @@ def main():
   ready(source)
   js(source,'const d=db.getSiblingDB("preservation_fixture");await d.items.insertOne({_id:"synthetic",quantity:NumberDecimal("123.450"),at:ISODate("2026-01-02T03:04:05Z"),payload:BinData(0,"AAECAwQF"),before:true});await d.items.createIndex({before:1},{unique:true});await d.getCollection("fs.files").insertOne({_id:ObjectId("650000000000000000000001"),length:6,chunkSize:255,uploadDate:new Date(),filename:"synthetic.bin"});await d.getCollection("fs.chunks").insertOne({files_id:ObjectId("650000000000000000000001"),n:0,data:BinData(0,"AAECAwQF")});')
   run('docker','cp',str(ROOT/'preserve_mongo_once.sh'),source+':/tmp/preserve.sh')
-  result=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',timeout=220)
+  # Match the operator path: bash -s receives source through stdin plus Windows trailing CRLF.
+  result=run('docker','exec','-i',*ENV,source,'bash','-s','--','--approved-one-off',timeout=220,input=(ROOT/'preserve_mongo_once.sh').read_text()+'\r\n')
   info=json.loads(result.stdout);assert info['copy_created'] and info['writes_unlocked'] and not info['restoration_proven']
   assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
   js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{after:true}});')
@@ -74,6 +75,7 @@ def main():
    run('docker','cp',str(stub),source+':/tmp/fail-bin/tar')
   failed=run('docker','exec',*ENV,'-e','PATH=/tmp/fail-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
   assert failed.returncode!=0 and 'copy_created' not in failed.stdout
+  assert 'phase=ARCHIVE code=2' in failed.stderr and 'cleanup=returned' in failed.stderr
   assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
   js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{source_writable:true}})')
   assert js(source,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).source_writable===true)')=='true'
