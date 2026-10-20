@@ -36,6 +36,8 @@ def dossier(order,invoices,packing_lists,quotes,today):
                          "source_current":r.get("source_order_revision")==expected if expected else None})
         return sorted(rows,key=lambda r:(r["status"]=="cancelled",r["reference"],r["id"]))
     invoice_rows=documents(invoices,expected_invoice);packing_rows=documents(packing_lists,expected_packing)
+    invoice_state="review" if any(r["status"]=="unknown" or r["version"] is None for r in invoice_rows) else operation["invoice_status"]
+    packing_state="review" if any(r["status"]=="unknown" or r["version"] is None for r in packing_rows) else operation["packing_status"]
     flags=[flag for flag in operation["flags"] if flag in {"documents_pending","shipment_missing","shipment_overdue","data_review"}]
     if any(r["status"]=="unknown" or r["version"] is None for r in invoice_rows+packing_rows):
         if "data_review" not in flags: flags.append("data_review")
@@ -58,7 +60,7 @@ def dossier(order,invoices,packing_lists,quotes,today):
     if not isinstance(shipment,dict): shipment={}
     return {"order":{**{key:text(order.get(key),500 if key=="customer" else 200) for key in ("id","number","customer","customer_country","order_date","incoterm","lead_id")},
                      "status":operation["status"],"version":order.get("version") if type(order.get("version")) is int else None},
-            "quote":quote,"invoice_state":operation["invoice_status"],"packing_state":operation["packing_status"],
+            "quote":quote,"invoice_state":invoice_state,"packing_state":packing_state,
             "commercial_source_checked":bool(expected_invoice and expected_packing),
             "invoices":invoice_rows,"packing_lists":packing_rows,
             "shipment":{key:text(shipment.get(key),500) for key in SHIPMENT_FIELDS},

@@ -3,7 +3,7 @@ import {Link,useSearchParams} from "react-router-dom";
 import {api} from "@/AuthContext";
 import {PageHeader,Button,Card,CardContent} from "@/components/erp";
 const states={draft:"Rascunho",confirmed:"Confirmado",shipped:"Embarcado",delivered:"Entregue",cancelled:"Cancelado",unknown:"A conferir",approved:"Aprovado internamente"};
-const docs={missing:"Nenhum documento ativo",draft:"Rascunho ativo",approved:"Aprovado internamente e compatível com o pedido",outdated:"Origem alterada; conferir documento",ambiguous:"Mais de um documento ativo; conferir vínculo"};
+const docs={review:"Metadados inconsistentes; conferir documento",missing:"Nenhum documento ativo",draft:"Rascunho ativo",approved:"Aprovado internamente e compatível com o pedido",outdated:"Origem alterada; conferir documento",ambiguous:"Mais de um documento ativo; conferir vínculo"};
 const quoteStates={not_linked:"Pedido sem cotação vinculada",linked:"Cotação vinculada à revisão registrada no pedido",missing:"Cotação de origem não encontrada",ambiguous:"Cotação de origem ambígua",review:"Cotação ou vínculo a conferir"};
 const flags={documents_pending:"Documentação comercial a conferir",shipment_missing:"Embarque não registrado ou cancelado",shipment_overdue:"Previsão logística vencida",data_review:"Dados ou vínculos a conferir",quote_review:"Cotação de origem a conferir"};
 const shipping={planned:"Planejado",booked:"Reservado",in_transit:"Em trânsito",arrived:"Chegou ao destino",delivered:"Entregue",cancelled:"Cancelado"};

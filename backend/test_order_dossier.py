@@ -99,6 +99,7 @@ class DossierTests(unittest.IsolatedAsyncioTestCase):
         data=(await self.get()).json()
         self.assertFalse(data["commercial_source_checked"])
         self.assertEqual(data["invoices"][0]["status"],"unknown")
+        self.assertEqual(data["invoice_state"],"review")
         self.assertIsNone(data["invoices"][0]["source_current"])
         self.assertIn("data_review",data["flags"])
         await self.db.orders.update_one({"id":"sale"},{"$set":{"source_quote_id":{"$ne":None}}})
