@@ -44,11 +44,15 @@ Memória do cálculo, cliente do CRM e condições comerciais preservadas; aprov
 
 Documento comercial em USD com memória explícita da venda, dados cadastrais conferidos, aprovação versionada e PDF privado com marca de rascunho/cancelamento. Sem copiar fornecedores ou custos internos; não cria outra conta ou NF-e. Ver COMMERCIAL_INVOICES.md para uso, contrato, testes e limites.
 
+## Sexta entrega: Packing List vinculada ao pedido
+
+Grupos manuais de volumes com embalagem, pesos, cubagem opcional e alocação exata das quantidades de cada item. Aprovação explícita, documento imutável/cancelável e PDF privado sem preços/custos. Ver PACKING_LISTS.md. Não equivale à homologação ou publicação.
+
 ## Próximas entregas, uma de cada vez
 
 1. Homologar o fluxo CRM/cálculo→cotação→pedido com condições comerciais e aprovação interna; desenhar envio e aceite do comprador separadamente. Cotações não criam pedidos/contas implicitamente.
 2. Homologar o embarque completo manual vinculado ao pedido; desenhar embarques parciais/devoluções separadamente antes de qualquer ampliação. Sem ativar tracking pago.
-3. Homologar a Commercial Invoice e implementar Packing List vinculada ao processo, com volumes, pesos, embalagem e conferência explícita; sem inferir dados ausentes.
+3. Homologar a Commercial Invoice e a Packing List vinculadas ao processo, com volumes, pesos, embalagem e conferência explícita; sem inferir dados ausentes.
 4. Gestão diária e indicadores derivados dos registros, filtros, alertas internos e histórico permanente. Não apresentar exemplos ou inferências como operação concluída.
 5. Validar fluxo integrado oportunidade→cotação→pedido→embarque→documentação→recebimento e importação/deduplicação/relatórios. Integrações externas somente depois da configuração e homologação autorizadas.
 

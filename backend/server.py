@@ -24,6 +24,8 @@ from business_workflow import normalize_order, normalize_purchase, inventory_bal
 from order_shipments import build_shipment, allowed_statuses as shipment_statuses, SUMMARY_FIELDS as SHIPMENT_SUMMARY_FIELDS
 from commercial_quotations import QuotationCreate, QuotationEdit, QuotationState, TERMS as QUOTE_TERMS, SUMMARY as QUOTE_SUMMARY, validate_terms as validate_quote_terms, quotation_event
 from commercial_invoices import InvoiceCreate as CommercialInvoiceCreate, InvoiceEdit as CommercialInvoiceEdit, InvoiceDecision as CommercialInvoiceDecision, SUMMARY as COMMERCIAL_INVOICE_SUMMARY, DETAILS as COMMERCIAL_INVOICE_DETAILS, commercial_snapshot, revision as invoice_revision, validate_details as validate_invoice_details, invoice_event
+from packing_lists import PackingCreate, PackingEdit, PackingDecision, DETAILS as PACKING_DETAILS, SUMMARY as PACKING_SUMMARY, packing_snapshot, revision as packing_revision, validate_details as validate_packing_details, packing_event
+from packing_list_pdf import render_packing_list
 from commercial_invoice_pdf import render_invoice as render_commercial_invoice, InvoiceRenderingError
 from reportlab.platypus.doctemplate import LayoutError
 from contextlib import asynccontextmanager
@@ -1350,6 +1352,13 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
             expected_items = (order.source_quote_snapshot or {}).get("items")
             if result["items"] != expected_items:
                 raise HTTPException(409, "O cadastro comercial mudou. Revise a cotação antes de continuar.")
+        if previous and await db.packing_lists.find_one({"order_id": order.id, "status": {"$in": ["draft", "approved"]}}, {"_id": 1}):
+            try:
+                unchanged = packing_revision(packing_snapshot(result)) == packing_revision(packing_snapshot(previous))
+            except (TypeError, ValueError):
+                unchanged = False
+            if result["status"] not in {"confirmed", "shipped", "delivered"} or not unchanged:
+                raise HTTPException(409, "Pedido vinculado a Packing List ativa. Cancele o documento antes de alterar itens ou comprador.")
         if previous and await db.commercial_invoices.find_one({"order_id": order.id, "status": {"$in": ["draft", "approved"]}}, {"_id": 1}):
             try:
                 unchanged = invoice_revision(commercial_snapshot(result)) == invoice_revision(commercial_snapshot(previous))
@@ -1451,6 +1460,8 @@ async def del_ord(oid: str, user=Depends(get_admin_user)):
             raise HTTPException(400, "Cancele o pedido antes de arquivá-lo")
         if await db.commercial_invoices.find_one({"order_id": oid, "status": {"$in": ["draft", "approved"]}}, {"_id": 1}):
             raise HTTPException(409, "Commercial Invoice ativa impede arquivar o pedido.")
+        if await db.packing_lists.find_one({"order_id": oid, "status": {"$in": ["draft", "approved"]}}, {"_id": 1}):
+            raise HTTPException(409, "Packing List ativa impede arquivar o pedido.")
         await ensure_owned()
         await db.orders.update_one({"id": oid}, {"$set": {"deleted_at": now_iso()}})
         return {"deleted": 1, "restorable": True}
@@ -1481,7 +1492,7 @@ async def invoice_order(oid):
     if len(records) != 1: raise HTTPException(409, "Pedido ambíguo. Solicite revisão.")
     order = records[0]
     if order.get("deleted_at") or order.get("workflow_enabled") is not True or order.get("status") not in {"confirmed", "shipped", "delivered"}:
-        raise HTTPException(409, "Commercial Invoice exige pedido confirmado, embarcado ou entregue e não arquivado.")
+        raise HTTPException(409, "Documento de exportação exige pedido confirmado, embarcado ou entregue e não arquivado.")
     return order
 
 async def invoice_source(oid):
@@ -1605,6 +1616,130 @@ async def download_commercial_invoice(iid: str, user=Depends(get_admin_user)):
     # Filename comes from a validated stored ID, never a user filename/path/URL.
     safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(record["id"]))[:80]
     return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="Commercial-Invoice-{safe_id}-{record["status"]}-v{record["version"]}.pdf"',
+        "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
+
+
+async def packing_source(oid):
+    order = await invoice_order(oid)
+    try: snapshot = packing_snapshot(order)
+    except (TypeError, ValueError): raise HTTPException(400, "Revise cliente, itens, valores e Incoterm no pedido.") from None
+    return {"order_id": oid, "source_order_version": order["version"], "source_order_revision": packing_revision(snapshot),
+            "source_order_snapshot": snapshot}
+
+async def packing_record(iid):
+    records = await db.packing_lists.find({"id": iid}, {"_id": 0}).limit(2).to_list(2)
+    if not records: raise HTTPException(404, "Packing List não encontrada")
+    if len(records) != 1: raise HTTPException(409, "Packing List ambígua. Solicite revisão.")
+    return records[0]
+
+async def packing_view(record):
+    changed = False
+    try:
+        source = await packing_source(record["order_id"])
+        changed = source["source_order_revision"] != record["source_order_revision"]
+    except HTTPException:
+        changed = True
+    return {**{k: v for k, v in record.items() if k != "_id"}, "source_changed": changed}
+
+def check_packing_details(record, approval=False):
+    try: validate_packing_details(record, datetime.now(timezone.utc).date(), approval)
+    except (TypeError, ValueError) as exc: raise HTTPException(400, str(exc)) from None
+
+def checked_packing_event(record, previous, actor, reason):
+    try: return packing_event(record, previous, actor, reason, now_iso())
+    except OverflowError as exc: raise HTTPException(413, str(exc)) from None
+    except (TypeError, ValueError): raise HTTPException(400, "Revise o documento e o limite de histórico da packing.") from None
+
+async def packing_pdf_bytes(record):
+    try: return await asyncio.to_thread(render_packing_list, record)
+    except InvoiceRenderingError as exc: raise HTTPException(400, str(exc)) from None
+    except (TypeError, ValueError, LayoutError): raise HTTPException(400, "Não foi possível renderizar o PDF. Revise tamanho, datas e conteúdo do documento.") from None
+
+@api.get("/orders/{oid}/packing-list-draft")
+async def packing_list_draft(oid: str, user=Depends(get_admin_user)):
+    source = await packing_source(oid)
+    linked = await db.packing_lists.find_one({"order_id": oid, "status": {"$in": ["draft", "approved"]}}, {"_id": 0, "id": 1})
+    return {**source, "active_packing_id": linked["id"] if linked else ""}
+
+@api.get("/packing-lists")
+async def list_packing_lists(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
+    status: Optional[Literal["draft", "approved", "cancelled"]] = None,
+    order_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_admin_user)):
+    query = {}
+    if status: query["status"] = status
+    if order_id: query["order_id"] = order_id
+    return await db.packing_lists.find(query, {"_id": 0, **{k: 1 for k in PACKING_SUMMARY}}).sort("id", 1).skip(skip).limit(limit).to_list(limit)
+
+@api.get("/packing-lists/{iid}")
+async def get_packing_list(iid: str, user=Depends(get_admin_user)):
+    return await packing_view(await packing_record(iid))
+
+@api.post("/packing-lists")
+async def create_packing_list(body: PackingCreate, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        if await db.packing_lists.find_one({"$or": [{"id": body.id}, {"reference": body.reference},
+                {"order_id": body.order_id, "status": {"$in": ["draft", "approved"]}}]}, {"_id": 1}):
+            raise HTTPException(409, "Pedido já possui packing ativa ou referência/identificador já utilizado. Confira a lista.")
+        source = await packing_source(body.order_id)
+        if source["source_order_version"] != body.source_order_version:
+            raise HTTPException(409, "Pedido alterado. Reabra a conferência antes de salvar a packing.")
+        values = body.model_dump(exclude={"change_note"})
+        values.update(source, status="draft", customer=source["source_order_snapshot"]["customer"], totals={})
+        check_packing_details(values)
+        record = checked_packing_event(values, None, user, body.change_note)
+        await ensure_owned()
+        await db.packing_lists.insert_one(dict(record))
+        return await packing_view(record)
+
+@api.put("/packing-lists/{iid}")
+async def edit_packing_list(iid: str, body: PackingEdit, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous = await packing_record(iid)
+        if previous["version"] != body.version: raise HTTPException(409, "Packing alterada. Recarregue antes de salvar.")
+        if previous["status"] != "draft": raise HTTPException(409, "Somente rascunhos podem ser editados. Cancele e crie outro documento.")
+        values = {**previous, **body.model_dump(exclude={"version", "change_note"})}
+        check_packing_details(values)
+        record = checked_packing_event(values, previous, user, body.change_note)
+        await ensure_owned()
+        result = await db.packing_lists.replace_one(version_query(previous), record)
+        if not result.matched_count: raise HTTPException(409, "Packing alterada. Recarregue antes de salvar.")
+        return await packing_view(record)
+
+@api.post("/packing-lists/{iid}/status")
+async def decide_packing_list(iid: str, body: PackingDecision, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous = await packing_record(iid)
+        if previous["version"] != body.version: raise HTTPException(409, "Packing alterada. Recarregue antes da decisão.")
+        if previous["status"] == "cancelled" or previous["status"] == body.status:
+            raise HTTPException(409, "Transição da packing não permitida.")
+        values = {**previous, "status": body.status}
+        if body.status == "approved":
+            if not body.details_confirmed: raise HTTPException(400, "Confirme a conferência cadastral, de volumes, pesos e quantidades antes de aprovar.")
+            source = await packing_source(previous["order_id"])
+            if source["source_order_revision"] != previous["source_order_revision"]:
+                raise HTTPException(409, "O pedido comercial mudou. Cancele o rascunho e prepare outra packing.")
+            check_packing_details(values, approval=True)
+            values.update(approved_by=user["id"], approved_at=now_iso())
+            # Refuse unsupported glyphs/layout before committing an approved record.
+            await packing_pdf_bytes(values)
+        record = checked_packing_event(values, previous, user, body.change_note)
+        await ensure_owned()
+        result = await db.packing_lists.replace_one(version_query(previous), record)
+        if not result.matched_count: raise HTTPException(409, "Packing alterada. Recarregue antes da decisão.")
+        return await packing_view(record)
+
+@api.get("/packing-lists/{iid}/pdf")
+async def download_packing_list(iid: str, user=Depends(get_admin_user)):
+    record = await packing_record(iid)
+    if record["status"] == "approved" and (await packing_view(record))["source_changed"]:
+        raise HTTPException(409, "Pedido incompatível com a packing. Revise a operação antes de baixar.")
+    data = await packing_pdf_bytes(record)
+    current = await packing_record(iid)
+    if current["version"] != record["version"]:
+        raise HTTPException(409, "Packing alterada durante a geração. Recarregue antes de baixar.")
+    # Filename comes from a validated stored ID, never a user filename/path/URL.
+    safe_id = re.sub(r"[^A-Za-z0-9_-]", "_", str(record["id"]))[:80]
+    return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="Packing-List-{safe_id}-{record["status"]}-v{record["version"]}.pdf"',
         "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"})
 
 

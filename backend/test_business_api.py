@@ -99,7 +99,7 @@ class BusinessApiTests(unittest.IsolatedAsyncioTestCase):
         self.db = SimpleNamespace(products=Collection([{"id":"p","name":"Açaí","unit":"kg","stock":10}]),
                                  product_offers=Collection([{"id":"o","product_id":"p","active":True,"supplier_id":"s","supplier_name":"Fornecedor"}]),
                                  suppliers=Collection([{"id":"s","name":"Fornecedor"}]), orders=Collection(), purchases=Collection(),
-                                 finance=Collection(), commercial_invoices=Collection(), workflow_locks=Collection())
+                                 finance=Collection(), commercial_invoices=Collection(), packing_lists=Collection(), workflow_locks=Collection())
         self.api = load_api(self.db)
         self.body = {"id":"order1","customer":"Teste","status":"confirmed","track_stock":True,"order_date":"2026-10-02",
                      "receivable_due_date":"2026-11-02","items":[{"product_id":"p","offer_id":"o","quantity":6,"unit_price":2}]}
