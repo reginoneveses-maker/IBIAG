@@ -240,6 +240,7 @@ const base = "http://127.0.0.1:8765";
     await page.goto(base+"/gestao/precos");
     await page.getByTestId(`price-row-${prices[0].id}`).getByRole("link",{name:"Criar cotação",exact:true}).click();
     await page.getByRole("heading",{name:"Nova cotação comercial",exact:true}).waitFor();
+    assert((await page.getByLabel("Valores da cotação",{exact:true}).innerText()).includes("4,26"));
     await page.getByLabel("Referência",{exact:true}).fill("COT-BROWSER");
     await page.getByLabel("Empresa do CRM",{exact:true}).selectOption(crmLeadId);
     await page.getByLabel("Validade até",{exact:true}).fill("2099-12-31");
@@ -385,7 +386,7 @@ const base = "http://127.0.0.1:8765";
     assert.deepEqual(externalDataRequests,[],"Portal attempted external scripts/data requests");
     assert.equal(await page.evaluate(()=>typeof window.posthog),"undefined");
     assert.deepEqual(errors,[]);
-    console.log("PASS browser: search → decision → CRM → draft order → saved calculation → stale rejection → reviewed draft → reload → CRM → company documents → folder upload → download → move → reload");
+    console.log("PASS browser: search → decision → CRM → draft order → saved calculation → stale rejection → reviewed draft → manual shipment → approved quotation → unique draft → reload → CRM → company documents → folder upload → download → move → reload");
   } finally {
     if(browser) await browser.close();
     server.kill("SIGTERM");

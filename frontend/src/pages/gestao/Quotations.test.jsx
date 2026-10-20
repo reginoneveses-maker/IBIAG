@@ -7,14 +7,14 @@ import { toast } from "sonner";
 jest.mock("@/AuthContext",()=>({api:{get:jest.fn(),post:jest.fn(),put:jest.fn()}}));
 jest.mock("sonner",()=>({toast:{error:jest.fn(),success:jest.fn()}}));
 jest.mock("@/components/ui/dialog",()=>({Dialog:({open,children})=>open?<div>{children}</div>:null,DialogContent:({children})=><div>{children}</div>,DialogHeader:({children})=><div>{children}</div>,DialogTitle:({children})=><h2>{children}</h2>,DialogFooter:({children})=><div>{children}</div>}));
-const source={source_price_id:"p1",source_price_revision:"a".repeat(64),source_price_snapshot:{private_cost:10},items:[{product_name:"Acerola",supplier_name:"Supplier",quantity:250,unit:"kg",unit_price:4}],total_usd:1000};
+const source={source_price_id:"p1",source_price_revision:"a".repeat(64),source_price_snapshot:{private_cost:10},items:[{product_name:"Acerola",supplier_name:"Supplier",quantity:250,unit:"kg",unit_price:4.2615}],total_usd:1065.38};
 const quote={...source,id:"q1",reference:"COT-1",lead_id:"lead",customer:"Buyer",customer_country:"Portugal",version:1,status:"draft",valid_until:"2099-12-31",incoterm:"FOB",payment_terms:"Prepaid",delivery_terms:"Santos, 30 days",notes:"",history:[]};
 const mount=url=>render(<MemoryRouter initialEntries={[url||"/gestao/cotacoes"]}><Quotations/></MemoryRouter>);
 beforeEach(()=>{jest.clearAllMocks();Object.defineProperty(global,"crypto",{configurable:true,value:{randomUUID:()=>"new-quote"}});api.get.mockImplementation(path=>Promise.resolve({data:path==="/quotations"?[quote]:path==="/quotations/q1"?quote:path==="/leads"?[{id:"lead",company:"Buyer"}]:source}));api.post.mockResolvedValue({data:quote});api.put.mockResolvedValue({data:{...quote,version:2}});});
 afterEach(cleanup);
 async function open(){fireEvent.click(await screen.findByRole("button",{name:"Abrir cotação"}));await screen.findByRole("heading",{name:"Cotação COT-1"});}
 test("saved-price shortcut creates only a quotation on explicit save with server-owned values omitted",async()=>{
- mount("/gestao/cotacoes?price=p1");await screen.findByRole("heading",{name:"Nova cotação comercial"});expect(api.post).not.toHaveBeenCalled();
+ mount("/gestao/cotacoes?price=p1");await screen.findByRole("heading",{name:"Nova cotação comercial"});expect(api.post).not.toHaveBeenCalled();expect(screen.getByLabelText("Valores da cotação").textContent).toContain("4,2615");expect(screen.getByLabelText("Valores da cotação").textContent).toContain("1.065,38");
  fireEvent.change(screen.getByLabelText("Empresa do CRM"),{target:{value:"lead"}});fireEvent.change(screen.getByLabelText("Validade até"),{target:{value:"2099-12-31"}});
  fireEvent.change(screen.getByLabelText("Condições de pagamento"),{target:{value:"Prepaid"}});fireEvent.change(screen.getByLabelText("Condições de entrega"),{target:{value:"Santos, 30 days"}});fireEvent.change(screen.getByLabelText("Motivo do registro ou decisão"),{target:{value:"Commercial review"}});
  fireEvent.click(screen.getByRole("button",{name:"Salvar cotação"}));await waitFor(()=>expect(api.post).toHaveBeenCalledTimes(1));const [path,body]=api.post.mock.calls[0];expect(path).toBe("/quotations");expect(body).toMatchObject({id:"new-quote",lead_id:"lead",source_price_revision:source.source_price_revision});for(const key of ["items","total_usd","source_price_snapshot","status","history"])expect(body[key]).toBeUndefined();
