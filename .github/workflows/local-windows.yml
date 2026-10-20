@@ -38,3 +38,6 @@ jobs:
       - name: Exercise launcher on Windows with disposable mocked Docker
         shell: powershell
         run: ./local/test-launcher.ps1
+      - name: First install and preservation guard with native Windows Docker shim
+        shell: powershell
+        run: ./local/test-native-volume-check.ps1

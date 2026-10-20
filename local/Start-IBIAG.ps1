@@ -46,8 +46,11 @@ try {
     }
     if (-not (Test-Path -LiteralPath $ConfigFile)) {
         if ($Action -eq "Stop") { throw "Nao existe uma instalacao local configurada para parar." }
-        & docker volume inspect ibiag-local_mongo_data *> $null
-        if ($LASTEXITCODE -eq 0) {
+        # Listing succeeds with empty output on first install. An inspect of a
+        # missing volume emits stderr, which is terminating in Windows PS 5.1.
+        $LocalVolumes = @(& docker volume ls --format '{{.Name}}')
+        if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel consultar os volumes locais. Nenhuma configuracao foi criada." }
+        if ($LocalVolumes -contains "ibiag-local_mongo_data") {
             throw "Existem dados locais, mas a configuracao original nao foi encontrada. Nao gere outras senhas nem apague o volume; recupere a configuracao original."
         }
         New-Item -ItemType Directory -Force -Path $ConfigFolder | Out-Null

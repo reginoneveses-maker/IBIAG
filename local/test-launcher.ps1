@@ -16,7 +16,8 @@ function global:docker {
     if ($Command -like "version --format*") { return "28.5.1" }
     if ($Command -like "info --format*") { return "linux" }
     if ($Command -eq "compose version --short") { return "2.40.0" }
-    if ($Command -like "volume inspect*") { $global:LASTEXITCODE = 1; return }
+    if ($Command -eq "volume ls --format {{.Name}}") { return }
+    if ($Command -like "volume inspect*") { throw "Missing-volume inspect must not be used for first install" }
     if ($Arguments[0] -eq "compose") {
         $global:ComposeCalls.Add($Command)
         if ($Command -notlike "*--project-name ibiag-local*") { throw "Wrong project" }
