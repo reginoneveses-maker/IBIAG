@@ -20,7 +20,7 @@ AVAILABLE=$(df -Pk /tmp | awk 'NR==2 {print $4}')
 export MONGOSH_DISABLE_TELEMETRY=1
 mongo_check() { timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$1})().catch(()=>quit(2));" 2>/dev/null; }
 # Refuse sharding/replica sets, custom dbpaths, encryption and an existing fsync lock.
-PREFLIGHT='const a=db.getSiblingDB("admin"); const h=await a.runCommand({hello:1}); const c=await a.runCommand({getCmdLineOpts:1}); const s=await a.runCommand({serverStatus:1}); const p=c.parsed||{}; const o=await a.currentOp(); if(h.ok!==1||c.ok!==1||s.ok!==1||h.setName||h.msg==="isdbgrid"||!(await db.version()).startsWith("8.")||(p.storage?.dbPath&&p.storage.dbPath!=="/data/db")||p.security?.enableEncryption||p.security?.kmip||o.fsyncLock||s.storageEngine?.name!=="wiredTiger")quit(2); print("PREFLIGHT_OK");'
+PREFLIGHT='const a=db.getSiblingDB("admin"); const h=await a.runCommand({hello:1}); const c=await a.runCommand({getCmdLineOpts:1}); const s=await a.runCommand({serverStatus:1}); const p=c.parsed||{}; const o=await a.runCommand({currentOp:1}); if(h.ok!==1||c.ok!==1||s.ok!==1||o.ok!==1||h.setName||h.msg==="isdbgrid"||!(await db.version()).startsWith("8.")||(p.storage?.dbPath&&p.storage.dbPath!=="/data/db")||p.security?.enableEncryption||p.security?.kmip||o.fsyncLock||s.storageEngine?.name!=="wiredTiger")quit(2); print("PREFLIGHT_OK");'
 [[ $(mongo_check "$PREFLIGHT") == PREFLIGHT_OK ]] || fail
 # Atomic marker prevents concurrent copies by this helper, including uncertain cleanup.
 mkdir -m 700 "$COORD" 2>/dev/null || fail
@@ -40,10 +40,15 @@ exec 9>"$COORD/release.mutex" || exit 2
 flock -w 30 9 || exit 2
 [[ -f $COORD/owner && $(cat "$COORD/owner") == "$EXPECTED_TOKEN" ]] || exit 2
 [[ -f $COORD/armed ]] || exit 0
-STATUS_JS='const s=await db.getSiblingDB("admin").currentOp();print(s.fsyncLock?"LOCK_STATUS_LOCKED":"LOCK_STATUS_UNLOCKED");'
-STATUS=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$STATUS_JS})().catch(()=>quit(2));" 2>/dev/null) || exit 2
-if [[ $STATUS == LOCK_STATUS_UNLOCKED ]]; then rm -f "$COORD/armed"; exit 0; fi
-[[ $STATUS == LOCK_STATUS_LOCKED && ! -e $COORD/unlock-attempt ]] || exit 2
+STATUS_JS='const s=await db.getSiblingDB("admin").runCommand({currentOp:1});if(s.ok!==1)quit(2);print(s.fsyncLock?"LOCK_STATUS_LOCKED":"LOCK_STATUS_UNLOCKED");'
+# A confirmed owned lock MUST be decremented. Shell helper currentOp() results
+# are not proof of release. Only the server fsyncUnlock response count0 is.
+if [[ ! -f $COORD/lock-confirmed || -e $COORD/unlock-attempt ]]; then
+ STATUS=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "(async()=>{$STATUS_JS})().catch(()=>quit(2));" 2>/dev/null) || exit 2
+ if [[ $STATUS == LOCK_STATUS_UNLOCKED ]]; then rm -f "$COORD/armed"; exit 0; fi
+ [[ $STATUS == LOCK_STATUS_LOCKED ]] || exit 2
+fi
+[[ ! -e $COORD/unlock-attempt ]] || exit 2
 # Never retry an uncertain decrement: that could release another operator's lock.
 (set -C; : > "$COORD/unlock-attempt") || exit 2
 JS='const a=db.getSiblingDB("admin");const r=await a.runCommand({fsyncUnlock:1});if(r.ok!==1||Number(r.lockCount)!==0)quit(2); print("UNLOCKED");'
@@ -61,7 +66,7 @@ cleanup() {
       printf '%s\n' 'MANUAL_UNLOCK_REQUIRED: run the reviewed release command before any other operation.' >&2
       exit 3
     fi
-    rm -f "$COORD/release.sh" "$COORD/release.mutex" "$COORD/expired" "$COORD/owner" "$COORD/unlock-attempt"
+    rm -f "$COORD/release.sh" "$COORD/release.mutex" "$COORD/expired" "$COORD/owner" "$COORD/unlock-attempt" "$COORD/lock-confirmed"
     rmdir "$COORD" 2>/dev/null || true
   fi
   if [[ $DONE != 1 && -n $WORK ]]; then rm -f "$WORK/data.tar.gz.partial" "$WORK/data.tar.gz"; rmdir "$WORK" 2>/dev/null || true; fi
@@ -74,10 +79,12 @@ trap 'exit 2' INT TERM HUP
 # Marker stays present on failed unlock, refusing a new copy and requiring operator recovery.
 touch "$COORD/armed"
 nohup bash -c 'sleep 150; d=/tmp/ibiag-preserve-active; if [[ -f $d/owner && $(cat "$d/owner") == "$1" && -f $d/armed ]]; then touch "$d/expired"; bash "$d/release.sh" "$1"; fi' ibiag-watchdog "$TOKEN" </dev/null >/dev/null 2>&1 &
-LOCK='const a=db.getSiblingDB("admin");if((await a.currentOp()).fsyncLock){print("PREEXISTING_LOCK");quit(0);}const r=await a.runCommand({fsync:1,lock:true,fsyncLockAcquisitionTimeoutMillis:15000});if(r.ok!==1||Number(r.lockCount)!==1)quit(2);print("LOCKED");'
+LOCK='const a=db.getSiblingDB("admin");const s=await a.runCommand({currentOp:1});if(s.ok!==1)quit(2);if(s.fsyncLock){print("PREEXISTING_LOCK");quit(0);}const r=await a.runCommand({fsync:1,lock:true,fsyncLockAcquisitionTimeoutMillis:15000});if(r.ok!==1)quit(2);print("OWNED_LOCK_"+Number(r.lockCount));'
 LOCK_RESULT=$(mongo_check "$LOCK") || fail
 if [[ $LOCK_RESULT == PREEXISTING_LOCK ]]; then rm -f "$COORD/armed"; fail; fi
-[[ $LOCK_RESULT == LOCKED ]] || fail
+[[ $LOCK_RESULT =~ ^OWNED_LOCK_[1-9][0-9]*$ ]] || fail
+touch "$COORD/lock-confirmed"
+[[ $LOCK_RESULT == OWNED_LOCK_1 ]] || fail
 # Copy the complete dbpath, including journal, while writes are blocked. No mongodump
 # reads behind queued writes. Any tar warning/nonzero exit invalidates the copy.
 (ulimit -f 2097152; timeout --signal=TERM --kill-after=5s 110s tar -czf "$WORK/data.tar.gz.partial" -C "$DATA_PATH" .) 2>/dev/null || fail

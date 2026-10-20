@@ -20,7 +20,7 @@ ENV=['-e','RAILWAY_PROJECT_ID=c1a9635c-789b-4e42-ac9b-cca4326fab9a',
 def run(*args,check=True,timeout=120):
  return subprocess.run(list(args),capture_output=True,text=True,check=check,timeout=timeout)
 def js(container,code):
- return run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});').stdout.strip()
+ return run('docker','exec',container,'mongosh','--quiet','--norc','--eval','(async()=>{'+code+'})().catch(e=>{print(e.message);quit(2);});',timeout=25).stdout.strip()
 def ready(container):
  deadline=time.monotonic()+60
  for _ in range(80):
@@ -38,12 +38,12 @@ def main():
  try:
   run('docker','run','-d','--name',source,'--network','none',IMAGE)
   ready(source)
-  js(source,'const d=db.getSiblingDB("preservation_fixture");d.items.insertOne({_id:"synthetic",quantity:NumberDecimal("123.450"),at:ISODate("2026-01-02T03:04:05Z"),payload:BinData(0,"AAECAwQF"),before:true});d.items.createIndex({before:1},{unique:true});d.getCollection("fs.files").insertOne({_id:ObjectId("650000000000000000000001"),length:6,chunkSize:255,uploadDate:new Date(),filename:"synthetic.bin"});d.getCollection("fs.chunks").insertOne({files_id:ObjectId("650000000000000000000001"),n:0,data:BinData(0,"AAECAwQF")});')
+  js(source,'const d=db.getSiblingDB("preservation_fixture");await d.items.insertOne({_id:"synthetic",quantity:NumberDecimal("123.450"),at:ISODate("2026-01-02T03:04:05Z"),payload:BinData(0,"AAECAwQF"),before:true});await d.items.createIndex({before:1},{unique:true});await d.getCollection("fs.files").insertOne({_id:ObjectId("650000000000000000000001"),length:6,chunkSize:255,uploadDate:new Date(),filename:"synthetic.bin"});await d.getCollection("fs.chunks").insertOne({files_id:ObjectId("650000000000000000000001"),n:0,data:BinData(0,"AAECAwQF")});')
   run('docker','cp',str(ROOT/'preserve_mongo_once.sh'),source+':/tmp/preserve.sh')
   result=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',timeout=220)
   info=json.loads(result.stdout);assert info['copy_created'] and info['writes_unlocked'] and not info['restoration_proven']
-  assert js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='false'
-  js(source,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{after:true}});')
+  assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
+  js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{after:true}});')
   with tempfile.TemporaryDirectory(prefix='ibiag-synthetic-restore-') as directory:
    folder=Path(directory);archive=folder/'synthetic.tar.gz';data=folder/'data';data.mkdir()
    run('docker','cp',source+':'+info['archive'],str(archive))
@@ -59,7 +59,7 @@ def main():
    ready(clone)
    verified=js(clone,'const d=db.getSiblingDB("preservation_fixture");const x=await d.items.findOne({_id:"synthetic"});print(Boolean(x&&x.before===true&&!x.after&&x.quantity.toString()==="123.450"&&x.at.toISOString()==="2026-01-02T03:04:05.000Z"&&x.payload.base64()==="AAECAwQF"&&(await d.items.getIndexes()).some(i=>i.unique&&i.key.before===1)&&(await d.getCollection("fs.files").countDocuments({filename:"synthetic.bin"}))===1&&(await d.getCollection("fs.chunks").findOne({n:0})).data.base64()==="AAECAwQF"));')
    assert verified=='true','Synthetic restored data/index/types/GridFS did not match'
-   js(clone,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{clone_writable:true}})')
+   js(clone,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{clone_writable:true}})')
    assert js(clone,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).clone_writable===true)')=='true'
    run('docker','rm','-fv',clone)
   # Fault injection into a disposable container: archive failure must unlock live Mongo.
@@ -69,14 +69,37 @@ def main():
    run('docker','cp',str(stub),source+':/tmp/fail-bin/tar')
   failed=run('docker','exec',*ENV,'-e','PATH=/tmp/fail-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
   assert failed.returncode!=0 and 'copy_created' not in failed.stdout
-  assert js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='false'
-  js(source,'db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{source_writable:true}})')
+  assert js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false'
+  js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{source_writable:true}})')
+  assert js(source,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).source_writable===true)')=='true'
   # A pre-existing lock belongs to another operation and must not be released.
-  js(source,'db.getSiblingDB("admin").runCommand({fsync:1,lock:true})')
+  js(source,'await db.getSiblingDB("admin").runCommand({fsync:1,lock:true})')
   refused=run('docker','exec',*ENV,source,'bash','/tmp/preserve.sh','--approved-one-off',check=False,timeout=90)
-  assert refused.returncode!=0 and js(source,'print(Boolean((await db.getSiblingDB("admin").currentOp()).fsyncLock))')=='true'
-  js(source,'db.getSiblingDB("admin").runCommand({fsyncUnlock:1})')
-  print('PASS: synthetic MongoDB8 copy/restored data, BSON types, unique index, GridFS bytes; independent clone writable; archive failure unlocked; existing lock preserved')
+  assert refused.returncode!=0 and js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='true'
+  js(source,'await db.getSiblingDB("admin").runCommand({fsyncUnlock:1})')
+  # Kill only the synthetic parent; the detached deadline guard must release a real Mongo lock.
+  run('docker','exec',source,'mkdir','-p','/tmp/slow-bin')
+  with tempfile.TemporaryDirectory() as d:
+   variant=Path(d)/'guard.sh';variant.write_text((ROOT/'preserve_mongo_once.sh').read_text().replace('sleep 150','sleep 8'))
+   stub=Path(d)/'tar';stub.write_text('#!/bin/sh\nsleep 60\nexit 2\n');stub.chmod(0o755)
+   run('docker','cp',str(variant),source+':/tmp/guard.sh');run('docker','cp',str(stub),source+':/tmp/slow-bin/tar')
+  run('docker','exec','-d',*ENV,'-e','PATH=/tmp/slow-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',source,'bash','-c','echo $$ > /tmp/parent.pid; exec bash /tmp/guard.sh --approved-one-off > /tmp/guard.log 2>&1')
+  locked=False;deadline=time.monotonic()+8
+  while time.monotonic()<deadline:
+   locked=js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='true'
+   if locked:break
+   time.sleep(.1)
+  assert locked,'Synthetic guard fixture did not acquire its lock'
+  pid=run('docker','exec',source,'cat','/tmp/parent.pid').stdout.strip();assert pid.isdigit()
+  run('docker','exec',source,'kill','-KILL',pid)
+  deadline=time.monotonic()+18
+  while time.monotonic()<deadline:
+   if js(source,'print(Boolean((await db.getSiblingDB("admin").runCommand({currentOp:1})).fsyncLock))')=='false':break
+   time.sleep(.2)
+  else:raise AssertionError('Detached guard did not release real Mongo lock')
+  js(source,'await db.getSiblingDB("preservation_fixture").items.updateOne({_id:"synthetic"},{$set:{guard_recovered:true}})')
+  assert js(source,'print((await db.getSiblingDB("preservation_fixture").items.findOne({_id:"synthetic"})).guard_recovered===true)')=='true'
+  print('PASS: MongoDB8 independent restored BSON/index/GridFS and writes; archive failure unlocked; existing lock preserved; real lock released by deadline after parent SIGKILL')
  finally:
   for name in (clone,source):run('docker','rm','-fv',name,check=False)
 

@@ -17,14 +17,14 @@ from pathlib import Path
 p=Path(os.environ['FAKE_STATE']);f=p.open('a+');fcntl.flock(f,fcntl.LOCK_EX);f.seek(0);s=json.load(f)
 q=sys.argv[-1];result='';code=0
 assert q.startswith('(async()=>{'), 'Mongo commands require an explicit async context'
-if 'LOCK_STATUS_' in q:result='LOCK_STATUS_LOCKED' if s['locked'] else 'LOCK_STATUS_UNLOCKED'
+if 'LOCK_STATUS_' in q:result='LOCK_STATUS_LOCKED' if s['locked'] and not os.environ.get('FALSE_STATUS') else 'LOCK_STATUS_UNLOCKED'
 elif 'PREFLIGHT_OK' in q:
  result='PREFLIGHT_OK' if not s['locked'] else '';code=0 if result else 2
 elif 'fsyncUnlock' in q:
  if os.environ.get('FAIL_UNLOCK'):code=2
  else:s['locked']=False;s['unlocks']+=1;result='UNLOCKED'
 elif 'fsync:1' in q:
- s['locked']=True;s['locks']+=1;result='LOCKED'
+ s['locked']=True;s['locks']+=1;result='OWNED_LOCK_1'
 f.seek(0);f.truncate();json.dump(s,f);f.flush()
 if code: print('CONFIDENTIAL-EXCEPTION-CANARY',file=sys.stderr)
 if result: print(result)
@@ -73,6 +73,9 @@ class PreservationTests(unittest.TestCase):
   r=self.run_copy(FAIL_TAR='1');self.assertNotEqual(r.returncode,0);self.assertEqual(r.stdout,'')
   self.assertNotIn('CANARY',r.stderr);self.assertFalse(self.status()['locked']);self.assertEqual(self.status()['unlocks'],1)
   self.assertFalse(list(self.root.glob('copy-*/data.tar.gz*')))
+ def test_confirmed_own_lock_requires_unlock_even_if_status_helper_would_say_false(self):
+  r=self.run_copy(FALSE_STATUS='1');self.assertEqual(r.returncode,0,r.stderr)
+  self.assertFalse(self.status()['locked']);self.assertEqual(self.status()['unlocks'],1)
  def test_target_mismatch_never_locks_or_creates_copy(self):
   r=self.run_copy(RAILWAY_SERVICE_ID='wrong');self.assertNotEqual(r.returncode,0);self.assertEqual(self.status()['locks'],0);self.assertFalse(self.coord.exists())
  def test_windows_raw_stdin_trailing_crlf_is_accepted_without_false_failure(self):
