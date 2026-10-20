@@ -514,6 +514,24 @@ const base = "http://127.0.0.1:8765";
     assert.deepEqual(await sampleRead("products"),sampleBefore.products);
     assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
     assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
+    // The dossier composes existing records without creating or altering any.
+    const dossierInvoices=await sampleRead("commercial-invoices"),dossierPacking=await sampleRead("packing-lists");
+    await page.goto(base+"/gestao/operacao");
+    await page.getByTestId("operation-"+pricedDraft.id).getByRole("link",{name:"Ver dossiê",exact:true}).click();
+    await page.getByRole("heading",{name:"Dossiê do pedido",exact:true}).waitFor();
+    await page.getByRole("heading",{name:"CI-BROWSER-SYNTHETIC",exact:true}).waitFor();
+    await page.getByRole("heading",{name:"PL-BROWSER-SYNTHETIC",exact:true}).waitFor();
+    const dossierData=await sampleRead("orders/"+encodeURIComponent(pricedDraft.id)+"/dossier");
+    assert.equal(dossierData.invoice_state,"approved");assert.equal(dossierData.packing_state,"approved");
+    assert.equal(dossierData.invoices[0].source_current,true);
+    assert.equal(dossierData.packing_lists[0].source_current,true);
+    await capture("order-dossier-desktop.png");
+    await page.setViewportSize({width:390,height:844});await assertNoOverflow();await capture("order-dossier-mobile.png");await page.setViewportSize({width:1440,height:1000});
+    assert.deepEqual(await sampleRead("commercial-invoices"),dossierInvoices);
+    assert.deepEqual(await sampleRead("packing-lists"),dossierPacking);
+    assert.deepEqual(await sampleRead("products"),sampleBefore.products);
+    assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
+    assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
     // Isolated fixture only: administrative suspension must revoke an existing
     // member session, and reactivation must never resurrect that token.
     const adminHeaders={Authorization:`Bearer ${access_token}`};

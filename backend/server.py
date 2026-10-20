@@ -1,3 +1,4 @@
+from order_dossier import dossier as build_order_dossier, valid_id as dossier_valid_id, DOC_FIELDS as DOSSIER_DOC_FIELDS, SHIPMENT_FIELDS as DOSSIER_SHIPMENT_FIELDS
 from quality_dashboard import quality_rows, quality_summary, DOC_TYPES as QUALITY_DOC_TYPES, FIELDS as QUALITY_FIELDS
 import math
 import zipfile, json, hashlib, mimetypes
@@ -2416,6 +2417,33 @@ async def quality_dashboard(response: Response,skip: int=Query(0,ge=0,le=10000),
     response.headers.update({"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
     return {"generated_at":now.isoformat(),"today":now.date().isoformat(),"timezone":"America/Fortaleza",
             "summary":quality_summary(rows),"total":len(rows),"rows":rows[skip:skip+limit]}
+
+# ============ READ-ONLY ORDER DOSSIER ============
+@api.get("/orders/{oid}/dossier")
+async def get_order_dossier(oid: str,response: Response,user=Depends(get_admin_user)):
+    if not dossier_valid_id(oid): raise HTTPException(422,"Identificador de pedido inválido.")
+    fields=tuple(k for k in OPERATION_ORDER_FIELDS if not k.startswith("shipment.")) + tuple("shipment."+k for k in DOSSIER_SHIPMENT_FIELDS) + ("version","source_quote_id","source_quote_revision","source_quote_snapshot.reference","deleted_at")
+    matches=await db.orders.find({"id":oid},{"_id":0,**{k:1 for k in fields}}).limit(2).to_list(2)
+    if not matches: raise HTTPException(404,"Pedido não encontrado.")
+    if len(matches)!=1: raise HTTPException(409,"Pedido ambíguo. Revise o cadastro.")
+    order=matches[0]
+    if order.get("deleted_at"): raise HTTPException(404,"Pedido arquivado. Consulte o arquivo de pedidos.")
+    documents=[]
+    for collection in (db.commercial_invoices,db.packing_lists):
+        records=await collection.find({"order_id":oid},{"_id":0,**{k:1 for k in DOSSIER_DOC_FIELDS}}).limit(201).to_list(201)
+        if len(records)>200: raise HTTPException(413,"Mais de 200 documentos por tipo neste pedido. Revise o vínculo antes de conferir o dossiê.")
+        documents.append(records)
+    qid=order.get("source_quote_id") or ""
+    if qid and not dossier_valid_id(qid): raise HTTPException(409,"Vínculo de cotação inconsistente. Revise o pedido.")
+    quotes=await db.quotations.find({"id":qid},{"_id":0,"id":1,"status":1,"version":1}).limit(2).to_list(2) if qid else []
+    if qid:
+        linked=await db.orders.find({"source_quote_id":qid},{"_id":0,"id":1}).limit(2).to_list(2)
+        for quote in quotes: quote["linked_order_id"]=linked[0]["id"] if len(linked)==1 else ""
+    now=datetime.now(ZoneInfo("America/Fortaleza"))
+    try: result=build_order_dossier(order,*documents,quotes,now.date())
+    except (ValueError,TypeError,KeyError,ArithmeticError): raise HTTPException(409,"Dados do dossiê inconsistentes. Confira o pedido e os documentos.") from None
+    response.headers.update({"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
+    return {"generated_at":now.isoformat(),"today":now.date().isoformat(),"timezone":"America/Fortaleza",**result}
 
 # ============ READ-ONLY ORDER OPERATIONS ============
 @api.get("/gestao/operations")
