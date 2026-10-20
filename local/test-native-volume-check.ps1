@@ -63,3 +63,6 @@ exit $LASTEXITCODE
     $env:IBIAG_TEST_VOLUME_CASE = $OldCase
     if (Test-Path -LiteralPath $Root) { Remove-Item -LiteralPath $Root -Recurse -Force }
 }
+
+# Expected negative child cases leave LASTEXITCODE=1; the successful harness must exit zero.
+exit 0
