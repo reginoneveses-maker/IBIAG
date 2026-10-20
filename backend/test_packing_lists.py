@@ -152,6 +152,15 @@ class PackingListTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(edit.status_code,200,edit.text);doc=edit.json()
             self.assertEqual((await self.decide(doc)).status_code,400)
 
+    async def test_missing_buyer_country_is_never_inferred_and_must_be_reviewed_before_approval(self):
+        await self.db.orders.update_one({'id':'sale'},{'$set':{'customer_country':''}})
+        doc=await self.document(buyer_country='')
+        self.assertEqual(doc['buyer_country'],'')
+        self.assertEqual((await self.decide(doc)).status_code,400)
+        edit=await self.client.put('/api/packing-lists/pl1',headers=self.headers(),json={**self.details(doc),'buyer_country':'Portugal','version':1,'change_note':'Review missing buyer country'})
+        self.assertEqual(edit.status_code,200,edit.text)
+        self.assertEqual((await self.decide(edit.json())).status_code,200)
+
     async def test_approved_immutable_cancelled_terminal_and_references_retained(self):
         doc=await self.approved()
         self.assertEqual((await self.client.put('/api/packing-lists/pl1',headers=self.headers(),json={**self.details(doc),'version':doc['version'],'change_note':'Rewrite approved'})).status_code,409)
