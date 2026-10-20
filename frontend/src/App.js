@@ -21,6 +21,7 @@ import CommercialInvoices from "@/pages/gestao/CommercialInvoices";
 import Quotations from "@/pages/gestao/Quotations";
 import Shipments from "@/pages/gestao/Shipments";
 import Samples from "@/pages/gestao/Samples";
+import Quality from "@/pages/gestao/Quality";
 import Inventory from "@/pages/Inventory";
 import ImportCRM from "@/pages/ImportCRM";
 import GestaoHome from "@/pages/gestao/GestaoHome";
@@ -63,6 +64,7 @@ function App() {
                 <Route path="invoices-comerciais" element={<AdminOnly><CommercialInvoices /></AdminOnly>} />
                 <Route path="cotacoes" element={<AdminOnly><Quotations /></AdminOnly>} />
                 <Route path="embarques" element={<AdminOnly><Shipments /></AdminOnly>} />
+                <Route path="qualidade" element={<AdminOnly><Quality /></AdminOnly>} />
                 <Route path="amostras" element={<AdminOnly><Samples /></AdminOnly>} />
                 <Route path="pedidos" element={<AdminOnly><Orders /></AdminOnly>} />
                 <Route path="estoque" element={<AdminOnly><Inventory /></AdminOnly>} />

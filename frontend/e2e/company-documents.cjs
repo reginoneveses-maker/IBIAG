@@ -496,6 +496,24 @@ const base = "http://127.0.0.1:8765";
     assert.deepEqual(await sampleRead("products"),sampleBefore.products);
     assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
     assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
+    // Metadata quality is read-only and cannot approve records or open files.
+    const qualitySeed=await page.request.post(base+"/api/certifications",{headers:sampleHeaders,data:{supplier_id:"s1",name:"Fixture expired organic",issue_date:"2019-01-01",expiry_date:"2020-01-01",alert_days:30,file_path:""}});
+    assert.equal(qualitySeed.status(),200);
+    const qualityBefore=await sampleRead("certifications");
+    await page.goto(base+"/gestao/qualidade");
+    await page.getByRole("heading",{name:"Fixture expired organic",exact:true}).waitFor();
+    const qualityCard=page.getByRole("heading",{name:"Fixture expired organic",exact:true}).locator("..");
+    await qualityCard.getByText("Certificado vencido",{exact:true}).waitFor();
+    await qualityCard.getByText("Anexo não informado",{exact:true}).waitFor();
+    await page.getByLabel("Pendência de qualidade",{exact:true}).selectOption("expired");
+    await page.getByRole("button",{name:"Aplicar filtros",exact:true}).click();
+    await page.getByRole("heading",{name:"Fixture expired organic",exact:true}).waitFor();
+    await capture("quality-desktop.png");
+    await page.setViewportSize({width:390,height:844});await assertNoOverflow();await capture("quality-mobile.png");await page.setViewportSize({width:1440,height:1000});
+    assert.deepEqual(await sampleRead("certifications"),qualityBefore);
+    assert.deepEqual(await sampleRead("products"),sampleBefore.products);
+    assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
+    assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
     // Isolated fixture only: administrative suspension must revoke an existing
     // member session, and reactivation must never resurrect that token.
     const adminHeaders={Authorization:`Bearer ${access_token}`};

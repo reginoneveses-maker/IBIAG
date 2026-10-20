@@ -44,6 +44,7 @@ const groups = (module, t) => module === "gestao"
       ]},
       { title: "Documentos", items: [
         { to: "/gestao/documentos", icon: FolderArchive, label: "Central de Documentos" },
+        { to: "/gestao/qualidade", icon: ClipboardList, label: "Qualidade documental" },
         { to: "/gestao/procedimentos", icon: ClipboardList, label: "Procedimentos" },
       ]},
       { title: "Estoque & Logística", items: [

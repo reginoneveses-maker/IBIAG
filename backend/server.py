@@ -1,3 +1,4 @@
+from quality_dashboard import quality_rows, quality_summary, DOC_TYPES as QUALITY_DOC_TYPES, FIELDS as QUALITY_FIELDS
 import math
 import zipfile, json, hashlib, mimetypes
 from dotenv import load_dotenv
@@ -2386,6 +2387,35 @@ async def get_operation_history(kind: Literal["quotation", "commercial_invoice",
     except (TypeError, ValueError): raise HTTPException(409, "Integridade do histórico não confirmada. Solicite revisão administrativa.") from None
     response.headers.update({"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
     return result
+
+# ============ READ-ONLY QUALITY METADATA ============
+@api.get("/gestao/quality")
+async def quality_dashboard(response: Response,skip: int=Query(0,ge=0,le=10000),limit: int=Query(50,ge=1,le=100),
+    source: Optional[Literal["certification","document"]]=None,
+    attention: Optional[Literal["expired","expiring","missing_expiry","invalid_dates","missing_file","missing_supplier","missing_product","data_review","without_findings"]]=None,
+    supplier_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),
+    product_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),user=Depends(get_admin_user)):
+    # One extra row prevents reporting silently truncated totals.
+    cert_query={"supplier_id":supplier_id} if supplier_id else {}
+    doc_query={"deleted_at":{"$in":[None,""]},"document_type":{"$in":list(QUALITY_DOC_TYPES)}}
+    if supplier_id: doc_query["supplier_id"]=supplier_id
+    if product_id: doc_query["product_id"]=product_id
+    certs=[] if source=="document" or product_id else await db.certifications.find(cert_query,{"_id":0,**{k:1 for k in QUALITY_FIELDS["certification"]}}).limit(5001).to_list(5001)
+    documents=[] if source=="certification" else await db.documents.find(doc_query,{"_id":0,**{k:1 for k in QUALITY_FIELDS["document"]}}).limit(5001).to_list(5001)
+    if len(certs)>5000 or len(documents)>5000: raise HTTPException(413,"Mais de 5000 registros na origem. Refine fornecedor, produto ou tipo de registro.")
+    def ids(records,key): return list({r[key] for r in records if isinstance(r.get(key),str) and r[key]})
+    supplier_ids=ids(certs+documents,"supplier_id")
+    product_ids=ids(documents,"product_id")
+    suppliers=await db.suppliers.find({"id":{"$in":supplier_ids}},{"_id":0,"id":1,"name":1}).limit(10001).to_list(10001)
+    products=await db.products.find({"id":{"$in":product_ids}},{"_id":0,"id":1,"name":1}).limit(10001).to_list(10001)
+    if len(suppliers)>10000 or len(products)>10000: raise HTTPException(413,"Cadastros vinculados excedem o limite de conferência.")
+    now=datetime.now(ZoneInfo("America/Fortaleza"))
+    try: rows=quality_rows(certs,documents,suppliers,products,now.date())
+    except ValueError as exc: raise HTTPException(409,str(exc)) from None
+    if attention: rows=[row for row in rows if (not row["flags"] if attention=="without_findings" else attention in row["flags"])]
+    response.headers.update({"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
+    return {"generated_at":now.isoformat(),"today":now.date().isoformat(),"timezone":"America/Fortaleza",
+            "summary":quality_summary(rows),"total":len(rows),"rows":rows[skip:skip+limit]}
 
 # ============ READ-ONLY ORDER OPERATIONS ============
 @api.get("/gestao/operations")
