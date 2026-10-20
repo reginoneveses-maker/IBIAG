@@ -18,6 +18,7 @@ from buyer_discovery import discover_buyers, discover_decision_maker, enrich_com
 from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
+from operation_history import prepare_history, history_fields, history_page, HistoryError, HistoryConflict, InvalidCursor
 from operations_dashboard import operation_rows, summarize as summarize_operations, calendar as operation_calendar, ORDER_FIELDS as OPERATION_ORDER_FIELDS, DOC_FIELDS as OPERATION_DOC_FIELDS
 from zoneinfo import ZoneInfo
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
@@ -1262,9 +1263,13 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
                 responsibles = await db.users.find({"id": shipment_input.responsible_id},
                     {"id": 1, "name": 1, "email": 1, "active": 1, "role": 1}).to_list(2)
                 responsible = responsibles[0] if len(responsibles) == 1 else None
-                order.shipment, order.status = build_shipment(previous,
+                prepared_shipment = await compact_operation_history("shipment", order.id, stored_shipment, previous["version"], ensure_owned)
+                shipment_previous = {**previous, "shipment": prepared_shipment}
+                order.shipment, order.status = build_shipment(shipment_previous,
                     shipment_input.model_dump(exclude={"version", "change_note"}), shipment_actor,
                     responsible, shipment_input.change_note, now_iso(), datetime.now(timezone.utc).date())
+                if "history_archive" in prepared_shipment:
+                    order.shipment["history_archive"] = prepared_shipment["history_archive"]
             except OverflowError as exc:
                 raise HTTPException(413, str(exc)) from None
             except (ValueError, TypeError):
@@ -1577,7 +1582,9 @@ async def edit_commercial_invoice(iid: str, body: CommercialInvoiceEdit, user=De
         if previous["status"] != "draft": raise HTTPException(409, "Somente rascunhos podem ser editados. Cancele e crie outro documento.")
         values = {**previous, **body.model_dump(exclude={"version", "change_note"})}
         check_invoice_details(values)
-        record = checked_invoice_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("commercial_invoice", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_invoice_event(values, prepared, user, body.change_note)
         await ensure_owned()
         result = await db.commercial_invoices.replace_one(version_query(previous), record)
         if not result.matched_count: raise HTTPException(409, "Invoice alterada. Recarregue antes de salvar.")
@@ -1600,7 +1607,9 @@ async def decide_commercial_invoice(iid: str, body: CommercialInvoiceDecision, u
             values.update(approved_by=user["id"], approved_at=now_iso())
             # Refuse unsupported glyphs/layout before committing an approved record.
             await invoice_pdf_bytes(values)
-        record = checked_invoice_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("commercial_invoice", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_invoice_event(values, prepared, user, body.change_note)
         await ensure_owned()
         result = await db.commercial_invoices.replace_one(version_query(previous), record)
         if not result.matched_count: raise HTTPException(409, "Invoice alterada. Recarregue antes da decisão.")
@@ -1701,7 +1710,9 @@ async def edit_packing_list(iid: str, body: PackingEdit, user=Depends(get_admin_
         if previous["status"] != "draft": raise HTTPException(409, "Somente rascunhos podem ser editados. Cancele e crie outro documento.")
         values = {**previous, **body.model_dump(exclude={"version", "change_note"})}
         check_packing_details(values)
-        record = checked_packing_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("packing_list", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_packing_event(values, prepared, user, body.change_note)
         await ensure_owned()
         result = await db.packing_lists.replace_one(version_query(previous), record)
         if not result.matched_count: raise HTTPException(409, "Packing alterada. Recarregue antes de salvar.")
@@ -1724,7 +1735,9 @@ async def decide_packing_list(iid: str, body: PackingDecision, user=Depends(get_
             values.update(approved_by=user["id"], approved_at=now_iso())
             # Refuse unsupported glyphs/layout before committing an approved record.
             await packing_pdf_bytes(values)
-        record = checked_packing_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("packing_list", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_packing_event(values, prepared, user, body.change_note)
         await ensure_owned()
         result = await db.packing_lists.replace_one(version_query(previous), record)
         if not result.matched_count: raise HTTPException(409, "Packing alterada. Recarregue antes da decisão.")
@@ -2049,7 +2062,7 @@ async def order_quote_source(qid):
     if await db.orders.find_one({"source_quote_id": qid}, {"_id": 1}):
         raise HTTPException(409, "A cotação já possui pedido, inclusive se cancelado ou arquivado.")
     await quote_references(quote)
-    snapshot = {key: value for key, value in quote.items() if key != "history"}
+    snapshot = {key: value for key, value in quote.items() if key not in {"history", "history_archive"}}
     return {"source_quote_id": qid, "source_quote_revision": quote["version"], "source_quote_snapshot": snapshot,
             **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items", "total_usd")}}
 
@@ -2101,7 +2114,9 @@ async def edit_quotation(qid: str, body: QuotationEdit, user=Depends(get_admin_u
         if previous["status"] != "draft": raise HTTPException(409, "Condições só podem ser alteradas em rascunho. Crie outra cotação.")
         values = {**previous, **body.model_dump(exclude={"version", "change_note"})}
         check_quotation_terms(values)
-        record = checked_quote_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("quotation", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_quote_event(values, prepared, user, body.change_note)
         await ensure_owned()
         saved = await db.quotations.replace_one(version_query(previous), record)
         if not saved.matched_count: raise HTTPException(409, "Cotação alterada. Recarregue antes de salvar.")
@@ -2122,7 +2137,9 @@ async def change_quotation_status(qid: str, body: QuotationState, user=Depends(g
             check_quotation_terms(values)
             await quote_references(values)
             values.update(approved_by=user["id"], approved_at=now_iso())
-        record = checked_quote_event(values, previous, user, body.change_note)
+        prepared = await compact_operation_history("quotation", previous["id"], previous, previous["version"], ensure_owned)
+        values.update(history_fields(prepared))
+        record = checked_quote_event(values, prepared, user, body.change_note)
         await ensure_owned()
         saved = await db.quotations.replace_one(version_query(previous), record)
         if not saved.matched_count: raise HTTPException(409, "Cotação alterada. Recarregue antes de continuar.")
@@ -2221,6 +2238,33 @@ async def cashflow(months: int = 12, currency: str = "BRL", period: str = "histo
     entries = await all_finance_entries()
     invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
     return cashflow_rows(entries, invoices, keys, currency)
+
+async def compact_operation_history(kind, rid, container, version, ensure_owned):
+    try: return await prepare_history(db.operation_history, kind, rid, container, version, ensure_owned)
+    except HistoryConflict as exc: raise HTTPException(409, str(exc)) from None
+    except OverflowError as exc: raise HTTPException(413, str(exc)) from None
+    except (TypeError, ValueError): raise HTTPException(400, "Histórico inconsistente. Solicite revisão administrativa; nenhuma revisão foi descartada.") from None
+
+@api.get("/operations-history/{kind}/{rid}")
+async def get_operation_history(kind: Literal["quotation", "commercial_invoice", "packing_list", "shipment"], rid: str, response: Response,
+    limit: int = Query(20, ge=1, le=50), cursor: str = Query("", max_length=2048), user=Depends(get_admin_user)):
+    if not rid or len(rid)>200 or "\x00" in rid: raise HTTPException(422, "Identificador inválido.")
+    if kind == "quotation": record = await quote_record(rid)
+    elif kind == "commercial_invoice": record = await invoice_record(rid)
+    elif kind == "packing_list": record = await packing_record(rid)
+    else:
+        matches = await db.orders.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
+        if not matches: raise HTTPException(404, "Pedido não encontrado.")
+        if len(matches)!=1: raise HTTPException(409, "Pedido ambíguo. Solicite revisão administrativa.")
+        record = matches[0]
+    container = record.get("shipment") or {} if kind == "shipment" else record
+    try: result = await history_page(db.operation_history, kind, rid, container, record["version"], JWT_SECRET, limit, cursor)
+    except HistoryConflict as exc: raise HTTPException(409, str(exc)) from None
+    except InvalidCursor as exc: raise HTTPException(400, str(exc)) from None
+    except OverflowError as exc: raise HTTPException(413, str(exc)) from None
+    except (TypeError, ValueError): raise HTTPException(409, "Integridade do histórico não confirmada. Solicite revisão administrativa.") from None
+    response.headers.update({"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
+    return result
 
 # ============ READ-ONLY ORDER OPERATIONS ============
 @api.get("/gestao/operations")

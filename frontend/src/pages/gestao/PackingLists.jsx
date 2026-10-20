@@ -1,3 +1,4 @@
+import OperationHistory from "@/components/OperationHistory";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/AuthContext";
@@ -94,7 +95,7 @@ export default function PackingLists(){
     {detail.status==="cancelled"&&<p>Documento cancelado. O PDF recebe a marca CANCELLED.</p>}
     {!isNew&&<div className="flex flex-wrap gap-3"><Button variant="outline" disabled={pdfLoading||saving||dirty} onClick={()=>getPdf(true)}>Conferir PDF</Button><Button variant="outline" disabled={pdfLoading||saving||dirty} onClick={()=>getPdf(false)}>Baixar PDF</Button></div>}
     {pdf&&<section aria-label="Prévia da Packing List"><Button variant="outline" onClick={()=>setPdf(null)}>Fechar prévia</Button><object data={pdf.url} type="application/pdf" className="w-full h-[500px]" aria-label="PDF da Packing List"><p>Use Baixar PDF para abrir no seu dispositivo.</p></object></section>}
-    {!isNew&&<section aria-label="Histórico da Packing List"><h3 className="font-semibold">Histórico</h3>{(detail.history||[]).slice().reverse().map(e=><div key={e.id} className="border-b py-2 text-sm"><p>Versão {e.version} · {e.by_name||e.by} · {e.at}</p><p>{e.note}</p></div>)}</section>}
+    {!isNew&&<OperationHistory kind="packing_list" resourceId={detail.id} version={detail.version} recent={detail?.history||[]} archived={!!detail?.history_archive} disabled={saving} onReload={()=>open(detail.id)}/>}
    </>}
    <DialogFooter className="flex-wrap gap-2"><Button variant="outline" disabled={saving} onClick={close}>Fechar</Button>{!isNew&&<Button variant="outline" disabled={saving} onClick={()=>open(detail.id)}>Recarregar Packing List</Button>}{editable&&<Button disabled={saving||!reason||!form.issue_date||(isNew&&!form.reference.trim())} onClick={()=>save()}>Salvar rascunho da Packing List</Button>}{!isNew&&detail?.status==="draft"&&<Button disabled={saving||dirty||!reason||!confirmed||detail.source_changed} onClick={()=>save("approved")}>Aprovar Packing List internamente</Button>}{!isNew&&detail?.status!=="cancelled"&&<Button variant="outline" disabled={saving||dirty||!reason} onClick={()=>save("cancelled")}>Cancelar Packing List</Button>}</DialogFooter>
   </DialogContent></Dialog>

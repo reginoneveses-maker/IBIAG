@@ -44,3 +44,8 @@ A fonte embarcada cobre o alfabeto latino usado nos exemplos, não todos os sist
 A etapa1 segue pendente de banco/persistência/storage/proxy e homologação com contas autorizadas. Testes sintéticos, PDF diagramado e CI não certificam operação em produção. Nenhuma implantação, migração, índice, backup ou serviço pago faz parte desta entrega.
 
 Referências de desenho consultadas em20/10/2026: https://www.trade.gov/commercial-invoice e https://www.trade.gov/common-export-documents . Descrevem documentos comerciais e a necessidade de conferir requisitos do destino; não são usadas como certificação de conformidade de uma exportação brasileira.
+
+
+## Atualização: histórico completo em páginas
+
+O fluxo HTTP agora rotaciona os eventos antigos em blocos no mesmo banco, mantendo uma janela recente limitada e a consulta de todas as revisões. Os limites locais mencionados acima continuam como proteção das funções internas e de dados inválidos; não exigem descartar alterações antigas para salvar uma nova revisão válida. Ver OPERATION_HISTORY.md para atomicidade da referência, permissões, limites de bytes, falhas/retry e pendências de durabilidade em produção.

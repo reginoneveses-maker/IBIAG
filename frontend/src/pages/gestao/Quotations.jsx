@@ -1,3 +1,4 @@
+import OperationHistory from "@/components/OperationHistory";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/AuthContext";
@@ -67,7 +68,7 @@ export default function Quotations(){
       {(isNew||(!detail.linked_order_id&&detail.status!=="cancelled"))&&<label>Motivo do registro ou decisão<Textarea disabled={saving} maxLength={300} value={form.change_note} onChange={e=>change("change_note",e.target.value)}/></label>}
       {detail.expired&&<p role="status">Cotação vencida. Crie uma nova cotação para outra venda.</p>}{dirty&&<p role="status">Salve as condições antes de aprovar ou cancelar.</p>}
       {detail.linked_order_id?<Link className="underline" to="/gestao/pedidos">Consultar pedido gerado</Link>:!isNew&&detail.can_order&&!dirty&&<Link className="underline font-semibold" to={`/prospects/orders?quote=${encodeURIComponent(detail.id)}`}>Preparar pedido em rascunho</Link>}
-      {!isNew&&<section aria-label="Histórico da cotação"><h3 className="font-semibold">Histórico</h3>{(detail.history||[]).slice().reverse().map(e=><div key={e.id} className="text-sm border-b py-2"><p>Versão {e.version} · {e.by_name||e.by} · {e.at}</p><p>{e.note}</p></div>)}</section>}
+    {!isNew&&<OperationHistory kind="quotation" resourceId={detail.id} version={detail.version} recent={detail?.history||[]} archived={!!detail?.history_archive} disabled={saving} onReload={()=>open(detail.id)}/>}
     </>}
     <DialogFooter className="flex-wrap gap-2"><Button variant="outline" disabled={saving} onClick={close}>Fechar</Button>{!isNew&&<Button variant="outline" disabled={saving} onClick={()=>open(detail.id)}>Recarregar cotação</Button>}{editable&&<Button disabled={saving||!valid} onClick={()=>save()}>Salvar cotação</Button>}{!isNew&&detail?.status==="draft"&&<Button disabled={saving||dirty||!reason||detail.expired} onClick={()=>save("approved")}>Aprovar internamente</Button>}{!isNew&&detail?.status!=="cancelled"&&!detail?.linked_order_id&&<Button variant="outline" disabled={saving||dirty||!reason} onClick={()=>save("cancelled")}>Cancelar cotação</Button>}</DialogFooter>
     </DialogContent></Dialog>

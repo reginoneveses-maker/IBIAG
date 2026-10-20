@@ -29,3 +29,8 @@ backend/test_commercial_quotations.py cobre HTTP, identidade e valores canônico
 Quotations.test.jsx e Orders.test.jsx verificam conferência sem gravação, payload mínimo, condições editadas, motivos, bloqueios, conflito sem repetição automática, respostas tardias, lista/paginação e preparação do pedido. Chromium percorre cálculo→cotação→aprovação interna→alteração do cálculo original→pedido único e verifica preservação da quantidade/valor, financeiro sem duplicação e nova conversão bloqueada. Provedores externos são bloqueados no navegador e dados são sintéticos.
 
 Não inclui PDF comercial, envio, assinatura/aceite externo, cotação com vários itens, parcelamento financeiro ou devoluções. Homologação com contas autorizadas e liberação permanecem dependentes da etapa1: banco/persistência, armazenamento, proxy reverso e evidência de segurança em produção. Código testado em desenvolvimento não equivale a funcionalidade liberada.
+
+
+## Atualização: histórico completo em páginas
+
+O fluxo HTTP agora rotaciona os eventos antigos em blocos no mesmo banco, mantendo uma janela recente limitada e a consulta de todas as revisões. Os limites locais mencionados acima continuam como proteção das funções internas e de dados inválidos; não exigem descartar alterações antigas para salvar uma nova revisão válida. Ver OPERATION_HISTORY.md para atomicidade da referência, permissões, limites de bytes, falhas/retry e pendências de durabilidade em produção.

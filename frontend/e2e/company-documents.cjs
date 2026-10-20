@@ -440,6 +440,24 @@ const base = "http://127.0.0.1:8765";
     await page.reload();
     await page.getByRole("button",{name:"Baixar spec-guarana.pdf",exact:true}).waitFor();
     assert.equal(await page.getByRole("button",{name:"Baixar spec-manga.pdf",exact:true}).count(),0);
+    // Longer histories retain all events across immutable blocks, without creating orders/finance.
+    const historyPriceResponse=await page.request.get(base+`/api/prices/${prices[0].id}/order-draft`,{headers:{Authorization:"Bearer "+access_token}});assert.equal(historyPriceResponse.status(),200);const historyPrice=await historyPriceResponse.json();
+    let historyQuoteResponse=await page.request.post(base+"/api/quotations",{headers:{Authorization:"Bearer "+access_token},data:{id:"history-quote",reference:"COT-HISTORY-SYNTHETIC",lead_id:crmLeadId,source_price_id:prices[0].id,source_price_revision:historyPrice.source_price_revision,valid_until:"2099-12-31",incoterm:"FOB",payment_terms:"Prepaid",delivery_terms:"30 days",change_note:"Initial history event"}});assert.equal(historyQuoteResponse.status(),200,await historyQuoteResponse.text());let historyQuote=await historyQuoteResponse.json();
+    for(let n=1;n<=33;n++){const data={version:historyQuote.version,valid_until:historyQuote.valid_until,incoterm:historyQuote.incoterm,payment_terms:historyQuote.payment_terms,delivery_terms:historyQuote.delivery_terms,notes:`Synthetic revision ${n}`,change_note:`Reviewed revision ${n}`};historyQuoteResponse=await page.request.put(base+"/api/quotations/history-quote",{headers:{Authorization:"Bearer "+access_token},data});assert.equal(historyQuoteResponse.status(),200,await historyQuoteResponse.text());historyQuote=await historyQuoteResponse.json();}
+    assert.equal(historyQuote.history_archive.count,32);assert.equal(historyQuote.history.length,2);
+    await page.goto(base+"/gestao/cotacoes?quote=history-quote");await page.getByRole("heading",{name:"Cotação COT-HISTORY-SYNTHETIC",exact:true}).waitFor();
+    const timeline=page.getByTestId("operation-history");await timeline.getByText("Reviewed revision 33",{exact:true}).waitFor();assert.equal(await timeline.locator("article").count(),20);
+    await timeline.getByRole("button",{name:"Carregar eventos anteriores",exact:true}).click();await timeline.getByText("Initial history event",{exact:true}).waitFor();assert.equal(await timeline.locator("article").count(),34);assert.equal(await timeline.getByRole("button",{name:"Carregar eventos anteriores",exact:true}).count(),0);
+    await timeline.scrollIntoViewIfNeeded();await page.getByRole("dialog").evaluate(el=>{el.scrollTop=el.scrollHeight;});await capture("operation-history-desktop.png");
+    await page.setViewportSize({width:390,height:844});await assertNoOverflow();
+    const mobileClose=page.getByRole("dialog").getByRole("button",{name:"Fechar",exact:true});
+    await mobileClose.scrollIntoViewIfNeeded();
+    const mobileCloseBox=await mobileClose.boundingBox();
+    assert(mobileCloseBox&&mobileCloseBox.y>=0&&mobileCloseBox.y+mobileCloseBox.height<=844,"History dialog close action must remain reachable on mobile");
+    await capture("operation-history-mobile.png");await page.setViewportSize({width:1440,height:1000});
+    await timeline.getByRole("button",{name:"Atualizar histórico",exact:true}).click();await timeline.getByRole("button",{name:"Carregar eventos anteriores",exact:true}).waitFor();assert.equal(await timeline.locator("article").count(),20);
+    assert.equal((await (await page.request.get(base+"/api/finance",{headers:{Authorization:"Bearer "+access_token}})).json()).length,1);
+    await page.getByRole("button",{name:"Fechar",exact:true}).click();
     // Isolated fixture only: administrative suspension must revoke an existing
     // member session, and reactivation must never resurrect that token.
     const adminHeaders={Authorization:`Bearer ${access_token}`};
@@ -473,7 +491,7 @@ const base = "http://127.0.0.1:8765";
     assert.deepEqual(externalDataRequests,[],"Portal attempted external scripts/data requests");
     assert.equal(await page.evaluate(()=>typeof window.posthog),"undefined");
     assert.deepEqual(errors,[]);
-    console.log("PASS browser: search → decision → CRM → draft order → saved calculation → stale rejection → reviewed draft → manual shipment → approved quotation → unique draft → commercial invoice → reviewed private PDF → reconciled packing list → operational indicators → reload → CRM → company documents → folder upload → download → move → reload");
+    console.log("PASS browser: search → decision → CRM → draft order → saved calculation → stale rejection → reviewed draft → manual shipment → approved quotation → unique draft → commercial invoice → reviewed private PDF → reconciled packing list → operational indicators → paginated complete history → reload → CRM → company documents → folder upload → download → move → reload");
   } finally {
     if(browser) await browser.close();
     server.kill("SIGTERM");
