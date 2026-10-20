@@ -84,3 +84,17 @@ A revisão5e1426aac3faab01596a9adb09cb4153062584b8 acrescenta fases/código fixo
 
 
 Validação da revisão5e1426a: workflow39447680392/job118713828949 aprovado, 11 testes e ensaio Mongo8 por stdin com restauração BSON/índice/GridFS, escrita posterior, falha de tar com fase ARCHIVE/código2 e desbloqueio, lock anterior preservado e recuperação pelo guard após SIGKILL do pai. Pipeline geral39447680122 também aprovada no mesmo commit: backend554+56 subtestes, frontend/build/navegador. SHA256 do helper revisado:5f2760de543eb56871ee7e0c862ab30a019ae1f91f094dd45fb3c6573d6846c0. A revisão não torna a cópia real concluída nem comprova a causa da tentativa anterior. Uma próxima execução deve usar o arquivo/hash novos e retornar fases em caso de erro; não repetir automaticamente nem aceitar avisos de tar.
+
+
+## Tentativa com fases —12:57 America/Fortaleza
+
+A captura do operador confirmou hash aceito/execução e saída PRESERVATION_NOT_CONFIRMED phase=ARCHIVE code=1, seguida de phase=ARCHIVE cleanup=returned. O arquivo foi rejeitado; não há cópia preservada ou restauração real confirmada. cleanup=returned indica retorno do fluxo que exige liberação, mas não substitui observação contínua de estado do banco. Não foi solicitada repetição automática. A tentativa anterior das12:50 falhou localmente por arquivo ausente, antes de SSH, e não deve ser contada como outra pausa.
+
+GNU tar documenta código1 em create como arquivos alterados durante a leitura. MongoDB8 documenta mudanças físicas de journal/checkpoint mesmo sob fsyncLock e prevê cp para cópia segura. Não foi identificado qual arquivo provocou o aviso nesta instância: não atribuir especificamente a FTDC, dados comerciais ou checkpoint sem evidência. Referências: https://www.gnu.org/software/tar/manual/html_section/Synopsis.html ; https://www.mongodb.com/docs/v8.0/reference/command/fsync/ .
+
+A revisão7d5814fcff086f0022ac71126c5ac9849da37f4a troca tar da origem por cp -a --reflink=never --sparse=always do dbPath inteiro para staging privado sob lock, confirma unlock e só então executa tar no staging parado. Não ignora avisos, não exclui arquivos do banco e não altera a origem. cp tem timeout80s; tar110s após liberar gravações. Exige fonte de até2GiB aparentes e espaço livre de fonte+2GiB+512MiB. Limpeza apaga somente snapshot do WORK novo, jamais /data/db.
+
+Workflow39453554592/job118734393363 aprovado:12 testes, restauração independente Mongo8/BSON/índice/GridFS/escrita, falha real de cp com desbloqueio/escrita, tar após unlock, lock preexistente preservado e guard liberando lock real após morte do pai durante cp. SHA256 do helper:ae8f0ecbe1267ea53dbcc7a0df6c3800f6e3cfae1e6b132ff23e2a7798fab04b. Não houve execução real desta revisão nem novo serviço/volume/restart/migração.
+
+
+Pipeline geral39453554698 também aprovada no mesmo commit7d5814f:554 testes backend+56 subtestes;334 testes interface/21 suites, build e navegador. Repositório confirmado público por metadado do conector: o próximo comando pode baixar somente o helper do SHA fixo por HTTPS, conferir hash antes de SSH e evitar nome manual de arquivo. A cópia dos dados reais continua pendente e nunca será enviada ao repositório.
