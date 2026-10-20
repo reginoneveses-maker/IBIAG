@@ -40,11 +40,15 @@ Implementação vinculada ao pedido existente, com responsável, rota/modal, dat
 
 Memória do cálculo, cliente do CRM e condições comerciais preservadas; aprovação explícita e conversão única em pedido em rascunho. Ver COMMERCIAL_QUOTATIONS.md. Envio, PDF e aceite do comprador não estão incluídos.
 
+## Quinta entrega: Commercial Invoice vinculada ao pedido
+
+Documento comercial em USD com memória explícita da venda, dados cadastrais conferidos, aprovação versionada e PDF privado com marca de rascunho/cancelamento. Sem copiar fornecedores ou custos internos; não cria outra conta ou NF-e. Ver COMMERCIAL_INVOICES.md para uso, contrato, testes e limites.
+
 ## Próximas entregas, uma de cada vez
 
 1. Homologar o fluxo CRM/cálculo→cotação→pedido com condições comerciais e aprovação interna; desenhar envio e aceite do comprador separadamente. Cotações não criam pedidos/contas implicitamente.
 2. Homologar o embarque completo manual vinculado ao pedido; desenhar embarques parciais/devoluções separadamente antes de qualquer ampliação. Sem ativar tracking pago.
-3. Documentos operacionais vinculados ao processo: reutilizar armazenamento/pastas/autorização; emissão de Invoice/Packing List e aprovação precisam de implementação e conferência próprias.
+3. Homologar a Commercial Invoice e implementar Packing List vinculada ao processo, com volumes, pesos, embalagem e conferência explícita; sem inferir dados ausentes.
 4. Gestão diária e indicadores derivados dos registros, filtros, alertas internos e histórico permanente. Não apresentar exemplos ou inferências como operação concluída.
 5. Validar fluxo integrado oportunidade→cotação→pedido→embarque→documentação→recebimento e importação/deduplicação/relatórios. Integrações externas somente depois da configuração e homologação autorizadas.
 

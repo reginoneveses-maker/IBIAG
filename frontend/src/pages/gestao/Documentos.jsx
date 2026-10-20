@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, useAuth } from "@/AuthContext";
 import { downloadDocument, documentPreview } from "@/lib/api";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { FolderArchive, Folder, ChevronLeft, FileText, Search, Upload, Trash2, Download, X, Pencil, RotateCcw } from "lucide-react";
 
 const cats=["Financeiro & Fiscal","Produtos","Fornecedores","Clientes & Comercial","Societário","Qualidade & Compliance","Exportação & Logística"];
@@ -68,6 +68,7 @@ export default function Documentos({defaultSection="",title="Central de Document
  async function restore(id){try{await api.post("/documents/"+id+"/restore");await load();}catch(err){setBatchResult(err.response?.data?.detail||err.message)}}
  async function classify(e){e.preventDefault();setBusy(true);try{await api.patch("/documents/"+editing.id+"/classification",{title:editing.title,category:editing.category,section:editing.section||"",notes:editing.notes||"",document_type:editing.document_type||"",certificate_type:editing.certificate_type||"",folder_path:editing.folder_path||""});goFolder(editing.folder_path||"");setEditing(null);await load();}catch(err){setBatchResult(err.response?.data?.detail||err.message)}finally{setBusy(false)}}
  return <div className="space-y-6">
+  {isAdmin&&!embedded&&<Link className="underline text-sm" to="/gestao/invoices-comerciais">Commercial Invoices dos pedidos</Link>}
   <datalist id="document-folder-options">{folders.map(path=><option key={path} value={path}/>)}</datalist>
   <div className="flex flex-col md:flex-row md:items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#104496]/45">Gestão documental</p><h1 className="text-3xl font-bold text-[#104496] mt-1">{title}</h1>{subtitle&&<p className="text-sm text-slate-500 mt-2">{subtitle}</p>}<p className="text-sm text-slate-500 mt-2">{docs.length} {trash?"documentos na lixeira":"documentos cadastrados"}.</p></div>{!embedded&&isAdmin&&<><label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm cursor-pointer"><FolderArchive className="w-4 h-4"/>{busy?"Importando...":"Importar lotes PDF"}<input className="hidden" type="file" accept=".zip" multiple disabled={busy} onChange={importBatch}/></label><label className="inline-flex items-center px-4 py-2.5 rounded-xl border text-sm cursor-pointer">Vincular documentos<input className="hidden" type="file" accept=".json" disabled={busy} onChange={linkBatch}/></label><label className="inline-flex items-center px-4 py-2.5 rounded-xl border text-sm cursor-pointer">Reclassificar acervo<input className="hidden" type="file" accept=".json" disabled={busy} onChange={metadataBatch}/></label></>}<button onClick={()=>{setForm({...emptyForm,category:area||emptyForm.category,folder_path:folderPath||""});setOpen(true);}} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#104496] text-white text-sm font-semibold"><Upload className="w-4 h-4"/> Novo documento</button></div>
   {lead&&<p className="text-sm font-semibold">Documentos de {lead.company}</p>}
