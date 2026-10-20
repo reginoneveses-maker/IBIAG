@@ -86,6 +86,8 @@ def commercial_snapshot(order):
             raise ValueError("Revise os dados comerciais do pedido.")
     result = {key: order.get(key, "") for key in ("id", "number", "customer", "customer_country", "order_date", "incoterm", "receivable_due_date")}
     quote = order.get("source_quote_snapshot") or {}
+    if not isinstance(quote, dict) or any(not isinstance(quote.get(k,""), str) or len(quote.get(k,""))>1000 or not re.fullmatch(TEXT,quote.get(k,"")) for k in ("payment_terms","delivery_terms")):
+        raise ValueError("Revise as condições comerciais da cotação vinculada.")
     result.update(items=items, total_usd=total, currency="USD",
                   payment_terms=quote.get("payment_terms", ""), delivery_terms=quote.get("delivery_terms", ""))
     return result

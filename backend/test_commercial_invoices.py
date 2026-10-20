@@ -108,6 +108,13 @@ class CommercialInvoiceTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(r.status_code, expected, r.text)
         self.assertEqual(await self.db.commercial_invoices.count_documents({}), 0)
 
+    async def test_malformed_legacy_quote_terms_are_never_copied_into_public_snapshot(self):
+        await self.db.orders.update_one({"id":"sale"},{"$set":{"source_quote_snapshot":{"payment_terms":{"supplier_price":"PRIVATE-LEGACY-CANARY"}}}})
+        r=await self.create()
+        self.assertEqual(r.status_code,400,r.text)
+        self.assertNotIn("PRIVATE-LEGACY-CANARY",r.text)
+        self.assertEqual(await self.db.commercial_invoices.count_documents({}),0)
+
     async def test_draft_pdf_is_watermarked_and_pdf_text_has_no_private_data_or_active_content(self):
         await self.invoice(notes='<img src="https://private.invalid/probe"> & <script>bad()</script>')
         r = await self.pdf()

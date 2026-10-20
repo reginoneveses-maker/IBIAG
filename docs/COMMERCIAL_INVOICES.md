@@ -31,7 +31,7 @@ Bloqueia aprovação com alterações não salvas, sem motivo ou sem confirmaç�
 
 ## Testes e revisão
 
-backend/test_commercial_invoices.py executa21 cenários HTTP locais e as mesmas21 variantes em MongoDB descartável quando TEST_MONGO_URL é configurado. Cobre autorização, falsificação, consistência, aprovação/congelamento, concorrência de criação/decisão/alteração/download, cancelamento, limite/tamanho/erro sem vazamento, precisão e ausência de dados internos/ações ativas no PDF. Inclui documento paginado com25 itens, cabeçalho/marca d'água repetidos e nenhum item perdido.
+backend/test_commercial_invoices.py executa22 cenários HTTP locais e as mesmas22 variantes em MongoDB descartável quando TEST_MONGO_URL é configurado. Cobre autorização, falsificação, consistência, aprovação/congelamento, concorrência de criação/decisão/alteração/download, cancelamento, limite/tamanho/erro sem vazamento, precisão e ausência de dados internos/ações ativas no PDF. Inclui documento paginado com25 itens, cabeçalho/marca d'água repetidos e nenhum item perdido.
 
 CommercialInvoices.test.jsx cobre preparação sem gravação, payload mínimo, abertura de invoice existente, motivos/confirmação, dados alterados, conflito sem repetição, prévia privada, descarte de consulta/PDF tardios e recuperação da lista. O fluxo Chromium percorre pedido entregue→invoice→PDF DRAFT→aprovação→PDF aprovado→recarregar e verifica bytes/texto do download, bloqueio de alteração do pedido e ausência de nova conta. Mantém os cenários anteriores de CRM/cotação/embarques/documentos/acesso e bloqueia rede externa.
 
