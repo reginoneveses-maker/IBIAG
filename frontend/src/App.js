@@ -15,6 +15,7 @@ import Tasks from "@/pages/Tasks";
 import AccountAccess from "@/pages/AccountAccess";
 import PasswordChange from "@/pages/PasswordChange";
 import Orders from "@/pages/Orders";
+import Operations from "@/pages/gestao/Operations";
 import PackingLists from "@/pages/gestao/PackingLists";
 import CommercialInvoices from "@/pages/gestao/CommercialInvoices";
 import Quotations from "@/pages/gestao/Quotations";
@@ -56,6 +57,7 @@ function App() {
                 <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
                 <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
+                <Route path="operacao" element={<AdminOnly><Operations /></AdminOnly>} />
                 <Route path="packing-lists" element={<AdminOnly><PackingLists /></AdminOnly>} />
                 <Route path="invoices-comerciais" element={<AdminOnly><CommercialInvoices /></AdminOnly>} />
                 <Route path="cotacoes" element={<AdminOnly><Quotations /></AdminOnly>} />

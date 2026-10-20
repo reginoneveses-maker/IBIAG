@@ -37,6 +37,8 @@ export default function GestaoHome() {
         </div>
       </section>
 
+      <Link className="block rounded-xl bg-[#1B4496] text-white p-5" to="/gestao/operacao"><strong>Operação do dia</strong><p className="text-sm mt-1">Conferir pedidos, documentos, embarques e recebimentos pendentes.</p></Link>
+
       {alerts.length > 0 && (
         <Card className="border-amber-300 bg-amber-50/70">
           <CardContent className="p-4 sm:p-5">
