@@ -46,6 +46,7 @@ const groups = (module, t) => module === "gestao"
         { to: "/gestao/procedimentos", icon: ClipboardList, label: "Procedimentos" },
       ]},
       { title: "Estoque & Logística", items: [
+        { to: "/gestao/packing-lists", icon: ShoppingCart, label: "Packing Lists" },
         { to: "/gestao/invoices-comerciais", icon: ShoppingCart, label: "Commercial Invoices" },
         { to: "/gestao/cotacoes", icon: ShoppingCart, label: "Cotações" },
         { to: "/gestao/embarques", icon: ShoppingCart, label: "Embarques" },
@@ -72,6 +73,7 @@ const groups = (module, t) => module === "gestao"
         { to: "/prospects/orders", icon: ShoppingCart, label: "Pedidos" },
       ]},
       { title: "Estoque & Logística", items: [
+        { to: "/gestao/packing-lists", icon: ShoppingCart, label: "Packing Lists" },
         { to: "/gestao/invoices-comerciais", icon: ShoppingCart, label: "Commercial Invoices" },
         { to: "/gestao/cotacoes", icon: ShoppingCart, label: "Cotações" },
         { to: "/gestao/embarques", icon: ShoppingCart, label: "Embarques" },
