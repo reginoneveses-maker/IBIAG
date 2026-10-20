@@ -51,3 +51,24 @@ Não houve restart, deploy, alteração de autenticação, usuário Mongo, URI, 
 7. Repetir auditor somente leitura, comprovar autenticação/privilégios/montagem, depois tratar leads sem proprietário com titularidade revisada e validar cadeia do proxy. Publicar candidato somente com checks/retorno e homologação autorizada; backups recorrentes continuam desativados.
 
 Referências: https://www.mongodb.com/docs/v8.0/reference/installation-ubuntu-community-troubleshooting/ ; https://www.mongodb.com/docs/manual/reference/command/getcmdlineopts/ ; https://docs.railway.com/volumes/reference ; https://docs.railway.com/pricing/plans . São bases técnicas para o plano, não evidência de execução de migração.
+
+## Dimensionamento e autorização —11:32–11:33 America/Fortaleza
+
+O operador forneceu o resultado de du -sh /data/db:1.1G. É uso físico do diretório e inclui alocação/journal, não tamanho de dump lógico ou estimativa exata do arquivo transferido. Não executar cópias brutas sem consistência nem inferir que o espaço do df global pertence ao banco.
+
+Em11:33 o usuário respondeu sim à pergunta explícita sobre uma cópia pontual de segurança no computador e a pausa temporária das gravações necessária, após ser informado de possível tráfego cobrado. Essa autorização supera somente a proibição anterior para esta cópia/pausa, não para backups recorrentes, criação de volume/serviços pagos ou migração/restart. Nenhum desses recursos foi ativado.
+
+A preparação está no PR53, base sequencial PR52, tools/preserve_mongo_once.sh e docs/ONE_OFF_PRESERVATION.md. São cópia física sob fsyncLock, retorno a gravações antes do download, diretório temporário privado, limites de tempo/tamanho, guard separado e recuperação conservadora que não repete decremento incerto. A documentação oficial alerta que mongodump pode esperar indefinidamente atrás de escritas enfileiradas sob fsyncLock; não foi usado como alternativa cega. O comando mongodump --version solicitado ao operador é apenas descoberta de ferramenta; não iniciou dump.
+
+Onze testes locais sintéticos passaram, incluindo falhas/desbloqueio, morte do processo e stdin Windows. A primeira CI com Mongo8 real detectou que acesso encadeado ao resultado assíncrono de currentOp podia indicar desbloqueio incorreto; a escrita real posterior ficou bloqueada no fixture. As tentativas com await explícito ainda não bastaram: o teste continuou identificando escrita bloqueada apesar da consulta auxiliar indicar falso. O fluxo foi corrigido para exigir fsyncUnlock com lockCount=0 quando a aquisição própria foi confirmada, usar currentOp como comando do servidor e preservar decremento único em resultados incertos. Nenhuma versão intermediária foi executada em produção. O teste de restauração em outro container e validação de BSON/índices/GridFS/escrita continua sendo condição para fornecer comando real. Nunca confundir esses testes descartáveis com restauração dos dados IBIAG.
+
+O banco publicado permanece sem pausa/copiar arquivo/restore confirmado. O helper anterior readonly_audit_bundle.py continua sendo somente leitura; a nova rotina de preservação requer o aceite explícito separado já recebido. A sessão SSH e os dados reais continuam no computador/servidor do operador, sem passagem pelo agente/GitHub/Library.
+
+
+## Ferramenta pontual — validação isolada aprovada
+
+PR53, commit166fef7d136ac858430fb5aa3380ce91cb92a72e, workflow39445605497/job118706558779: sucesso. Onze testes de falha/recuperação passaram e o ensaio com MongoDB8 real, em containers descartáveis sem rede, confirmou restauração independente de BSON/índice unique/GridFS, escrita na origem após a cópia, escrita no destino restaurado, desbloqueio após falha do arquivo, preservação de lock preexistente e liberação por guard após SIGKILL somente do processo pai. SHA256 do helper:06c5b37d09cd30a1f477020253f161a6d0a74e44205033cad72ea87318bf01bb.
+
+As falhas anteriores incluíram confirmação incorreta do unlock, uso de await fora de função async, incompatibilidade do kernel do runner com Mongo8 e uma verificação de binário BSON pelo método errado do shell. O teste final usa resposta lockCount=0 do servidor, contexto async explícito, runner Ubuntu22.04 compatível e EJSON para verificar bytes. Não foi desativada a proteção do fornecedor contra kernel incompatível. Nenhuma dessas tentativas acessou a Railway.
+
+Esses resultados validam a ferramenta em fixture, não a recuperabilidade dos dados reais. Produção continua sem cópia/pausa confirmada; o próximo passo autorizado depende da execução pelo operador em seu computador, seguida de transferência binária e conferência de SHA256. Volume persistente, autenticação mínima, owners, proxy e homologação continuam pendentes. Não há autorização nova para serviços/volumes pagos, migração/restart ou backups recorrentes.
