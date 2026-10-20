@@ -11,7 +11,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install isolated browser checker
+        run: |
+          npm install --prefix /tmp/ibiag-local-browser playwright@1.51.1
+          /tmp/ibiag-local-browser/node_modules/.bin/playwright install --with-deps chromium
       - name: Build, authenticate and preserve data across container recreation
+        env:
+          LOCAL_PLAYWRIGHT_PATH: /tmp/ibiag-local-browser/node_modules/playwright
         run: python tools/check_local_install.py
   windows-launcher:
     runs-on: windows-latest

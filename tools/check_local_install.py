@@ -22,6 +22,7 @@ def main():
             "LOCAL_MONGO_ROOT_PASSWORD=" + secrets.token_hex(32) + "\n"
             "LOCAL_DB_PASSWORD=" + secrets.token_hex(32) + "\n"
             "LOCAL_JWT_SECRET=" + secrets.token_hex(32) + "\n", encoding="ascii")
+        private_values = [line.split("=", 1)[1] for line in env_file.read_text().splitlines()]
         compose = ["docker", "compose", "-p", PROJECT, "--project-directory", str(ROOT),
                    "--env-file", str(env_file), "-f", str(ROOT / "compose.local.yaml")]
 
@@ -30,6 +31,10 @@ def main():
                                     capture_output=True, timeout=1200)
             if result.returncode:
                 # Do not dump rendered config, environment, Mongo URL or secrets.
+                details = (result.stdout + "\n" + result.stderr)[-12000:]
+                for value in private_values:
+                    details = details.replace(value, "[REDACTED]")
+                print(details, flush=True)
                 raise RuntimeError("Local CI command failed: " + args[0])
             return result.stdout
 
@@ -74,6 +79,7 @@ def main():
             verify(request("/api/openapi.json")[0] == 404, "API schema unavailable")
 
             password = secrets.token_urlsafe(24)
+            private_values.append(password)
             email = "local-owner@example.com"
             # Exercise actual account creation helper without an interactive terminal.
             setup = (
@@ -102,6 +108,10 @@ def main():
             status, data, _ = request("/api/auth/login", body={"email": email, "password": password})
             verify(status == 200, "real login")
             token = json.loads(data)["access_token"]
+            private_values.append(token)
+            browser_env = {**os.environ, "LOCAL_TEST_EMAIL": email, "LOCAL_TEST_PASSWORD": password}
+            subprocess.run(["node", str(ROOT / "tools/check_local_browser.cjs")],
+                           env=browser_env, check=True, timeout=120)
             status, data, _ = request("/api/leads", token, {"company": "Synthetic Local Persistence", "country": "Brazil"})
             verify(status == 200, "CRM record saved")
             lead = json.loads(data)

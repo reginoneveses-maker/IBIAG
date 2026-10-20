@@ -3,6 +3,8 @@ WORKDIR /app
 COPY frontend/package.json ./
 RUN npm install --legacy-peer-deps
 COPY frontend/ ./
+COPY local/prepare-ui.cjs /tmp/prepare-ui.cjs
+RUN node /tmp/prepare-ui.cjs
 # Same-origin API: no Railway URL or environment files in this build.
 ENV REACT_APP_BACKEND_URL="" GENERATE_SOURCEMAP=false
 RUN npm run build
