@@ -59,3 +59,8 @@ backend/test_*.py
 backend/browser_fixture.py
 frontend/e2e
 frontend/src/**/*.test.*
+
+# Windows launchers/CI are not application runtime inputs.
+local/Start-IBIAG.ps1
+local/LEIA-ME.md
+tools/check_local_install.py
