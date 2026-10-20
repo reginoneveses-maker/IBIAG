@@ -72,3 +72,15 @@ PR53, commit166fef7d136ac858430fb5aa3380ce91cb92a72e, workflow39445605497/job118
 As falhas anteriores incluíram confirmação incorreta do unlock, uso de await fora de função async, incompatibilidade do kernel do runner com Mongo8 e uma verificação de binário BSON pelo método errado do shell. O teste final usa resposta lockCount=0 do servidor, contexto async explícito, runner Ubuntu22.04 compatível e EJSON para verificar bytes. Não foi desativada a proteção do fornecedor contra kernel incompatível. Nenhuma dessas tentativas acessou a Railway.
 
 Esses resultados validam a ferramenta em fixture, não a recuperabilidade dos dados reais. Produção continua sem cópia/pausa confirmada; o próximo passo autorizado depende da execução pelo operador em seu computador, seguida de transferência binária e conferência de SHA256. Volume persistente, autenticação mínima, owners, proxy e homologação continuam pendentes. Não há autorização nova para serviços/volumes pagos, migração/restart ou backups recorrentes.
+
+
+## Primeira tentativa real —12:17–12:18 America/Fortaleza
+
+O operador executou o helper166fef7 após validação de SHA256. A captura mostrou duas mensagens PRESERVATION_NOT_CONFIRMED e retorno não zero, sem copy_created nem MANUAL_UNLOCK_REQUIRED. Não é cópia confirmada; a etapa exata da falha não estava disponível na saída antiga. Não deduzir a causa a partir de testes sintéticos aprovados.
+
+A consulta posterior somente leitura ao comando currentOp retornou fsync_locked=false. O teste de diretório retornou MARKER_ABSENT. É evidência de ausência de lock de fsync naquele momento e de coordenador residual; não é teste de escrita ou restauração dos dados reais. O diagnóstico pelo here-string terminou com numeric argument required por CRLF no exit0; a consulta anterior terminou e sua saída é visível. Nenhum desbloqueio manual, restart ou segunda tentativa foi solicitado com essa evidência.
+
+A revisão5e1426aac3faab01596a9adb09cb4153062584b8 acrescenta fases/código fixos sem dados comerciais e desliga a entrada padrão de mongosh para evitar disputa com bash -s. O ensaio de Mongo8 passou a receber o script por stdin com CRLF final. A causa da primeira tentativa continua não confirmada. Não houve criação de volume, serviço pago, backup recorrente, migração ou implantação.
+
+
+Validação da revisão5e1426a: workflow39447680392/job118713828949 aprovado, 11 testes e ensaio Mongo8 por stdin com restauração BSON/índice/GridFS, escrita posterior, falha de tar com fase ARCHIVE/código2 e desbloqueio, lock anterior preservado e recuperação pelo guard após SIGKILL do pai. Pipeline geral39447680122 também aprovada no mesmo commit: backend554+56 subtestes, frontend/build/navegador. SHA256 do helper revisado:5f2760de543eb56871ee7e0c862ab30a019ae1f91f094dd45fb3c6573d6846c0. A revisão não torna a cópia real concluída nem comprova a causa da tentativa anterior. Uma próxima execução deve usar o arquivo/hash novos e retornar fases em caso de erro; não repetir automaticamente nem aceitar avisos de tar.
