@@ -1,0 +1,27 @@
+# Operação do dia — indicadores de pedidos
+
+Gestão → Operação do dia, `/gestao/operacao`, somente admin. Reutiliza pedidos, documentos aprovados, embarque manual e estado da conta vinculada; não recria CRM, caixa ou estoque, não toma decisão e não grava alertas. Sem cron, mensagens, fornecedor externo, custo, backup ou dado demonstrativo inserido na base real.
+
+## Contrato
+
+GET `/api/gestao/operations` exige administração, inclusive quando solicitante é proprietário de empresa no CRM. Filtros: situação do pedido (cinco estados existentes), país exato, data inicial/final do pedido inclusivas e tipo de pendência. Datas reais e ordem do período validadas; nenhuma expressão enviada vira filtro Mongo arbitrário. Arquivados ficam fora. Lista até100 por página, padrão50; leitura máxima1000 pedidos por situação/país/período. Acima disso, retorna413 e exige refinamento: nenhum total parcial apresentado como completo. IDs ausentes/ambíguos retornam409. Documentos ativos têm limite2000 por coleção; excesso também exige revisão/refinamento.
+
+Resumo representa todos os pedidos nos filtros de país/período/situação, antes de paginação e filtro de pendência. Cartões permitem restringir a lista a uma pendência sem alterar esse resumo. Cada pedido conta uma vez em cada categoria; um pedido pode ter várias pendências e os cartões não são somáveis entre si. A lista é ordenada por número de pendências decrescente, data do pedido e ID. Resposta informa total correspondente à lista, skip/limit, instante de geração e fuso America/Fortaleza. Consulta entre coleções não é snapshot transacional: recarregue antes de uma decisão, cuja própria rota confere versões.
+
+- **Recebimento vencido**: pedido operacional confirmado/embarcado/entregue, conta ainda não recebida, vencimento anterior à data civil de Fortaleza. Vencer hoje não significa atraso. Pagamento provém do campo canônico alterado pela rota de financeiro; não é inferido de invoice ou entrega. Sem soma de moedas/valores ou contas manuais nesta visão.
+- **Previsão de embarque vencida**: saída prevista vencida sem saída real em planned/booked, ou chegada prevista vencida sem chegada real em planned/booked/in_transit. Não representa posição de carga ou tracking externo; chegadas registradas encerram alerta da chegada.
+- **Documentação a conferir**: pelo menos Invoice/Packing List não estão aprovadas com memória compatível. Classificação administrativa interna para o fluxo completo, sem afirmar exigência legal universal ou pendência aduaneira. Ausência, rascunho, origem alterada e vínculo ambíguo aparecem distintos. Cancelados nunca contam como documentos prontos.
+- **Embarque não registrado/cancelado**: pedido operacional elegível sem estado logístico ativo. Entrega antiga sem embarque documentado continua pedindo conferência, sem inventar histórico.
+- **Cadastro/vínculo a revisar**: pedido legado sem workflow, situação/data inválida, pagamento não booleano, memória comercial inconsistente, documentação ambígua/desatualizada ou cronologia/estado logístico incompatível. Campos ausentes não são completados automaticamente. Datas reais de embarque continuam sob o contrato UTC existente; o corte diário de vencimento do painel usa Fortaleza.
+
+A resposta seleciona somente referência, comprador/país, estado, datas, presença de recebimento, estados documentais/logísticos e alertas. Não inclui preços, custos, fornecedores, notas internas, itens, histórias ou termos da cotação. Projeções DB evitam carregar esses históricos; memória comercial é calculada em memória para conferir revisões e não retorna ao navegador. Nenhuma trava de escrita ou atualização do banco é feita pela consulta.
+
+UI tem carregamento/erro e repetição sem inventar cartões zero, filtros aplicados explicitamente, reset/paginação e descarte de respostas tardias. Links abrem os fluxos administrativos existentes para conferência; não há ação de aprovar ou pagar no cartão.
+
+## Validação
+
+`test_operations_dashboard.py`: oito cenários HTTP repetidos com Mongo descartável, cobrindo permissões, leitura sem escrita/vazamento, filtros/limites, datas civis de Fortaleza à1hUTC, revisão de documentos, recusa de totais incompletos/IDs ambíguos, estado legado, alerta logístico, recebimento pela rota real e financeiro único. `Operations.test.jsx`: sete cenários de interação, filtros explícitos, recuperação, navegação, paginação e resposta tardia. Chromium abre painel após Packing List, confere documentos aprovados, filtra entregue/pendência, valida lista vazia, navega de volta ao documento e verifica desktop/móvel sem overflow.
+
+`test_stage2_end_to_end.py` percorre um único processo de CRM/cálculo →cotação aprovada →pedido em rascunho →confirmação →Invoice/Packing List aprovadas →cinco estados de embarque →recebimento repetido idempotente. Confere uma conta para esse pedido, uma baixa de estoque, PDFs preservados após logística/recebimento, vínculo único da cotação e painel sem pendências. Repete no Mongo real descartável; não se confunde com homologação de produção.
+
+Continua pendente: liberação/integração na main, acesso operacional/persistência/proxy da etapa1, homologação com equipe/contas autorizadas e critérios históricos não recuperados das conversas citadas. Histórico atual dos documentos/embarques é limitado e requer revisão ao atingir limites; painel não implementa arquivo de auditoria permanente, envio/aceite do comprador, embarque parcial ou importação de dados reais.

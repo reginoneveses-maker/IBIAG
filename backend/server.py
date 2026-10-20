@@ -18,6 +18,8 @@ from buyer_discovery import discover_buyers, discover_decision_maker, enrich_com
 from discovery_jobs import MARKETS, REGIONS, resolve_markets, run_discovery_job
 from spec_library import supplier_spec_library, is_spec_document
 from document_categories import normalize_document, matches_document, validate_classification
+from operations_dashboard import operation_rows, summarize as summarize_operations, calendar as operation_calendar, ORDER_FIELDS as OPERATION_ORDER_FIELDS, DOC_FIELDS as OPERATION_DOC_FIELDS
+from zoneinfo import ZoneInfo
 from finance_reporting import cashflow_rows, pending_totals, currency_code, month_keys
 from pricing import decimal_number, calculate_price
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
@@ -2219,6 +2221,41 @@ async def cashflow(months: int = 12, currency: str = "BRL", period: str = "histo
     entries = await all_finance_entries()
     invoices = await db.invoices.find({}, {"_id": 0}).to_list(10000)
     return cashflow_rows(entries, invoices, keys, currency)
+
+# ============ READ-ONLY ORDER OPERATIONS ============
+@api.get("/gestao/operations")
+async def order_operations(skip: int = Query(0, ge=0, le=1000), limit: int = Query(50, ge=1, le=100),
+    status: Optional[Literal["draft", "confirmed", "shipped", "delivered", "cancelled"]] = None,
+    attention: Optional[Literal["receivable_overdue", "shipment_overdue", "documents_pending", "shipment_missing", "data_review"]] = None,
+    country: str = Query("", max_length=100, pattern=r"^[^\x00-\x1f\x7f]*$"),
+    date_from: str = Query("", max_length=10), date_to: str = Query("", max_length=10), user=Depends(get_admin_user)):
+    try:
+        start = operation_calendar(date_from) if date_from else None
+        end = operation_calendar(date_to) if date_to else None
+        if start and end and start > end: raise ValueError("Início não pode ser posterior ao fim.")
+    except (TypeError, ValueError): raise HTTPException(400, "Confira as datas e a ordem do período do pedido.") from None
+    query = {"deleted_at": {"$in": [None, ""]}}
+    if status: query["status"] = status
+    if country.strip(): query["customer_country"] = country.strip()
+    if start or end:
+        query["order_date"] = {**({"$gte": start.isoformat()} if start else {}), **({"$lte": end.isoformat()} if end else {})}
+    orders = await db.orders.find(query, {"_id": 0, **{k:1 for k in OPERATION_ORDER_FIELDS}}).limit(1001).to_list(1001)
+    if len(orders)>1000: raise HTTPException(413, "Mais de1000 pedidos nos filtros. Refine país, situação ou período para conferir o resumo completo.")
+    ids = [order.get("id") for order in orders]
+    if any(not isinstance(i,str) or not i or len(i)>200 for i in ids) or len(set(ids))!=len(ids):
+        raise HTTPException(409, "Identificadores de pedidos inconsistentes. Solicite revisão administrativa.")
+    docs = []
+    for collection in (db.commercial_invoices, db.packing_lists):
+        records = await collection.find({"order_id": {"$in": ids}, "status": {"$in": ["draft", "approved"]}},
+            {"_id": 0, **{k:1 for k in OPERATION_DOC_FIELDS}}).limit(2001).to_list(2001)
+        if len(records)>2000: raise HTTPException(413, "Documentos ativos inconsistentes. Refine os pedidos e solicite revisão administrativa.")
+        docs.append(records)
+    now = datetime.now(ZoneInfo("America/Fortaleza"))
+    rows = operation_rows(orders, *docs, now.date())
+    summary = summarize_operations(rows)
+    selected = [row for row in rows if not attention or attention in row["flags"]]
+    return {"generated_at": now.isoformat(), "today": now.date().isoformat(), "timezone": "America/Fortaleza",
+        "summary": summary, "total":len(selected), "skip":skip, "limit":limit, "rows":selected[skip:skip+limit]}
 
 # ============ GESTÃO STATS ============
 @api.get("/gestao/stats")
