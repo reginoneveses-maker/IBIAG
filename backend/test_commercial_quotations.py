@@ -224,6 +224,30 @@ class QuotationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.json()["items"][0]["supplier_name"], "Supplier")
         self.assertEqual((await self.update({**r.json(), "notes": "Reviewed"})).status_code, 200)
 
+    async def test_catalog_change_after_preview_cannot_change_approved_unit(self):
+        await self.approved()
+        source = (await self.order_preview()).json()
+        await self.db.product_offers.update_one({"id": "offer"}, {"$set": {"unit": "box"}})
+        response = await self.create({**self.body, **source})
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(await self.db.orders.count_documents({}), 0)
+
+    async def test_archived_cancelled_order_still_prevents_second_conversion(self):
+        await self.approved()
+        source = (await self.order_preview()).json()
+        response = await self.create({**self.body, **source})
+        self.assertEqual(response.status_code, 200, response.text)
+        cancelled = await self.update({**response.json(), "status": "cancelled", "order_date": "2026-10-19"})
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        archived = await self.client.delete(f"/api/orders/{self.body['id']}", headers=self.headers())
+        self.assertEqual(archived.status_code, 200, archived.text)
+        self.assertEqual((await self.order_preview()).status_code, 409)
+        duplicate = await self.create({**self.body, **source, "id": "second-order"})
+        self.assertEqual(duplicate.status_code, 409, duplicate.text)
+        detail = (await self.client.get("/api/quotations/q1", headers=self.headers())).json()
+        self.assertEqual(detail["linked_order_id"], self.body["id"])
+        self.assertFalse(detail["can_order"])
+
     async def test_size_limit_and_optimistic_edit_preserve_previous_document(self):
         q = await self.quote()
         terms = {k: q[k] for k in server.QUOTE_TERMS}

@@ -1738,7 +1738,7 @@ async def quote_references(record):
         if len(matches) != 1: raise HTTPException(409, "Revise produto, fornecedor e oferta da cotação.")
         if collection.name == "product_offers":
             offer = matches[0]
-            if offer.get("active", True) is not True or offer.get("product_id") != item["product_id"] or offer.get("supplier_id") != item["supplier_id"]:
+            if offer.get("active", True) is not True or offer.get("product_id") != item["product_id"] or offer.get("supplier_id") != item["supplier_id"] or (offer.get("unit") and offer["unit"] != item["unit"]):
                 raise HTTPException(409, "A oferta da cotação mudou ou está inativa. Revise a operação.")
 
 async def quotation_view(record):
