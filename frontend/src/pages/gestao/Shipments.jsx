@@ -1,3 +1,4 @@
+import OperationHistory from "@/components/OperationHistory";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/AuthContext";
@@ -71,7 +72,7 @@ export default function Shipments(){
         <label>Motivo da alteração<Textarea value={form.change_note} maxLength={300} onChange={e=>change("change_note",e.target.value)}/></label>
       </fieldset>
       <p className="text-xs">Saída real confirma a baixa do estoque próprio. Cancelar transporte antes da saída mantém a venda confirmada; o cancelamento da venda é feito no pedido. Datas reais já registradas e rota após a saída ficam preservadas.</p>
-      <section aria-label="Histórico do embarque"><h3 className="font-semibold">Histórico</h3>{(detail.shipment?.history||[]).slice().reverse().map(event=><div key={event.id} className="border-b py-2 text-sm"><strong>{states[event.to_status]||event.to_status}</strong> · {event.by_name||event.by} · {event.at}<p>{event.note}</p><dl>{Object.entries(event.changes||{}).map(([key,value])=><div key={key}><dt className="inline">{labels[key]||key}: </dt><dd className="inline break-words">{key==="status"?(states[value]||value):key==="mode"?(modes[value]||value):String(value)}</dd></div>)}</dl></div>)}</section>
+      <OperationHistory kind="shipment" resourceId={detail.id} version={detail.version} recent={detail.shipment?.history||[]} archived={!!detail.shipment?.history_archive} disabled={saving} onReload={()=>open(detail.id)}/>
       </>}
       <DialogFooter><Button variant="outline" disabled={saving} onClick={close}>Fechar</Button>{!readonly&&<><Button variant="outline" disabled={saving} onClick={()=>open(detail.id)}>Recarregar pedido</Button><Button disabled={saving||form.change_note.trim().length<3} onClick={save}>{saving?"Salvando…":"Salvar embarque"}</Button></>}</DialogFooter>
     </DialogContent></Dialog>

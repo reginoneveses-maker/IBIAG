@@ -31,3 +31,8 @@ Aprovação interna exige versão atual, motivo e confirmação explícita da co
 `PackingLists.test.jsx`:14 cenários de interação, payload sem memória/totais forjados, grupos manuais, aprovação/dirty/confirmação, conflitos, rascunho existente, paginação/repetição, resposta tardia, prévia/revogação. Browser real percorre pedido entregue → grupos → aprovação recusada por249/250kg → correção → prévia → aprovação → PDF → recarga; confere financeiro único e telas desktop/móvel. `tools/render_packing_list_review.py` gera PDFs sintéticos sem DB/rede/credenciais para inspeção visual com Poppler.
 
 Resultados locais, CI e evidências serão registrados no PR. Skips locais não comprovam os casos reais. Embarques parciais/devoluções, assinatura/envio, dimensões calculadas, carga de dados comerciais, homologação com contas autorizadas e liberação em produção continuam fora desta entrega.
+
+
+## Atualização: histórico completo em páginas
+
+O fluxo HTTP agora rotaciona os eventos antigos em blocos no mesmo banco, mantendo uma janela recente limitada e a consulta de todas as revisões. Os limites locais mencionados acima continuam como proteção das funções internas e de dados inválidos; não exigem descartar alterações antigas para salvar uma nova revisão válida. Ver OPERATION_HISTORY.md para atomicidade da referência, permissões, limites de bytes, falhas/retry e pendências de durabilidade em produção.

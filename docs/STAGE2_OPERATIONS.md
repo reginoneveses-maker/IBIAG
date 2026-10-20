@@ -52,12 +52,16 @@ Grupos manuais de volumes com embalagem, pesos, cubagem opcional e alocação ex
 
 Consulta administrativa com filtros de situação/país/período, alertas derivados de documentação, logística, recebimento e qualidade cadastral. Sem escrita ou automação. Ver OPERATIONS_DASHBOARD.md. Teste único integrado percorre cotação→pedido→documentos→embarque→recebimento no mesmo processo isolado.
 
+## Oitava entrega: histórico operacional paginado
+
+Eventos antigos de cotações, invoices, packing lists e embarques ficam em blocos referenciados pelo registro principal, com verificação de integridade, sem corte automático por limite da lista recente. Versão/CAS protege a referência; consulta administrativa paginada e falhas/retry testados. Ver OPERATION_HISTORY.md. Não equivale a auditoria global, backup ou prova de durabilidade em produção.
+
 ## Próximas entregas, uma de cada vez
 
 1. Homologar o fluxo CRM/cálculo→cotação→pedido com condições comerciais e aprovação interna; desenhar envio e aceite do comprador separadamente. Cotações não criam pedidos/contas implicitamente.
 2. Homologar o embarque completo manual vinculado ao pedido; desenhar embarques parciais/devoluções separadamente antes de qualquer ampliação. Sem ativar tracking pago.
 3. Homologar a Commercial Invoice e a Packing List vinculadas ao processo, com volumes, pesos, embalagem e conferência explícita; sem inferir dados ausentes.
-4. Homologar o painel de gestão diária/indicadores derivados dos pedidos. Desenhar arquivo de auditoria permanente separadamente dos históricos limitados existentes. Não apresentar exemplos ou inferências como operação concluída.
+4. Homologar o painel de gestão diária/indicadores derivados dos pedidos. Homologar o histórico paginado dos quatro fluxos e definir a abrangência da auditoria dos demais módulos. A durabilidade depende da persistência validada. Não apresentar exemplos ou inferências como operação concluída.
 5. Validar fluxo integrado oportunidade→cotação→pedido→embarque→documentação→recebimento e importação/deduplicação/relatórios. Integrações externas somente depois da configuração e homologação autorizadas.
 
 Dependências de liberação: resolver a etapa1, inclusive banco/persistência/storage/proxy, esclarecer os dois ingressos de backend, validar migração caso necessária e executar os fluxos com contas autorizadas. Não anexar volume vazio, reiniciar/migrar banco ou publicar código como atalho para obter uma validação verde.

@@ -30,3 +30,8 @@ Saída/chegada previstas são obrigatórias e ordenadas. Trânsito exige saída 
 `frontend/src/pages/gestao/Shipments.test.jsx` cobre abertura por pedido, corpo/versionamento, conflito sem repetição, consulta arquivada, datas/rota preservadas, filtro/repetição e falha de abertura. O Chromium percorre CRM → cálculo → pedido confirmado → embarque completo → recarga → documentos, com todas as chamadas externas bloqueadas/simuladas e uma única conta a receber.
 
 Resultados concretos de execução e CI são registrados no PR e no relatório de validação. Skips locais não equivalem à execução real de MongoDB/Docker. A liberação depende também da etapa 1 (proxy, persistência/banco/storage, acessos e ingressos no Railway).
+
+
+## Atualização: histórico completo em páginas
+
+O fluxo HTTP agora rotaciona os eventos antigos em blocos no mesmo banco, mantendo uma janela recente limitada e a consulta de todas as revisões. Os limites locais mencionados acima continuam como proteção das funções internas e de dados inválidos; não exigem descartar alterações antigas para salvar uma nova revisão válida. Ver OPERATION_HISTORY.md para atomicidade da referência, permissões, limites de bytes, falhas/retry e pendências de durabilidade em produção.
