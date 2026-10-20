@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# One operator-approved physical copy. Never deploys, restarts or deletes source data.
+set -Eeuo pipefail
+umask 077
+DATA_PATH=/data/db
+COORD=/tmp/ibiag-preserve-active
+WORK=''
+OWNED=0
+DONE=0
+
+fail() { printf '%s\n' 'PRESERVATION_NOT_CONFIRMED' >&2; exit 2; }
+[[ ${1:-} == --approved-one-off ]] || fail
+[[ ${RAILWAY_PROJECT_ID:-} == c1a9635c-789b-4e42-ac9b-cca4326fab9a && ${RAILWAY_ENVIRONMENT_ID:-} == fcab95f8-3e30-4da9-8e0b-d9b7f94747ce && ${RAILWAY_SERVICE_ID:-} == 9cc0395c-7601-451b-a6fa-1511ab168158 ]] || fail
+for tool in mongosh tar gzip sha256sum timeout flock nohup mktemp df stat find; do command -v "$tool" >/dev/null || fail; done
+[[ -d $DATA_PATH && ! -L $DATA_PATH && -f $DATA_PATH/WiredTiger ]] || fail
+[[ -z $(find "$DATA_PATH" -type l -print -quit) ]] || fail
+# Require 3GiB free, cap the archive at 2GiB. No size estimate from host-wide df.
+AVAILABLE=$(df -Pk /tmp | awk 'NR==2 {print $4}')
+[[ $AVAILABLE =~ ^[0-9]+$ && $AVAILABLE -ge 3145728 ]] || fail
+export MONGOSH_DISABLE_TELEMETRY=1
+mongo_check() { timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$1" 2>/dev/null; }
+# Refuse sharding/replica sets, custom dbpaths, encryption and an existing fsync lock.
+PREFLIGHT='const a=db.getSiblingDB("admin"); const h=a.runCommand({hello:1}); const c=a.runCommand({getCmdLineOpts:1}); const s=a.runCommand({serverStatus:1}); const p=c.parsed||{}; const o=a.currentOp(); if(h.ok!==1||c.ok!==1||s.ok!==1||h.setName||h.msg==="isdbgrid"||!db.version().startsWith("8.")||(p.storage?.dbPath&&p.storage.dbPath!=="/data/db")||p.security?.enableEncryption||p.security?.kmip||o.fsyncLock||s.storageEngine?.name!=="wiredTiger")quit(2); print("PREFLIGHT_OK");'
+[[ $(mongo_check "$PREFLIGHT") == PREFLIGHT_OK ]] || fail
+# Atomic marker prevents concurrent copies by this helper, including uncertain cleanup.
+mkdir -m 700 "$COORD" 2>/dev/null || fail
+OWNED=1
+WORK=$(mktemp -d /tmp/ibiag-preserve-XXXXXXXX)
+TOKEN=${WORK##*/}
+printf '%s' "$TOKEN" > "$COORD/owner"
+cat > "$COORD/release.sh" <<'RELEASE'
+#!/usr/bin/env bash
+set -u
+umask 077
+COORD=/tmp/ibiag-preserve-active
+EXPECTED_TOKEN=${1:-}
+[[ -n $EXPECTED_TOKEN && -f $COORD/owner && $(cat "$COORD/owner") == "$EXPECTED_TOKEN" ]] || exit 2
+export MONGOSH_DISABLE_TELEMETRY=1
+exec 9>"$COORD/release.mutex" || exit 2
+flock -w 30 9 || exit 2
+[[ -f $COORD/owner && $(cat "$COORD/owner") == "$EXPECTED_TOKEN" ]] || exit 2
+[[ -f $COORD/armed ]] || exit 0
+STATUS_JS='print(db.getSiblingDB("admin").currentOp().fsyncLock?"LOCK_STATUS_LOCKED":"LOCK_STATUS_UNLOCKED");'
+STATUS=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$STATUS_JS" 2>/dev/null) || exit 2
+if [[ $STATUS == LOCK_STATUS_UNLOCKED ]]; then rm -f "$COORD/armed"; exit 0; fi
+[[ $STATUS == LOCK_STATUS_LOCKED && ! -e $COORD/unlock-attempt ]] || exit 2
+# Never retry an uncertain decrement: that could release another operator's lock.
+(set -C; : > "$COORD/unlock-attempt") || exit 2
+JS='const a=db.getSiblingDB("admin");const r=a.runCommand({fsyncUnlock:1});if(r.ok!==1||Number(r.lockCount)!==0)quit(2); print("UNLOCKED");'
+RESULT=$(timeout --signal=TERM --kill-after=5s 20s mongosh --quiet --norc --eval "$JS" 2>/dev/null) || exit 2
+[[ $RESULT == UNLOCKED ]] || exit 2
+rm -f "$COORD/armed"
+exit 0
+RELEASE
+chmod 600 "$COORD/release.sh"
+cleanup() {
+  local status=$?
+  trap - EXIT INT TERM HUP
+  if [[ $OWNED == 1 ]]; then
+    if ! bash "$COORD/release.sh" "$TOKEN"; then
+      printf '%s\n' 'MANUAL_UNLOCK_REQUIRED: run the reviewed release command before any other operation.' >&2
+      exit 3
+    fi
+    rm -f "$COORD/release.sh" "$COORD/release.mutex" "$COORD/expired" "$COORD/owner" "$COORD/unlock-attempt"
+    rmdir "$COORD" 2>/dev/null || true
+  fi
+  if [[ $DONE != 1 && -n $WORK ]]; then rm -f "$WORK/data.tar.gz.partial" "$WORK/data.tar.gz"; rmdir "$WORK" 2>/dev/null || true; fi
+  if [[ $DONE != 1 ]]; then printf '%s\n' 'PRESERVATION_NOT_CONFIRMED' >&2; fi
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 2' INT TERM HUP
+# Detached deadline guard survives ordinary parent/SSH disconnection. Not a scheduler.
+# Marker stays present on failed unlock, refusing a new copy and requiring operator recovery.
+touch "$COORD/armed"
+nohup bash -c 'sleep 150; d=/tmp/ibiag-preserve-active; if [[ -f $d/owner && $(cat "$d/owner") == "$1" && -f $d/armed ]]; then touch "$d/expired"; bash "$d/release.sh" "$1"; fi' ibiag-watchdog "$TOKEN" </dev/null >/dev/null 2>&1 &
+LOCK='const a=db.getSiblingDB("admin");if(a.currentOp().fsyncLock){print("PREEXISTING_LOCK");quit(0);}const r=a.runCommand({fsync:1,lock:true,fsyncLockAcquisitionTimeoutMillis:15000});if(r.ok!==1||Number(r.lockCount)!==1)quit(2);print("LOCKED");'
+LOCK_RESULT=$(mongo_check "$LOCK") || fail
+if [[ $LOCK_RESULT == PREEXISTING_LOCK ]]; then rm -f "$COORD/armed"; fail; fi
+[[ $LOCK_RESULT == LOCKED ]] || fail
+# Copy the complete dbpath, including journal, while writes are blocked. No mongodump
+# reads behind queued writes. Any tar warning/nonzero exit invalidates the copy.
+(ulimit -f 2097152; timeout --signal=TERM --kill-after=5s 110s tar -czf "$WORK/data.tar.gz.partial" -C "$DATA_PATH" .) 2>/dev/null || fail
+[[ ! -e $COORD/expired ]] || fail
+bash "$COORD/release.sh" "$TOKEN" || fail
+# Validate only after returning the database to writers. Never print archive contents.
+gzip -t "$WORK/data.tar.gz.partial" 2>/dev/null || fail
+tar -tzf "$WORK/data.tar.gz.partial" >/dev/null 2>&1 || fail
+SIZE=$(stat -c %s "$WORK/data.tar.gz.partial")
+[[ $SIZE -gt 0 && $SIZE -le 2147483648 ]] || fail
+DIGEST=$(sha256sum "$WORK/data.tar.gz.partial"); DIGEST=${DIGEST%% *}
+mv "$WORK/data.tar.gz.partial" "$WORK/data.tar.gz"
+chmod 600 "$WORK/data.tar.gz"
+DONE=1
+printf '{"copy_created":true,"writes_unlocked":true,"restoration_proven":false,"archive":"%s/data.tar.gz","bytes":%s,"sha256":"%s"}\n' "$WORK" "$SIZE" "$DIGEST"
