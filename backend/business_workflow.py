@@ -32,7 +32,7 @@ def valid_date(value, label, required=False):
         raise ValueError(f"{label} obrigatória e no formato AAAA-MM-DD")
     return value
 
-def normalize_order(body, previous, products, offers):
+def normalize_order(body, previous, products, offers, *, frozen_items=None):
     result=dict(body)
     status=result.get("status", "draft")
     if status not in ORDER_STATUSES:
@@ -71,6 +71,10 @@ def normalize_order(body, previous, products, offers):
               "offer_id":offer["id"],"supplier_id":offer.get("supplier_id", ""),
               "supplier_name":offer.get("supplier_name", ""), "quantity":float(qty),
               "unit":unit,"unit_price":float(price)}
+        # Approved quotations own their descriptive snapshot. References and
+        # numeric values still pass the same catalog and ledger validation.
+        if frozen_items is not None and raw in frozen_items:
+            item.update({key: raw[key] for key in ("product_name", "supplier_name")})
         if grandfathered:
             item.update({key: existing_item.get(key, item[key]) for key in ("product_name", "supplier_id", "supplier_name")})
         total+=Decimal(str(money(qty*price)))

@@ -22,6 +22,7 @@ from finance_reporting import cashflow_rows, pending_totals, currency_code, mont
 from pricing import decimal_number, calculate_price
 from business_workflow import normalize_order, normalize_purchase, inventory_balances, validate_balances, linked_finance
 from order_shipments import build_shipment, allowed_statuses as shipment_statuses, SUMMARY_FIELDS as SHIPMENT_SUMMARY_FIELDS
+from commercial_quotations import QuotationCreate, QuotationEdit, QuotationState, TERMS as QUOTE_TERMS, SUMMARY as QUOTE_SUMMARY, validate_terms as validate_quote_terms, quotation_event
 from contextlib import asynccontextmanager
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
@@ -113,7 +114,7 @@ async def delete_object(path: str):
 
 # ----- Auth helpers -----
 def hash_pw(pw): return bcrypt.hashpw(password_bytes(pw, minimum=8), bcrypt.gensalt()).decode()
-def verify_pw(pw, h): 
+def verify_pw(pw, h):
     try: return bcrypt.checkpw(password_bytes(pw), h.encode())
     except Exception: return False
 
@@ -337,6 +338,9 @@ class SalesOrder(BaseModel):
     source_price_id: str = Field(default="", max_length=200, pattern=r"^[^\x00]*$")
     source_price_revision: str = Field(default="", max_length=64, pattern=r"^(?:[0-9a-f]{64})?$")
     source_price_snapshot: dict = Field(default_factory=dict)
+    source_quote_id: str = Field(default="", max_length=80, pattern=r"^[A-Za-z0-9_-]*$")
+    source_quote_revision: int = Field(default=0, strict=True, ge=0)
+    source_quote_snapshot: dict = Field(default_factory=dict)
     shipment: dict = Field(default_factory=dict)
     products: str = ""
     incoterm: str = "FOB"
@@ -1141,23 +1145,26 @@ async def upd_sup(sid: str, s: Supplier, user=Depends(get_admin_user)):
 @api.delete("/suppliers/{sid}")
 async def del_sup(sid: str, user=Depends(get_admin_user)):
     require_admin(user)
-    supplier = await db.suppliers.find_one({"id": sid}, {"_id": 0})
-    if not supplier:
-        raise HTTPException(404, "Fornecedor não encontrado")
-    checks = [
-        (db.product_offers, {"supplier_id": sid}),
-        (db.purchases, {"supplier_id": sid}),
-        (db.orders, {"items.supplier_id": sid}),
-        (db.contracts, {"supplier_id": sid}),
-        (db.certifications, {"supplier_id": sid}),
-        (db.documents, {"supplier_id": sid}),
-        (db.specs, {"supplier_id": sid}),
-    ]
-    for collection, query in checks:
-        if await collection.find_one(query, {"_id": 1}):
-            raise HTTPException(409, "Fornecedor vinculado ao histórico comercial não pode ser excluído.")
-    r = await db.suppliers.delete_one({"id": sid})
-    return {"deleted": r.deleted_count}
+    async with business_write_lock() as ensure_owned:
+        supplier = await db.suppliers.find_one({"id": sid}, {"_id": 0})
+        if not supplier:
+            raise HTTPException(404, "Fornecedor não encontrado")
+        checks = [
+            (db.product_offers, {"supplier_id": sid}),
+            (db.purchases, {"supplier_id": sid}),
+            (db.orders, {"items.supplier_id": sid}),
+            (db.quotations, {"items.supplier_id": sid}),
+            (db.contracts, {"supplier_id": sid}),
+            (db.certifications, {"supplier_id": sid}),
+            (db.documents, {"supplier_id": sid}),
+            (db.specs, {"supplier_id": sid}),
+        ]
+        for collection, query in checks:
+            if await collection.find_one(query, {"_id": 1}):
+                raise HTTPException(409, "Fornecedor vinculado ao histórico comercial não pode ser excluído.")
+        await ensure_owned()
+        r = await db.suppliers.delete_one({"id": sid})
+        return {"deleted": r.deleted_count}
 
 # ============ INVOICES ============
 @api.get("/invoices", response_model=List[Invoice])
@@ -1227,6 +1234,7 @@ def version_query(record):
     return {"id": record["id"], "version": {"$in": [None, 0]}}
 
 async def save_order_workflow(order, create=False, shipment_input=None, shipment_actor=None):
+    quote_source = None
     async with business_write_lock() as ensure_owned:
         previous = await db.orders.find_one({"id": order.id}, {"_id": 0})
         if not create and not previous:
@@ -1260,15 +1268,36 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
                 if stored_shipment.get("status") != "cancelled" or order.status not in {"draft", "confirmed", "cancelled"}:
                     raise HTTPException(409, "Use o fluxo de embarque para alterar a situação deste pedido.")
         if previous:
+            stored_quote = previous.get("source_quote_id", "")
+            if "source_quote_id" in order.model_fields_set and order.source_quote_id != stored_quote:
+                raise HTTPException(409, "A origem da cotação não pode ser trocada.")
+            if stored_quote and (order.incoterm != previous.get("incoterm") or
+                                ("lead_id" in order.model_fields_set and order.lead_id != previous.get("lead_id"))):
+                raise HTTPException(409, "Cliente e Incoterm da cotação devem ser preservados.")
+            for key, default in (("source_quote_id", ""), ("source_quote_revision", 0), ("source_quote_snapshot", {})):
+                setattr(order, key, previous.get(key, default))
             stored_source = previous.get("source_price_id", "")
             if "source_price_id" in order.model_fields_set and order.source_price_id != stored_source:
                 raise HTTPException(409, "A origem do cálculo não pode ser trocada. Crie outro rascunho.")
             for key in ("source_price_id", "source_price_revision", "source_price_snapshot"):
                 setattr(order, key, previous.get(key, {} if key.endswith("snapshot") else ""))
-            if stored_source:
+            if stored_source or stored_quote:
                 if [item.model_dump() for item in order.items] != previous.get("items", []):
                     raise HTTPException(409, "Itens de cálculo vinculado não podem ser alterados. Recalcule e crie outro rascunho.")
+        elif order.source_quote_id:
+            if order.status != "draft" or order.source_price_id:
+                raise HTTPException(400, "Cotação gera somente rascunho, sem outra origem de cálculo.")
+            quote_source = await order_quote_source(order.source_quote_id)
+            if order.source_quote_revision != quote_source["source_quote_revision"]:
+                raise HTTPException(409, "A cotação mudou. Reabra a conferência.")
+            for key in ("lead_id", "customer", "customer_country", "incoterm", "source_quote_snapshot"):
+                setattr(order, key, quote_source[key])
+            order.items = [OrderItem(**item) for item in quote_source["items"]]
+            order.source_price_revision = ""
+            order.source_price_snapshot = {}
         elif order.source_price_id:
+            order.source_quote_revision = 0
+            order.source_quote_snapshot = {}
             if order.status != "draft":
                 raise HTTPException(400, "Pedido a partir de cálculo deve começar em rascunho.")
             source = await order_price_source(order.source_price_id)
@@ -1279,6 +1308,8 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
         else:
             order.source_price_revision = ""
             order.source_price_snapshot = {}
+            order.source_quote_revision = 0
+            order.source_quote_snapshot = {}
         # Older API clients may omit the new relationship. Never erase it as a
         # side effect of an unrelated update, nor rewrite a commercial snapshot.
         if previous and "lead_id" not in order.model_fields_set:
@@ -1296,6 +1327,9 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
             if previous and previous_lead == order.lead_id:
                 order.customer = previous["customer"]
                 order.customer_country = previous.get("customer_country", "")
+            elif quote_source:
+                order.customer = quote_source["customer"]
+                order.customer_country = quote_source["customer_country"]
             else:
                 if not isinstance(lead.get("company"), str) or not lead["company"].strip() or not isinstance(lead.get("country", ""), str):
                     raise HTTPException(400, "Revise nome e país da empresa no CRM antes de vincular.")
@@ -1304,10 +1338,15 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
         products, orders, purchases = await business_snapshot()
         offers = await db.product_offers.find({}, {"_id": 0}).to_list(None)
         try:
-            result = normalize_order(order.model_dump(), previous, {p["id"]:p for p in products}, {o["id"]:o for o in offers})
+            result = normalize_order(order.model_dump(), previous, {p["id"]:p for p in products}, {o["id"]:o for o in offers},
+                                     frozen_items=order.source_quote_snapshot.get("items") if order.source_quote_id else None)
             validate_balances(inventory_balances(products, [o for o in orders if o["id"] != order.id]+[result], purchases))
         except ValueError as exc:
             raise HTTPException(400, str(exc))
+        if order.source_quote_id:
+            expected_items = (order.source_quote_snapshot or {}).get("items")
+            if result["items"] != expected_items:
+                raise HTTPException(409, "O cadastro comercial mudou. Revise a cotação antes de continuar.")
         result.update(version=int((previous or {}).get("version") or 0)+1, updated_at=now_iso())
         await ensure_owned()
         if previous:
@@ -1682,6 +1721,131 @@ async def order_price_source(pid):
                        "supplier_name": price.supplier_name, "quantity": price.quantity,
                        "unit": price.unit, "unit_price": price.sell_price_usd}]}
 
+# ============ COMMERCIAL QUOTATIONS (INTERNAL APPROVAL) ============
+async def quote_record(qid):
+    records = await db.quotations.find({"id": qid}, {"_id": 0}).limit(2).to_list(2)
+    if not records: raise HTTPException(404, "Cotação não encontrada")
+    if len(records) != 1: raise HTTPException(409, "Identificador de cotação ambíguo. Solicite revisão.")
+    return records[0]
+
+async def quote_references(record):
+    leads = await db.leads.find({"id": record["lead_id"]}, {"_id": 0}).limit(2).to_list(2)
+    if len(leads) != 1: raise HTTPException(409, "Revise a empresa vinculada à cotação.")
+    item = record["items"][0]
+    for collection, rid in ((db.products, item["product_id"]), (db.suppliers, item["supplier_id"]),
+                            (db.product_offers, item["offer_id"])):
+        matches = await collection.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
+        if len(matches) != 1: raise HTTPException(409, "Revise produto, fornecedor e oferta da cotação.")
+        if collection.name == "product_offers":
+            offer = matches[0]
+            if offer.get("active", True) is not True or offer.get("product_id") != item["product_id"] or offer.get("supplier_id") != item["supplier_id"] or (offer.get("unit") and offer["unit"] != item["unit"]):
+                raise HTTPException(409, "A oferta da cotação mudou ou está inativa. Revise a operação.")
+
+async def quotation_view(record):
+    linked = await db.orders.find_one({"source_quote_id": record["id"]}, {"_id": 0, "id": 1})
+    expired = record["valid_until"] < datetime.now(timezone.utc).date().isoformat()
+    return {**{k: v for k, v in record.items() if k != "_id"}, "linked_order_id": linked["id"] if linked else "", "expired": expired,
+            "can_order": record["status"] == "approved" and not expired and not linked}
+
+def checked_quote_event(record, previous, actor, note):
+    try:
+        return quotation_event(record, previous, actor, note, now_iso())
+    except OverflowError as exc:
+        raise HTTPException(413, str(exc)) from None
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Revise os dados e o limite do histórico da cotação.") from None
+
+def check_quotation_terms(record):
+    try: validate_quote_terms(record, datetime.now(timezone.utc).date())
+    except (TypeError, ValueError) as exc: raise HTTPException(400, str(exc)) from None
+
+async def order_quote_source(qid):
+    quote = await quote_record(qid)
+    if quote["status"] != "approved" or quote["valid_until"] < datetime.now(timezone.utc).date().isoformat():
+        raise HTTPException(409, "A cotação precisa estar aprovada internamente e dentro da validade.")
+    if await db.orders.find_one({"source_quote_id": qid}, {"_id": 1}):
+        raise HTTPException(409, "A cotação já possui pedido, inclusive se cancelado ou arquivado.")
+    await quote_references(quote)
+    snapshot = {key: value for key, value in quote.items() if key != "history"}
+    return {"source_quote_id": qid, "source_quote_revision": quote["version"], "source_quote_snapshot": snapshot,
+            **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items", "total_usd")}}
+
+@api.get("/quotations")
+async def list_quotations(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
+    status: Optional[Literal["draft", "approved", "cancelled"]] = None,
+    lead_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_admin_user)):
+    query = {}
+    if status: query["status"] = status
+    if lead_id: query["lead_id"] = lead_id
+    records = await db.quotations.find(query, {"_id": 0, **{k: 1 for k in QUOTE_SUMMARY}}).sort("id", 1).skip(skip).limit(limit).to_list(limit)
+    links = await db.orders.find({"source_quote_id": {"$in": [q["id"] for q in records]}},
+                                 {"_id": 0, "id": 1, "source_quote_id": 1}).to_list(limit)
+    mapped = {o["source_quote_id"]: o["id"] for o in links}
+    return [{**q, "linked_order_id": mapped.get(q["id"], "")} for q in records]
+
+@api.get("/quotations/{qid}/order-draft")
+async def quotation_order_draft(qid: str, user=Depends(get_admin_user)):
+    return await order_quote_source(qid)
+
+@api.get("/quotations/{qid}")
+async def get_quotation(qid: str, user=Depends(get_admin_user)):
+    return await quotation_view(await quote_record(qid))
+
+@api.post("/quotations")
+async def create_quotation(body: QuotationCreate, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        if await db.quotations.find_one({"$or": [{"id": body.id}, {"reference": body.reference}]}, {"_id": 1}):
+            raise HTTPException(409, "Identificador ou referência da cotação já utilizado. Confira a lista.")
+        values = body.model_dump(exclude={"change_note"})
+        check_quotation_terms(values)
+        source = await order_price_source(body.source_price_id)
+        if source["source_price_revision"] != body.source_price_revision:
+            raise HTTPException(409, "O cálculo mudou. Abra e confira novamente antes de criar a cotação.")
+        leads = await db.leads.find({"id": body.lead_id}, {"_id": 0}).limit(2).to_list(2)
+        if len(leads) != 1 or not isinstance(leads[0].get("company"), str) or not leads[0]["company"].strip() or not isinstance(leads[0].get("country", ""), str):
+            raise HTTPException(400, "Selecione uma empresa única e válida do CRM.")
+        values.update(source, customer=leads[0]["company"], customer_country=leads[0].get("country", ""), status="draft")
+        record = checked_quote_event(values, None, user, body.change_note)
+        await ensure_owned()
+        await db.quotations.insert_one(dict(record))
+        return await quotation_view(record)
+
+@api.put("/quotations/{qid}")
+async def edit_quotation(qid: str, body: QuotationEdit, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous = await quote_record(qid)
+        if previous["version"] != body.version: raise HTTPException(409, "Cotação alterada. Recarregue antes de salvar.")
+        if previous["status"] != "draft": raise HTTPException(409, "Condições só podem ser alteradas em rascunho. Crie outra cotação.")
+        values = {**previous, **body.model_dump(exclude={"version", "change_note"})}
+        check_quotation_terms(values)
+        record = checked_quote_event(values, previous, user, body.change_note)
+        await ensure_owned()
+        saved = await db.quotations.replace_one(version_query(previous), record)
+        if not saved.matched_count: raise HTTPException(409, "Cotação alterada. Recarregue antes de salvar.")
+        return await quotation_view(record)
+
+@api.post("/quotations/{qid}/status")
+async def change_quotation_status(qid: str, body: QuotationState, user=Depends(get_admin_user)):
+    async with business_write_lock() as ensure_owned:
+        previous = await quote_record(qid)
+        if previous["version"] != body.version: raise HTTPException(409, "Cotação alterada. Recarregue antes de aprovar ou cancelar.")
+        if previous["status"] == "cancelled" or previous["status"] == body.status:
+            raise HTTPException(409, "Transição de cotação não permitida.")
+        if await db.orders.find_one({"source_quote_id": qid}, {"_id": 1}):
+            raise HTTPException(409, "Cotação vinculada a pedido deve manter sua memória aprovada.")
+        values = {**previous, "status": body.status}
+        if body.status == "approved":
+            if previous["status"] != "draft": raise HTTPException(409, "Cotação já aprovada.")
+            check_quotation_terms(values)
+            await quote_references(values)
+            values.update(approved_by=user["id"], approved_at=now_iso())
+        record = checked_quote_event(values, previous, user, body.change_note)
+        await ensure_owned()
+        saved = await db.quotations.replace_one(version_query(previous), record)
+        if not saved.matched_count: raise HTTPException(409, "Cotação alterada. Recarregue antes de continuar.")
+        return await quotation_view(record)
+
+
 @api.get("/prices/{pid}/order-draft")
 async def price_order_draft(pid: str, user=Depends(get_admin_user)):
     return await order_price_source(pid)
@@ -1752,6 +1916,8 @@ async def del_price(pid: str, user=Depends(get_admin_user)):
     async with business_write_lock() as ensure_owned:
         if await db.orders.find_one({"source_price_id": pid}, {"_id": 1}):
             raise HTTPException(409, "Cálculo vinculado a pedido não pode ser excluído.")
+        if await db.quotations.find_one({"source_price_id": pid}, {"_id": 1}):
+            raise HTTPException(409, "Cálculo vinculado a cotação não pode ser excluído.")
         await ensure_owned()
         r = await db.prices.delete_one({"id": pid})
         return {"deleted": r.deleted_count}
@@ -1889,7 +2055,7 @@ async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_admin
 async def delete_product_offer(oid: str, user=Depends(get_admin_user)):
     require_admin(user)
     async with business_write_lock() as ensure_owned:
-        if await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}):
+        if await db.orders.find_one({"items.offer_id": oid}) or await db.documents.find_one({"offer_id": oid}) or await db.quotations.find_one({"items.offer_id": oid}):
             raise HTTPException(400, "Oferta vinculada não pode ser excluída. Marque-a como inativa.")
         await ensure_owned()
         r = await db.product_offers.delete_one({"id": oid})
@@ -1955,6 +2121,7 @@ async def del_product(pid: str, user=Depends(get_admin_user)):
         checks = [
             (db.product_offers, {"product_id": pid}),
             (db.orders, {"items.product_id": pid}),
+            (db.quotations, {"items.product_id": pid}),
             (db.purchases, {"product_id": pid}),
             (db.documents, {"product_id": pid}),
         ]
@@ -2000,7 +2167,7 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
         return PortfolioImportResult(products=len(product_names), suppliers=len(supplier_names), offers=len(rows), source_rows=len(rows))
 
     async with business_write_lock() as ensure_owned:
-        if replace and (await db.orders.find_one({"items.0": {"$exists": True}}) or await db.purchases.find_one({"product_id": {"$nin": [None, ""]}})):
+        if replace and (await db.quotations.find_one({}) or await db.orders.find_one({"items.0": {"$exists": True}}) or await db.purchases.find_one({"product_id": {"$nin": [None, ""]}})):
             raise HTTPException(400, "Portfólio com operações vinculadas não pode ser substituído. Use importação incremental.")
         await ensure_owned()
         if replace:
@@ -2014,7 +2181,7 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
                 await db.suppliers.insert_one(s.model_dump())
                 existing = s.model_dump()
             supplier_map[name] = existing
-    
+
         product_map = {}
         for r in rows:
             name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
@@ -2037,7 +2204,7 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
             )
             await db.products.insert_one(p.model_dump())
             product_map[key] = p.model_dump()
-    
+
         offer_count = 0
         for r in rows:
             name = re.sub(r"\\s+", " ", r.get("Produto","")).strip()
@@ -2069,12 +2236,12 @@ async def import_portfolio_xlsx(file: UploadFile = File(...), replace: bool = Tr
             )
             await db.product_offers.insert_one(offer.model_dump())
             offer_count += 1
-    
+
         # Refresh each supplier's product summary without inventing contact data.
         for name, supplier in supplier_map.items():
             supplied = sorted({r.get("Produto","").strip() for r in rows if r.get("Fornecedor","") == name and r.get("Produto","").strip()})
             await db.suppliers.update_one({"id": supplier["id"]}, {"$set": {"products": ", ".join(supplied)}})
-    
+
         await db.settings.update_one({"key":"portfolio_source"}, {"$set":{
             "key":"portfolio_source","value":"Tabela Produtos Ibiag 2026 - COMPLETA (1).xlsx",
             "source_rows":len(rows),"products":len(product_map),"suppliers":len(supplier_map),
@@ -2350,6 +2517,8 @@ async def del_lead(lid: str, user=Depends(get_current_user)):
         await require_lead(db, user, lid)
         if await db.orders.find_one({"lead_id": lid}, {"_id": 1}):
             raise HTTPException(409, "Empresa vinculada a pedido não pode ser excluída.")
+        if await db.quotations.find_one({"lead_id": lid}, {"_id": 1}):
+            raise HTTPException(409, "Empresa vinculada a cotação não pode ser excluída.")
         await ensure_owned()
         result = await db.leads.delete_one(lead_scope(user, {"id": lid}))
         if not result.deleted_count: raise HTTPException(404, "Empresa não encontrada")
