@@ -87,7 +87,7 @@ export default function PackingLists(){
      </div>)}
      <Button variant="outline" disabled={form.packages.length>=100} onClick={()=>change("packages",[...form.packages,{marks:"",packaging:"",package_count:1,net_kg:"",gross_kg:"",volume_m3:"",allocations:[{index:0,quantity:""}]}])}>Adicionar grupo de volumes</Button>
     </fieldset>
-    {!isNew&&<p>Totais salvos: {detail.totals.package_count} volumes · líquido {detail.totals.net_kg} kg · bruto {detail.totals.gross_kg} kg · cubagem {detail.totals.volume_m3??"incompleta"} m³</p>}
+    {!isNew&&<p>Totais salvos: {detail.totals.package_count} volumes · líquido {detail.totals.net_kg??"incompleto"} kg · bruto {detail.totals.gross_kg??"incompleto"} kg · cubagem {detail.totals.volume_m3??"incompleta"} m³</p>}
     {detail.status!=="cancelled"&&<label>Motivo do registro ou decisão<Textarea aria-label="Motivo do registro ou decisão" disabled={saving} maxLength={300} value={form.change_note} onChange={e=>change("change_note",e.target.value)}/></label>}
     {!isNew&&detail.status==="draft"&&<label className="flex items-start gap-2"><input type="checkbox" checked={confirmed} disabled={saving||dirty||detail.source_changed} onChange={e=>setConfirmed(e.target.checked)}/>Conferi dados cadastrais, volumes, embalagens, pesos e distribuição de todos os itens do pedido.</label>}
     {dirty&&<p role="status">Salve as alterações antes de conferir o PDF ou decidir.</p>}{detail.source_changed&&<p role="alert">O pedido está incompatível com esta memória. Cancele o rascunho ou a Packing List e prepare outro documento após revisar o pedido.</p>}

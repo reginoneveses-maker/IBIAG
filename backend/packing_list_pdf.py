@@ -51,12 +51,12 @@ def render_packing_list(record):
             item=data["items"][allocation["index"]]
             desc+="\n"+item["product_name"]+": "+(precise(allocation["quantity"]) if allocation["quantity"] else "Not provided")+" "+item["unit"]
         desc+="\nVolume m3: "+(precise(group["volume_m3"]) if group["volume_m3"] else "Not provided")
-        rows.append([p(desc),p(group["package_count"],right),p(precise(group["net_kg"] or "0"),right),p(precise(group["gross_kg"] or "0"),right)])
+        rows.append([p(desc),p(group["package_count"],right),p(precise(group["net_kg"]) if group["net_kg"] else "Not provided",right),p(precise(group["gross_kg"]) if group["gross_kg"] else "Not provided",right)])
     table=Table(rows,colWidths=[WIDTH*.52,WIDTH*.16,WIDTH*.16,WIDTH*.16],repeatRows=1,hAlign="LEFT",splitByRow=1)
     table.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("BACKGROUND",(0,0),(-1,0),colors.HexColor("#EBF0F8")),("LINEBELOW",(0,0),(-1,0),1,BLUE),("LINEBELOW",(0,1),(-1,-1),0.3,colors.HexColor("#DDE5EF")),("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
     totals=data["totals"]
     story.extend([table,Spacer(1,14),p("TOTAL PACKAGES: "+str(totals["package_count"]),label),
-        p("Net weight kg: "+precise(totals["net_kg"])+" | Gross weight kg: "+precise(totals["gross_kg"])),
+        p("Net weight kg: "+(precise(totals["net_kg"]) if totals["net_kg"] is not None else "Not provided for all groups")+" | Gross weight kg: "+(precise(totals["gross_kg"]) if totals["gross_kg"] is not None else "Not provided for all groups")),
         p("Total volume m3: "+(precise(totals["volume_m3"]) if totals["volume_m3"] is not None else "Not provided for all groups")),Spacer(1,14)])
     if data["notes"]: story.extend([p("PACKING NOTES",label),p(data["notes"]),Spacer(1,12)])
     story.extend([p("AUTHORIZED REPRESENTATIVE",label),p(data["signatory"]),p("Typed name. No electronic or handwritten signature is generated.",small)])

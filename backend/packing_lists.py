@@ -66,7 +66,7 @@ def validate_details(record, today, approval=False):
     if snapshot.get("customer_country") and record["buyer_country"] != snapshot["customer_country"]:
         raise ValueError("País do comprador deve coincidir com o pedido.")
     quantities = [Decimal(0) for _ in snapshot["items"]]
-    marks = set(); net = gross = volume = Decimal(0); count = 0; all_volumes = True
+    marks = set(); net = gross = volume = Decimal(0); count = 0; all_volumes = all_net = all_gross = True
     for group in record["packages"]:
         mark = group["marks"].strip().casefold()
         if mark and mark in marks: raise ValueError("Marcas dos grupos devem ser distintas.")
@@ -84,6 +84,8 @@ def validate_details(record, today, approval=False):
             raise ValueError("Confira marcas, embalagem e pesos positivos de cada grupo.")
         net += n; gross += g; volume += v; count += group["package_count"]
         all_volumes = all_volumes and bool(group["volume_m3"])
+        all_net = all_net and bool(group["net_kg"])
+        all_gross = all_gross and bool(group["gross_kg"])
     for i, item in enumerate(snapshot["items"]):
         target = Decimal(str(item["quantity"]))
         if quantities[i] > target: raise ValueError("Quantidade embalada excede o pedido.")
@@ -95,7 +97,8 @@ def validate_details(record, today, approval=False):
         if not record["delivery_same_as_buyer"] and any(not record[k].strip() for k in ("ship_to_name", "ship_to_address", "ship_to_country")):
             raise ValueError("Complete os dados do destinatário.")
     # Group weights/volume/allocations are group TOTALS, never per-package multipliers.
-    record["totals"] = {"package_count": count, "net_kg": format(net,"f"), "gross_kg": format(gross,"f"),
+    record["totals"] = {"package_count": count, "net_kg": format(net,"f") if record["packages"] and all_net else None,
+                        "gross_kg": format(gross,"f") if record["packages"] and all_gross else None,
                         "volume_m3": format(volume,"f") if record["packages"] and all_volumes else None}
 
 def packing_event(record, previous, actor, reason, now):

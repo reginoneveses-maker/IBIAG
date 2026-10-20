@@ -113,6 +113,12 @@ class PackingListTests(unittest.IsolatedAsyncioTestCase):
                        [{**self.body['packages'][0],'net_kg':'','gross_kg':''}], [{**self.body['packages'][0],'marks':''}],
                        [{**self.body['packages'][0],'packaging':''}]):
             doc=await self.document(packages=groups)
+            if not groups or not groups[0].get('net_kg'):
+                self.assertIsNone(doc['totals']['net_kg'])
+                pdf=await self.client.get(f'/api/packing-lists/{doc["id"]}/pdf',headers=self.headers())
+                self.assertEqual(pdf.status_code,200)
+                self.assertIn('Not provided for all groups',self.text(pdf))
+                self.assertNotIn('Net weight kg: 0',self.text(pdf))
             self.assertEqual((await self.decide(doc)).status_code,400)
             self.assertEqual((await self.decide(doc,'cancelled')).status_code,200)
             # Fresh references remain required, even after cancellation.
