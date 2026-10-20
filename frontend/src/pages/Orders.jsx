@@ -94,7 +94,7 @@ export default function Orders() {
         {form.lead_id&&<p className="text-xs col-span-2">Cliente e país vêm do cadastro ao vincular. O pedido preserva esses dados mesmo se o CRM mudar depois.</p>}
         <label className="text-sm col-span-2">Cliente<Input readOnly={!!form.lead_id} data-testid="ord-customer-input" value={form.customer} onChange={e=>change("customer",e.target.value)}/></label>
         <label className="text-sm">País<Input readOnly={!!form.lead_id} value={form.customer_country} onChange={e=>change("customer_country",e.target.value)}/></label>
-        <label className="text-sm">Incoterm<select className={selectClass} disabled={!!form.source_quote_id} value={form.incoterm} onChange={e=>change("incoterm",e.target.value)}>{["EXW","FOB","FCA","CFR","CIF","CPT","CIP","DAP","DPU","DDP"].map(x=><option key={x}>{x}</option>)}</select></label>
+        <label className="text-sm">Incoterm<select aria-label="Incoterm" className={selectClass} disabled={!!form.source_quote_id} value={form.incoterm} onChange={e=>change("incoterm",e.target.value)}>{["EXW","FOB","FCA","CFR","CIF","CPT","CIP","DAP","DPU","DDP"].map(x=><option key={x}>{x}</option>)}</select></label>
         <label className="text-sm">Data do pedido<Input type="date" value={form.order_date} onChange={e=>change("order_date",e.target.value)}/></label>
         <label className="text-sm">Vencimento do recebimento<Input type="date" value={form.receivable_due_date} onChange={e=>change("receivable_due_date",e.target.value)}/></label>
         <label className="text-sm">Data de entrega<Input type="date" value={form.delivery_date} onChange={e=>change("delivery_date",e.target.value)}/></label>
