@@ -64,7 +64,7 @@ export default function Precos() {
                   <td className="px-4 py-3 text-right font-mono-alt font-bold text-[#0F382C]">{priceMoney(p.sell_price_brl,"BRL",true)}</td>
                   <td className="px-4 py-3 text-right font-mono-alt font-bold text-amber-700">{priceMoney(p.sell_price_usd,"USD",true)}</td>
                   <td className="px-2 py-3 whitespace-nowrap">
-                    {p.offer_id&&!p.calculation_error&&p.sell_price_usd>0?<Link className="text-xs underline mr-2" data-testid={`price-order-${p.id}`} to={`/prospects/orders?price=${encodeURIComponent(p.id)}`}>Criar pedido</Link>:<span className="text-xs mr-2">Revise oferta e câmbio para criar pedido</span>}
+                    {p.offer_id&&!p.calculation_error&&p.sell_price_usd>0?<><Link className="text-xs underline mr-2" to={`/gestao/cotacoes?price=${encodeURIComponent(p.id)}`}>Criar cotação</Link><Link className="text-xs underline mr-2" data-testid={`price-order-${p.id}`} to={`/prospects/orders?price=${encodeURIComponent(p.id)}`}>Criar pedido</Link></>:<span className="text-xs mr-2">Revise oferta e câmbio para criar pedido</span>}
                     <Button size="sm" variant="ghost" onClick={() => { edit(p); setDialog(true); }} data-testid={`edit-price-${p.id}`}><Pencil className="w-3 h-3" /></Button>
                     <Button size="sm" variant="ghost" onClick={() => del(p.id)} className="text-rose-600" data-testid={`delete-price-${p.id}`}><Trash2 className="w-3 h-3" /></Button>
                   </td>
