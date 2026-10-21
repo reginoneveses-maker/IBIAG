@@ -23,6 +23,8 @@ const Pipeline = () => {
   const [leads, setLeads] = useState([]);
   const [industryFilter, setIndustryFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [pageSize, setPageSize] = useState(15);
+  const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(emptyLead);
   const [detailLead, setDetailLead] = useState(null);
@@ -82,7 +84,12 @@ const Pipeline = () => {
     return true;
   });
 
+  filtered.sort((a,b) => (a.company || "").localeCompare(b.company || "", "pt-BR", {sensitivity:"base", numeric:true}) || String(a.id).localeCompare(String(b.id)));
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleLeads = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const byStage = (s) => filtered.filter(l => l.stage === s);
+  useEffect(() => { setPage(1); }, [search, industryFilter, pageSize]);
 
   const openNew = () => { setEditing({ ...emptyLead }); setDialogOpen(true); };
   const openEdit = (l) => { setEditing(l); setDialogOpen(true); };
@@ -170,6 +177,13 @@ const Pipeline = () => {
         </Select>
       </div>
 
+      <nav aria-label="Paginação dos leads" className="flex flex-wrap items-center gap-3">
+        <span>Ordem: A–Z · {filtered.length} leads</span>
+        <label>Por página <select aria-label="Leads por página" value={pageSize} onChange={e => setPageSize(Number(e.target.value))} className="border rounded p-2 bg-white">{[15,30,50,100].map(n => <option key={n} value={n}>{n}</option>)}</select></label>
+        <Button variant="outline" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Página anterior</Button>
+        <label>Página <select aria-label="Página dos leads" value={currentPage} onChange={e => setPage(Number(e.target.value))} className="border rounded p-2 bg-white">{Array.from({length:pageCount},(_,i) => <option key={i+1} value={i+1}>{i+1}</option>)}</select> de {pageCount}</label>
+        <Button variant="outline" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Próxima página</Button>
+      </nav>
       <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin" data-testid="kanban-board">
         {STAGES.map(stage => (
           <div key={stage} className="flex-shrink-0 w-72" data-testid={`kanban-column-${stage}`}>
@@ -178,7 +192,7 @@ const Pipeline = () => {
               <span className="text-xs font-mono-alt">{byStage(stage).length}</span>
             </div>
             <div className="bg-white/60 border border-t-0 border-[#104496]/10 rounded-b-lg p-2 min-h-[400px] space-y-2">
-              {byStage(stage).map(l => (
+              {visibleLeads.filter(l => l.stage === stage).map(l => (
                 <Card
                   key={l.id}
                   data-testid={`lead-card-${l.id}`}

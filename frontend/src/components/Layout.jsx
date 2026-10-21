@@ -30,7 +30,7 @@ const groups = (module, t) => module === "gestao"
       ]},
       { title: "Produtos", items: [
         { to: "/gestao/produtos", icon: Package, label: "Portfólio & dossiês" },
-        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Especificações técnicas" },
+        { to: "/gestao/prospeccao", icon: FlaskConical, label: "Specs originais" },
         { to: "/gestao/precos", icon: Calculator, label: "Preços & calculadora" },
       ]},
       { title: "Fornecedores", items: [

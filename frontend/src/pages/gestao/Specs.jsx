@@ -91,7 +91,7 @@ export default function Specs() {
   return (
     <div data-testid="specs-page">
       {el}
-      <PageHeader number="04 · Prospecção IBIAG" title="Specs por Fornecedor" subtitle="Ficha técnica original do fornecedor e a versão IBIAG de cada produto"
+      <PageHeader number="04 · Prospecção IBIAG" title="Specs originais por fornecedor" subtitle="Ficha técnica original do fornecedor e a versão IBIAG de cada produto"
         action={<Button onClick={openNew} data-testid="new-spec-button" className="bg-amber-600 hover:bg-amber-700 text-white"><Plus className="w-4 h-4 mr-1" />Nova Spec</Button>} />
       <SupplierTabs suppliers={suppliers} active={active} counts={library.counts} onChange={setActive} onCreate={(s) => { loadSup(); setActive(s.id); }} allLabel="Todos" />
 
