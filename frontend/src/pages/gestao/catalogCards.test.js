@@ -32,3 +32,18 @@ test('compound solids cards isolate each PDF binding and preserve source records
  expect(JSON.stringify({products,offers})).toBe(before);
  expect(productVariants('Pulp (8%-14% solids)')).toEqual(['Pulp (8%-14% solids)']);
 });
+
+test('process-only forms preserve ingredient names and explicit imported spec distinctions',()=>{
+ const products=[{id:'acerola',name:'Acerola Concentrate'},{id:'camu',name:'Camu Camu Powder'}];
+ const offers=[
+ {id:'a',product_id:'acerola',form:'Clarified / Conc.',notes:'Spec: Acerola Concentrate 65° Brix Clarified | Embalagem: Metal Drums'},
+ {id:'b',product_id:'acerola',form:'Clarified / Conc.',notes:'Spec: Acerola Concentrate 50° Brix Cloudy | Embalagem: Metal Drums'},
+ {id:'c',product_id:'camu',form:'Freeze Dried'}];
+ expect(catalogCards(products,offers).map(c=>c.cardName)).toEqual(['Acerola Concentrate 65° Brix Clarified','Acerola Concentrate 50° Brix Cloudy','Camu Camu Powder · Freeze Dried']);
+});
+
+test('correcting a generic title preserves previously saved PDF binding keys',()=>{
+ const card=catalogCards([{id:'p',name:'Acerola Powder'}],[{id:'o',product_id:'p',form:'Freeze Dried'}])[0];
+ expect(card.cardName).toBe('Acerola Powder · Freeze Dried');
+ expect(catalogSpecCode(card)).toBe('catalog:p:o:Freeze%20Dried');
+});
