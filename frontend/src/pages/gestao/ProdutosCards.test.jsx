@@ -4,7 +4,7 @@ import {MemoryRouter} from 'react-router-dom';
 import Produtos from './Produtos';
 import {api} from '@/AuthContext';
 import {downloadDocument,documentPreview} from '@/lib/api';
-jest.mock('@/AuthContext',()=>({api:{get:jest.fn()}}));
+jest.mock('@/AuthContext',()=>({useAuth:()=>({user:{role:"user"}}),api:{get:jest.fn()}}));
 jest.mock('@/lib/api',()=>({downloadDocument:jest.fn(),documentPreview:jest.fn()}));
 
 test('card downloads and previews linked IBIAG version, with both sending integrations disabled',async()=>{

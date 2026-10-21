@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, CATEGORIES } from "@/lib/api";
+import { useAuth } from "@/AuthContext";
+import CatalogSpecActions from "@/components/CatalogSpecActions";
+import { catalogCards } from "@/pages/gestao/catalogCards";
 import { useLang } from "@/i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +15,9 @@ import { INGREDIENTS, ingredientKeys, matchesCatalogFilter } from "@/lib/catalog
 
 const Catalog = () => {
   const { t, lang } = useLang();
+  const {user} = useAuth();
+  const [offers,setOffers] = useState([]), [specs,setSpecs] = useState([]);
+  const refreshSpecs = () => api.get("/specs").then(r=>setSpecs(Array.isArray(r.data)?r.data:[]));
   const [products, setProducts] = useState([]);
   const [filter, setFilter] = useState("all");
   const [offerProduct, setOfferProduct] = useState(null);
@@ -24,9 +30,10 @@ const Catalog = () => {
     return api.get("/products").then(r => setProducts(r.data))
       .catch(() => setLoadError(true)).finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); refreshSpecs().catch(()=>{}); if(user?.role === "admin") api.get("/product-offers").then(r=>setOffers(Array.isArray(r.data)?r.data:[])).catch(()=>{}); }, [user?.role]);
 
-  const filtered = products.filter(p => matchesCatalogFilter(p, filter));
+  const cards = catalogCards(products,offers).map(c=>({...c,name:c.cardName,price_range:c.isGroupedVariant?"Sob consulta · preço da variação a confirmar":c.price_range}));
+  const filtered = cards.filter(p => matchesCatalogFilter(p, filter));
   const availableIngredients = new Set(products.flatMap(ingredientKeys));
   const extraIngredients = INGREDIENTS.filter(([key]) => !CATEGORIES.includes(key) && availableIngredients.has(key));
   const primaryFilters = [["all", "filter_all"], ...CATEGORIES.map(c => [c, `cat_${c}`])];
@@ -65,7 +72,7 @@ const Catalog = () => {
                 ? "bg-[#0F382C] text-white border-[#0F382C]"
                 : "bg-white text-[#0F382C] border-[#0F382C]/15 hover:border-[#0F382C]/40"
             }`}
-          >{t(label)} <span className="opacity-70">({products.filter(p => matchesCatalogFilter(p, key)).length})</span></button>
+          >{t(label)} <span className="opacity-70">({cards.filter(p => matchesCatalogFilter(p, key)).length})</span></button>
         ))}
         {(extraIngredients.length > 0 || availableIngredients.has("other")) && <label className="flex items-center gap-2 text-sm text-[#0F382C]">
           <span>{lang === "pt" ? "Mais ingredientes" : "More ingredients"}</span>
@@ -73,8 +80,8 @@ const Catalog = () => {
             value={primaryFilters.some(([key]) => key === filter) ? "" : filter}
             onChange={e => setFilter(e.target.value || "all")} className="rounded-full border border-[#0F382C]/20 bg-white px-3 py-2 max-w-[230px]">
             <option value="">{lang === "pt" ? "Selecione um ingrediente" : "Select an ingredient"}</option>
-            {extraIngredients.map(([key, pt, en]) => <option key={key} value={key} children={`${lang === "pt" ? pt : en} (${products.filter(p => matchesCatalogFilter(p, key)).length})`} />)}
-            {availableIngredients.has("other") && <option value="other" children={`${lang === "pt" ? "Outros" : "Other"} (${products.filter(p => matchesCatalogFilter(p, "other")).length})`} />}
+            {extraIngredients.map(([key, pt, en]) => <option key={key} value={key} children={`${lang === "pt" ? pt : en} (${cards.filter(p => matchesCatalogFilter(p, key)).length})`} />)}
+            {availableIngredients.has("other") && <option value="other" children={`${lang === "pt" ? "Outros" : "Other"} (${cards.filter(p => matchesCatalogFilter(p, "other")).length})`} />}
           </select>
         </label>}
         <div className="ml-auto text-xs font-mono-alt uppercase tracking-widest text-[#0F382C]/50 self-center">
@@ -92,7 +99,7 @@ const Catalog = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filtered.map(p => (
           <Card
-            key={p.id}
+            key={p.cardKey}
             data-testid={`product-card-${p.id}`}
             className="overflow-hidden border-[#0F382C]/10 bg-white hover:-translate-y-0.5 hover:shadow-md hover:border-[#0F382C]/30 transition-all group"
           >
@@ -118,6 +125,7 @@ const Catalog = () => {
                   <Badge key={c} variant="outline" className="text-[10px] border-amber-600/40 text-amber-800 bg-amber-50">{c}</Badge>
                 ))}
               </div>
+              <CatalogSpecActions card={p} specs={specs} onSaved={refreshSpecs} />
               <Button
                 onClick={() => openOffer(p)}
                 data-testid={`generate-offer-${p.id}`}

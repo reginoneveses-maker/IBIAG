@@ -4,7 +4,7 @@ import Catalog from "./Catalog";
 import portfolio from "@/lib/__fixtures__/portfolio-names.json";
 import {api} from "@/AuthContext";
 import {matchesCatalogFilter} from "@/lib/catalogIngredients";
-jest.mock("@/AuthContext", () => ({api:{get:jest.fn()}}));
+jest.mock("@/AuthContext", () => ({useAuth:()=>({user:{role:"user"}}),api:{get:jest.fn()}}));
 jest.mock("@/i18n", () => ({useLang:()=>({lang:"pt",t:key=>key})}));
 jest.mock("sonner", () => ({toast:{success:jest.fn()}}));
 const products=portfolio.map((p,i)=>({...p,id:String(i),certifications:[],image_url:""}));
@@ -30,7 +30,7 @@ test("each tab and additional ingredient selector display their imported product
   expect(screen.getByTestId("ingredient-filter").value).toBe("");
 });
 test("failed catalog requests show a retry and recover without an empty silent screen",async()=>{
-  api.get.mockRejectedValueOnce(new Error("network")).mockResolvedValueOnce({data:products.slice(0,1)});
+  let failed=false; api.get.mockImplementation(path=>{if(path!=="/products")return Promise.resolve({data:[]});if(!failed){failed=true;return Promise.reject(new Error("network"));}return Promise.resolve({data:products.slice(0,1)});});
   render(<Catalog/>);
   expect(await screen.findByRole("alert")).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Tentar novamente"}));

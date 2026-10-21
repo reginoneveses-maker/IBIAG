@@ -1,9 +1,10 @@
+import CatalogSpecActions from "@/components/CatalogSpecActions";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/AuthContext";
 import { PageHeader, Button, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, toast, Plus, Pencil, Trash2, Search, Truck, FileCheck2 } from "@/components/erp";
 import { Link } from "react-router-dom";
 import { documentPreview, downloadDocument } from "@/lib/api";
-import { catalogCards, linkedIbiagSpecs } from "./catalogCards";
+import { catalogCards } from "./catalogCards";
 
 const empty = {
   name: "", category: "acai", hs_code: "", ncm: "", technical_name: "", origin: "",
@@ -104,7 +105,6 @@ export default function Produtos() {
     try { await downloadDocument({file_path:path,file_name:name}); }
     catch { toast.error("Não foi possível baixar a ficha IBIAG"); }
   };
-  const ibiagSpecs = offer => linkedIbiagSpecs(offer, specs);
   const toggleId = (key,id) => setOfferForm(f => ({...f,[key]:f[key].includes(id)?f[key].filter(x=>x!==id):[...f[key],id]}));
 
   return (
@@ -134,17 +134,8 @@ export default function Produtos() {
               <div className="mt-5 rounded-xl border border-[#104496]/8 bg-[#EEF3FB]/50 p-3">
                 <div className="flex items-center justify-between gap-2 mb-2"><div className="text-[10px] font-mono-alt uppercase tracking-widest text-[#104496]"><Truck className="inline w-3.5 h-3.5 mr-1" /> Formas, fornecedores e preços</div><Button size="sm" variant="outline" onClick={() => openOffer(p)}><Plus className="w-3 h-3 mr-1" />Adicionar</Button></div>
                 {offers.filter(x=>x.id===p.cardOffer?.id).map(o=><div key={o.id} className="border-t border-[#104496]/8 py-3 first:border-t-0">
-                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{o.export_price_text || (Number(o.supplier_price) ? Number(o.supplier_price).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "Sob consulta")}</div><div className="text-[#104496]">{Number(o.sale_price_usd) ? `$${Number(o.sale_price_usd).toFixed(2)}` : ""}</div></div></div>
-                  <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
-                  <section className="mt-3 space-y-2" aria-label="Ficha IBIAG">
-                    {ibiagSpecs(o).map(s => <div key={s.id} className="flex flex-wrap gap-2 items-center">
-                      <span className="text-xs">Ficha IBIAG · {s.product_name} · v{s.version}</span>
-                      <Button size="sm" variant="outline" onClick={() => openLinkedFile(s.ibiag_file_path,s.ibiag_file_name)}>Visualizar ficha IBIAG</Button>
-                      <Button size="sm" variant="outline" onClick={() => downloadSpec(s.ibiag_file_path,s.ibiag_file_name)}>Baixar PDF</Button>
-                    </div>)}
-                    {!ibiagSpecs(o).length && <p className="text-xs">Ficha IBIAG pendente de vínculo.</p>}
-                    <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled>Enviar por e-mail · Integração pendente</Button><Button size="sm" variant="outline" disabled>Enviar por WhatsApp · Integração pendente</Button></div>
-                  </section>
+                  <div className="flex items-start justify-between gap-3"><div><div className="font-semibold text-sm">{o.form || "Forma não informada"}</div><div className="text-xs text-[#104496]/55">{o.supplier_name || "Fornecedor não informado"} · {o.unit || p.unit}</div></div><div className="text-right text-xs"><div className="font-mono-alt font-semibold">{p.isGroupedVariant ? "Preço da variação a confirmar" : o.export_price_text || (Number(o.supplier_price) ? Number(o.supplier_price).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : "Sob consulta")}</div><div className="text-[#104496]">{!p.isGroupedVariant && Number(o.sale_price_usd) ? `$${Number(o.sale_price_usd).toFixed(2)}` : ""}</div></div></div>
+                  <div className="flex gap-1 mt-2"><Button size="sm" variant="ghost" onClick={() => editOffer(p,o)}><Pencil className="w-3 h-3 mr-1" />Editar</Button><Button size="sm" variant="ghost" className="text-rose-600" disabled={p.isGroupedVariant} onClick={() => deleteOffer(o.id)}><Trash2 className="w-3 h-3 mr-1" />Excluir</Button></div>
                   <div className="flex flex-wrap gap-1 mt-2">{o.spec_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Spec vinculada</span>}{o.certification_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Certificado vinculado</span>}{o.other_document_ids?.length>0&&<span className="px-2 py-1 rounded-full bg-white border text-[10px]">Arquivo</span>}</div>
                   {Boolean(o.commission_text || Number(o.commission)) && <div className="text-[11px] text-[#104496]/55 mt-2">Comissão: {o.commission_text && !/^\d+(?:[.,]\d+)?$/.test(o.commission_text.trim()) ? o.commission_text : `${(Number(o.commission || o.commission_text) * 100).toLocaleString("pt-BR")}%`}</div>}
                   {o.notes&&<div className="text-[11px] text-[#104496]/55 mt-2">{o.notes}</div>}
@@ -154,8 +145,9 @@ export default function Produtos() {
 
               <div className="mt-5 rounded-xl border border-[#104496]/8 bg-[#EEF3FB]/50 p-3">
                 <div className="flex items-center gap-2 text-[10px] font-mono-alt uppercase tracking-widest text-[#104496] mb-2"><Truck className="w-3.5 h-3.5" /> Preços legados</div>
-                {prices.filter(x=>(x.product_name||"").trim().toLowerCase()===(p.name||"").trim().toLowerCase()).map(o=><div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#104496]/8 text-xs"><div><div className="font-semibold">{o.supplier_name||"Fornecedor não informado"}</div><div className="text-[#104496]/45">{o.unit||p.unit} · custo fornecedor</div></div><div className="text-right"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-[#104496]">${Number(o.sell_price_usd||0).toFixed(2)}</div></div></div>)}
+                {prices.filter(x=>!p.isGroupedVariant && (x.product_name||"").trim().toLowerCase()===(p.name||"").trim().toLowerCase()).map(o=><div key={o.id} className="flex items-center justify-between gap-3 py-2 border-t first:border-t-0 border-[#104496]/8 text-xs"><div><div className="font-semibold">{o.supplier_name||"Fornecedor não informado"}</div><div className="text-[#104496]/45">{o.unit||p.unit} · custo fornecedor</div></div><div className="text-right"><div className="font-mono-alt font-semibold">{Number(o.supplier_price||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</div><div className="text-[#104496]">${Number(o.sell_price_usd||0).toFixed(2)}</div></div></div>)}
               </div>
+              <CatalogSpecActions card={p} specs={specs} onSaved={load} />
               <div className="flex flex-wrap gap-2 mt-3">
                 <Link to={p.cardOffer?.supplier_id ? `/gestao/prospeccao?supplier=${encodeURIComponent(p.cardOffer.supplier_id)}` : "/gestao/prospeccao"}><Button size="sm" variant="outline"><FileCheck2 className="w-3.5 h-3.5 mr-1" />Specs originais por fornecedor</Button></Link>
                 <Link to="/gestao/precos"><Button size="sm" variant="outline">Preços</Button></Link>
@@ -171,7 +163,7 @@ export default function Produtos() {
               </div>
               <div className="flex gap-2 mt-5">
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => { edit(p); setDialog(true); }}>Dados do produto</Button>
-                <Button size="sm" variant="ghost" className="text-rose-600" onClick={() => p.cardOffer ? deleteOffer(p.cardOffer.id) : remove(p.id)}>{p.cardOffer ? "Excluir oferta" : "Excluir produto"}</Button>
+                <Button size="sm" variant="ghost" className="text-rose-600" disabled={p.isGroupedVariant} onClick={() => p.cardOffer ? deleteOffer(p.cardOffer.id) : remove(p.id)}>{p.cardOffer ? "Excluir oferta" : "Excluir produto"}</Button>
               </div>
             </CardContent>
           </Card>

@@ -1,0 +1,23 @@
+import React from 'react';
+import {render,screen,fireEvent,waitFor} from '@testing-library/react';
+import CatalogSpecActions from './CatalogSpecActions';
+import {api} from '@/AuthContext';
+import {catalogSpecCode} from '@/pages/gestao/catalogCards';
+jest.mock('@/AuthContext',()=>({useAuth:()=>({user:{role:'admin'}}),api:{get:jest.fn(),post:jest.fn(),put:jest.fn()}}));
+jest.mock('@/lib/api',()=>({documentPreview:jest.fn(),downloadDocument:jest.fn()}));
+test('binding requires explicit PDF, supplier and confirmation before saving only spec metadata',async()=>{
+ const card={id:'p',cardName:'Açaí Pulp 12%',cardOffer:{id:'o',supplier_id:'supplier'}};
+ api.get.mockImplementation(path=>Promise.resolve({data:path==='/suppliers'?[{id:'supplier',name:'Nossa Fruta'}]:{items:[{id:'d',title:'Ficha IBIAG 12%',file_name:'12.pdf',file_path:'12.pdf'}]}}));
+ api.post.mockResolvedValue({data:{}});const onSaved=jest.fn().mockResolvedValue();
+ render(<CatalogSpecActions card={card} onSaved={onSaved}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Vincular ficha IBIAG'}));
+ await screen.findByRole('option',{name:'Ficha IBIAG 12%'});
+ fireEvent.change(screen.getByLabelText('PDF IBIAG'),{target:{value:'d'}});
+ expect(screen.getByRole('button',{name:'Salvar vínculo'}).disabled).toBe(true);
+ expect(api.post).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole('checkbox'));
+ fireEvent.click(screen.getByRole('button',{name:'Salvar vínculo'}));
+ await waitFor(()=>expect(onSaved).toHaveBeenCalled());
+ expect(api.post).toHaveBeenCalledWith('/specs',expect.objectContaining({supplier_id:'supplier',code:catalogSpecCode(card),product_name:'Açaí Pulp 12%',ibiag_file_path:'12.pdf'}));
+ expect(api.put).not.toHaveBeenCalled();
+});
