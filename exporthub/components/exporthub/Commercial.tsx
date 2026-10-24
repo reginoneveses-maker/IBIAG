@@ -1,10 +1,11 @@
+'use client';
 import QuoteCompletion from './logistics/QuoteCompletion';
 import type {QuoteDraft} from '@/services/quote-completion';
-'use client';
+
 import {useEffect,useState,useRef} from 'react';
 import {normalizeCRM,event} from '@/services/crm';
 import type {CRMData} from '@/types/crm';
-import {createRecordSession} from '@/services/workspace';
+import {createRecordSession,readApiResponse} from '@/services/workspace';
 import {Calculator,Users,Check} from 'lucide-react';
 import type {Opportunity,Quote} from '@/types/commercial';
 import {DataTable,EmptyState} from './primitives';
@@ -15,14 +16,14 @@ import NaturalQuoteAssistant from './logistics/NaturalQuoteAssistant';
 import {readPackaging} from '@/services/logistics';
 const money=(v:number,c='USD',unit=false)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:c,minimumFractionDigits:2,maximumFractionDigits:unit?4:2}).format(v);
 export default function Commercial({view}:{view:'precificacao'}){
-const {readRecords,writeRecords}=useState(createRecordSession)[0];
+const {readRecords,writeRecords,acceptRecordSnapshot}=useState(createRecordSession)[0];
 const [viewQuote,setViewQuote]=useState<Quote|null>(null);const [workbookQuote,setWorkbookQuote]=useState<Quote|null>(null);
 const [author,setAuthor]=useState('Usuário do workspace');useEffect(()=>{fetch('/api/me').then(r=>r.json()).then((u:any)=>{if(u?.name)setAuthor(u.name)}).catch(()=>{})},[]);const [crmData,setCRMData]=useState<CRMData>(()=>normalizeCRM({}));const [profileError,setProfileError]=useState('');async function reloadProfiles(){try{setProfiles(await readRecords<typeof profiles>('products'));setProfileError('')}catch(e){setProfileError((e as Error).message)}}const [profiles,setProfiles]=useState<{id:string;supplier?:string;cost?:string;logistics?:string}[]>([]);useEffect(()=>{reloadProfiles()},[]);const suppliers=Array.from(new Set(profiles.flatMap(p=>[p.supplier?.trim(),...readPackaging(p.logistics).map(o=>o.supplier)]).filter(Boolean))) as string[];const [ops,setOps]=useState<Opportunity[]>([]);const [quotes,setQuotes]=useState<Quote[]>([]);const [loaded,setLoaded]=useState(false);const [error,setError]=useState('');const [toast,setToast]=useState('');
 async function load(){try{const raw=await readRecords<Partial<CRMData>>('commercial');const data=normalizeCRM(raw);setCRMData(data);setOps(data.ops);setQuotes(data.quotes);setLoaded(true);setError('')}catch(e){setError((e as Error).message)}}useEffect(()=>{load()},[]);useEffect(()=>{if(!toast)return;const t=setTimeout(()=>setToast(''),4000);return()=>clearTimeout(t)},[toast]);
 const savingRef=useRef(false);const [saving,setSaving]=useState(false);
 async function persist(nextOps:Opportunity[],nextQuotes:Quote[]){if(savingRef.current)return false;savingRef.current=true;setSaving(true);try{const added=nextQuotes.filter(q=>q.opportunityId&&!quotes.some(old=>old.id===q.id));const next={...crmData,ops:nextOps,quotes:nextQuotes,events:[...crmData.events,...added.map(q=>event(q.opportunityId,'Cotação salva',q.product+' · '+money(q.total,q.currency),author))]};await writeRecords('commercial',next);setCRMData(next);setOps(nextOps);setQuotes(nextQuotes);setToast('Registro salvo no sistema.');return true}catch(e){setToast((e as Error).message);return false}finally{savingRef.current=false;setSaving(false)}}
 async function saveCompanyProfile(profile:NonNullable<CRMData['pricingProfile']>){if(savingRef.current)return false;savingRef.current=true;setSaving(true);try{const next={...crmData,pricingProfile:profile};await writeRecords('commercial',next);setCRMData(next);setToast('Padrão de custos indiretos da empresa salvo.');return true}catch(e){setToast((e as Error).message);return false}finally{savingRef.current=false;setSaving(false)}}
-async function saveQuoteDraft(draft:QuoteDraft){if(savingRef.current)return false;savingRef.current=true;setSaving(true);try{const next={...crmData,quoteDrafts:[draft,...(crmData.quoteDrafts||[]).filter(d=>d.id!==draft.id)]};await writeRecords('commercial',next);setCRMData(next);setToast('Rascunho salvo.');return true}catch(e){setToast((e as Error).message);return false}finally{savingRef.current=false;setSaving(false)}}
+async function saveQuoteDraft(draft:QuoteDraft,expectedUpdatedAt:string|null,requestId:string):Promise<QuoteDraft|null>{if(savingRef.current)return null;savingRef.current=true;setSaving(true);try{const response=await fetch('/api/quote-drafts/'+encodeURIComponent(draft.id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft,expectedUpdatedAt,requestId}),signal:AbortSignal.timeout(60000)}),result=await readApiResponse<any>(response),data=normalizeCRM(acceptRecordSnapshot<CRMData>('commercial',result));setCRMData(data);setOps(data.ops);setQuotes(data.quotes);setToast('Rascunho salvo.');return result.draft}catch(e){setToast((e as Error).message);return null}finally{savingRef.current=false;setSaving(false)}}
 async function updateQuoteProfile(id:string,patch:Record<string,string>,source:Record<string,string>){if(savingRef.current)return false;savingRef.current=true;setSaving(true);try{const current=await readRecords<{id:string;[key:string]:string|undefined}[]>('products'),old=current.find(p=>p.id===id);const keys=['supplier','cost','priceCurrency','priceRate','priceValidUntil','moqKg','leadDays','origin','quoteCurrency','quoteRate','quoteMargin','quoteFees','quoteSettings','logistics'];if(keys.some(k=>(old?.[k]||'')!==(source[k]||'')))throw new Error('O cadastro mudou desde a leitura. Recarregue a ficha antes de confirmar sua atualização; a cotação continua preenchida.');const next=old?current.map(p=>p.id===id?{...p,...patch}:p):[...current,{id,...patch}];await writeRecords('products',next);setProfiles(next);setToast('Atualização da ficha confirmada.');return true}catch(e){setToast((e as Error).message);return false}finally{savingRef.current=false;setSaving(false)}}
 const defaultMargin='20',defaultFees='3';
 

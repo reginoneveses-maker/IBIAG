@@ -90,6 +90,7 @@ jobs:
           npm run build
       - name: Security, health and source regression tests
         run: |
+          node scripts/test-draft-recovery.cjs
           node scripts/test-quote-completion.cjs
           node scripts/test-crm-interchange.cjs
           node scripts/test-crm-interchange-d1.cjs
@@ -127,3 +128,21 @@ jobs:
             exporthub/ui-review/*.pdf
           if-no-files-found: ignore
           retention-days: 1
+
+  candidate-config:
+    runs-on: ubuntu-latest
+    env:
+      CANDIDATE_MONGO_ROOT_PASSWORD: "1111111111111111111111111111111111111111111111111111111111111111"
+      CANDIDATE_DB_PASSWORD: "2222222222222222222222222222222222222222222222222222222222222222"
+      CANDIDATE_JWT_SECRET: "3333333333333333333333333333333333333333333333333333333333333333"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Source-only release preflight tests
+        run: node tools/test-release-preflight.cjs
+      - name: Validate isolated candidate manifest without starting services
+        run: docker compose -f compose.candidate.yaml config --quiet
+      - name: Report publication blockers without reading real environment
+        run: node tools/release-preflight.cjs

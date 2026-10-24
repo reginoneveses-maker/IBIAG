@@ -13,10 +13,11 @@ function checkedRevision(value:unknown){if(typeof value!=='number'||!Number.isSa
 export function createRecordSession(){
 const revisions:Record<string,number>={};
 async function writeRecordsBatch(data:Record<string,unknown>){for(const name of Object.keys(data))if(revisions[name]===undefined)throw new Error('Carregue os registros antes de salvar.');const records=Object.entries(data).map(([name,value])=>({name,data:value,revision:revisions[name]}));const r=await recordRequest('/api/records/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({records})}),result=await readApiResponse<any>(r);for(const name of Object.keys(data))checkedRevision(result.revisions?.[name]);for(const name of Object.keys(data))revisions[name]=result.revisions[name];}
+function acceptRecordSnapshot<T>(name:string,raw:any):T{const revision=checkedRevision(raw?.revision);if(!Object.prototype.hasOwnProperty.call(raw,'data'))throw new Error('A resposta está incompleta.');revisions[name]=revision;return raw.data as T}
 async function readRecords<T>(name:string):Promise<T>{const r=await recordRequest('/api/records/'+name,{cache:'no-store'});const d=await readApiResponse<any>(r);const revision=checkedRevision(d.revision);if(!Object.prototype.hasOwnProperty.call(d,'data'))throw new Error('A resposta do sistema está incompleta. Tente novamente.');revisions[name]=revision;return d.data;}
 async function writeRecords(name:string,data:unknown){if(revisions[name]===undefined)throw new Error('Carregue os registros antes de salvar.');const r=await recordRequest('/api/records/'+name,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data,revision:revisions[name]})});const d=await readApiResponse<any>(r);revisions[name]=checkedRevision(d.revision);}
 
-return {readRecords,writeRecords,writeRecordsBatch};
+return {readRecords,writeRecords,writeRecordsBatch,acceptRecordSnapshot};
 }
 const defaultSession=createRecordSession();
 export const {readRecords,writeRecords,writeRecordsBatch}=defaultSession;
