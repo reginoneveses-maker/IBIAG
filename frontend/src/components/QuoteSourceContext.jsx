@@ -1,4 +1,4 @@
-import {useEffect,useRef,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {api} from "@/AuthContext";
 import {documentPreview,downloadDocument} from "@/lib/api";
 
@@ -6,10 +6,11 @@ const labels={expired:"Vencido",expiring:"Vence em breve",missing_expiry:"Valida
 export default function QuoteSourceContext({offerId}){
  const [context,setContext]=useState(null),[error,setError]=useState(""),[loading,setLoading]=useState(false),[preview,setPreview]=useState(null),[retry,setRetry]=useState(0);
  const request=useRef(0),fileRequest=useRef(0);
+ const invalidateRequests=useCallback(()=>{request.current++;fileRequest.current++},[]);
  useEffect(()=>{const id=++request.current;fileRequest.current++;setContext(null);setError("");setPreview(null);if(!offerId)return;setLoading(true);
  api.get("/integrated/offers/"+encodeURIComponent(offerId)+"/context",{timeout:15000}).then(r=>{if(id===request.current)setContext(r.data)}).catch(()=>{if(id===request.current)setError("Não foi possível carregar o contexto da oferta. A cotação continua disponível; não há confirmação de documentos.")}).finally(()=>{if(id===request.current)setLoading(false)});
- return()=>{request.current++;fileRequest.current++};
- },[offerId,retry]);
+ return invalidateRequests;
+ },[offerId,retry,invalidateRequests]);
  useEffect(()=>()=>{if(preview?.url)URL.revokeObjectURL(preview.url)},[preview]);
  async function view(file){const id=++fileRequest.current;try{const {data}=await api.get("/files/"+file.file_path,{responseType:"blob",timeout:60000});if(id!==fileRequest.current)return;const result=await documentPreview(data);if(id!==fileRequest.current){if(result.url)URL.revokeObjectURL(result.url);return}setPreview({...result,file})}catch{if(id===fileRequest.current)setError("Não foi possível abrir o arquivo privado. Os dados da cotação foram mantidos.")}}
  async function download(file){try{await downloadDocument(file)}catch{setError("Não foi possível baixar o arquivo privado.")}}
