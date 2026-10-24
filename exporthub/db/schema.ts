@@ -1,7 +1,7 @@
 // Intentionally empty by default.
 // Add Drizzle tables here when the site actually needs a database.
 // See examples/d1/db/schema.ts for an opt-in example.
-import {sqliteTable,text,integer,primaryKey,check,index} from 'drizzle-orm/sqlite-core';
+import {sqliteTable,text,integer,primaryKey,check,index,uniqueIndex} from 'drizzle-orm/sqlite-core';
 import {sql} from 'drizzle-orm';
 export const collections=sqliteTable('collections',{name:text('name').primaryKey(),payload:text('payload').notNull(),revision:integer('revision').notNull().default(0),updatedAt:text('updated_at').notNull(),updatedBy:text('updated_by').notNull()});
 export const specs=sqliteTable('specs',{id:text('id').primaryKey(),productId:text('product_id').notNull(),kind:text('kind').notNull(),supplier:text('supplier').notNull(),filename:text('filename').notNull(),size:integer('size').notNull(),createdAt:text('created_at').notNull(),createdBy:text('created_by').notNull()});
@@ -14,3 +14,9 @@ export const auditEvents=sqliteTable('audit_events',{id:text('id').primaryKey(),
 
 export const workspaceMembers=sqliteTable('workspace_members',{userId:text('user_id').primaryKey(),email:text('email').notNull().unique(),role:text('role').notNull(),createdAt:text('created_at').notNull()});
 export const workspaceInvites=sqliteTable('workspace_invites',{email:text('email').primaryKey(),role:text('role').notNull(),invitedBy:text('invited_by').notNull(),createdAt:text('created_at').notNull()});
+
+export const specRevisions=sqliteTable('spec_revisions',{
+ specId:text('spec_id').primaryKey().references(()=>specs.id),rootId:text('root_id').notNull().references(()=>specs.id),
+ revision:integer('revision').notNull(),sha256:text('sha256').notNull(),issuedOn:text('issued_on').notNull().default(''),
+ validUntil:text('valid_until').notNull().default(''),changeNote:text('change_note').notNull()
+},table=>[uniqueIndex('spec_revision_unique').on(table.rootId,table.revision),check('spec_revision_range',sql`${table.revision} >= 1 AND ${table.revision} <= 500`)]);

@@ -1,0 +1,6 @@
+import {workspace,apiError} from '@/db/workspace';
+import {sameOrigin} from '@/db/validation';
+import {specHistory,appendSpecRevision} from '@/db/spec-revisions';
+import {revisionUpload} from '@/services/spec-revisions';
+export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){try{const {db}=await workspace(),{id}=await params;const history=await specHistory(db,id);return Response.json({rootId:history.root,currentRevision:history.versions.at(-1)!.revision,versions:history.versions.map(v=>({id:v.id,revision:v.revision,filename:v.filename,size:v.size,createdAt:v.created_at,sha256:v.sha256,issuedOn:v.issued_on,validUntil:v.valid_until,changeNote:v.change_note,href:'/api/specs/'+encodeURIComponent(v.id)}))},{headers:{'Cache-Control':'private, no-store'}})}catch(e){return apiError(e)}}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{const {db,bucket,user}=await workspace('write');if(!sameOrigin(request))return new Response(null,{status:403});if(!bucket)throw new Error('Arquivos indisponíveis');const {id}=await params,input=await revisionUpload(request);return Response.json(await appendSpecRevision(db,bucket,id,input,user),{status:201,headers:{'Cache-Control':'private, no-store'}})}catch(e){return apiError(e)}}
