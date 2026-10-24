@@ -535,6 +535,27 @@ const base = "http://127.0.0.1:8765";
     assert.deepEqual(await sampleRead("products"),sampleBefore.products);
     assert.deepEqual(await sampleRead("orders"),sampleBefore.orders);
     assert.deepEqual(await sampleRead("finance"),sampleBefore.finance);
+    // Guided workflow: real price engine, no persisted sales/documents from the rehearsal.
+    const journeyBefore=await sampleRead('orders');
+    await page.goto(base+'/gestao/roteiro');
+    await page.getByRole('heading',{name:'Da empresa ao embarque',exact:true}).waitFor();
+    assert.equal(await page.getByRole('checkbox').count(),10);
+    await page.getByRole('checkbox',{name:'Conferi: Empresa e contatos',exact:true}).check();
+    await page.getByText('1 de 10 etapas marcadas nesta visita.',{exact:false}).waitFor();
+    assert((await page.getByTestId('demo-total').textContent()).includes('25.000'));
+    assert((await page.getByTestId('demo-packing').textContent()).includes('40 volumes'));
+    await page.getByLabel('Quantidade em kg',{exact:true}).fill('1500');
+    assert((await page.getByTestId('demo-total').textContent()).includes('37.500'));
+    await capture('journey-desktop.png');
+    await page.setViewportSize({width:390,height:844});await assertNoOverflow();await capture('journey-mobile.png');
+    await page.getByRole('link',{name:'Abrir Cotação',exact:true}).click();
+    await page.waitForURL(base+'/gestao/cotacoes');
+    await page.goto(base+'/gestao/roteiro');
+    await page.getByText('0 de 10 etapas marcadas nesta visita.',{exact:false}).waitFor();
+    await page.getByLabel('Quantidade em kg',{exact:true}).fill('0');
+    await page.getByRole('alert').filter({hasText:'quantidade maior que zero'}).waitFor();
+    assert.deepEqual(await sampleRead('orders'),journeyBefore);
+    await page.setViewportSize({width:1440,height:1000});
     // Isolated fixture only: administrative suspension must revoke an existing
     // member session, and reactivation must never resurrect that token.
     const adminHeaders={Authorization:`Bearer ${access_token}`};

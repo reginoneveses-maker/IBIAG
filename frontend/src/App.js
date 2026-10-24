@@ -1,3 +1,4 @@
+import CommercialJourney from '@/pages/gestao/CommercialJourney';
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LangProvider } from "@/i18n";
@@ -60,6 +61,7 @@ function App() {
                 <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
                 <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
+                <Route path="roteiro" element={<AdminOnly><CommercialJourney /></AdminOnly>} />
                 <Route path="operacao" element={<AdminOnly><Operations /></AdminOnly>} />
                 <Route path="packing-lists" element={<AdminOnly><PackingLists /></AdminOnly>} />
                 <Route path="invoices-comerciais" element={<AdminOnly><CommercialInvoices /></AdminOnly>} />

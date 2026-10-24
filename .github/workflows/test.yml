@@ -112,7 +112,9 @@ jobs:
       - name: Install local Chromium for document UI verification
         run: npx playwright install --with-deps chromium
       - name: Document versions interaction workflow
-        run: node scripts/test-spec-versions-ui.cjs
+        run: |
+          node scripts/test-spec-versions-ui.cjs
+          node scripts/test-crm-interchange-ui.cjs
       - name: Document UI screenshots (synthetic data)
         if: always()
         uses: actions/upload-artifact@v4
