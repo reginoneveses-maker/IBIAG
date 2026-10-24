@@ -4,6 +4,7 @@ No migration, scheduled backup or external provider is invoked.
 import asyncio
 import hashlib
 import json
+import math
 import os
 import re
 from datetime import datetime, timedelta
@@ -220,6 +221,7 @@ def install(api, rt):
 
     @api.put("/integrated/offers/{oid}/profile")
     async def update_profile(oid: str, body: ProfileSave, user=Depends(admin)):
+        bounded(body.model_dump())
         if not body.confirmed:
             raise HTTPException(400, "Confirmação explícita obrigatória.")
         allowed = {"supplier", "cost", "priceCurrency", "priceRate", "priceValidUntil", "moqKg", "leadDays", "logistics"}
@@ -236,7 +238,7 @@ def install(api, rt):
                 if k in body.patch:
                     try:
                         n = rt.decimal_number(body.patch[k])
-                        if n < 0 or k == "priceRate" and n <= 0: raise ValueError()
+                        if not math.isfinite(float(n)) or n < 0 or k == "priceRate" and n <= 0: raise ValueError()
                     except (ValueError, ArithmeticError):
                         raise HTTPException(400, "Valor cadastral inválido.") from None
             if body.patch.get("priceCurrency", "BRL") != "BRL" or body.patch.get("priceRate", "1") != "1":
@@ -279,6 +281,8 @@ def install(api, rt):
             if old:
                 if old.get("source_integrated_quote_id") != qid or old.get("source_integrated_owner") != user["id"]:
                     raise HTTPException(409, "Identificador comercial ambíguo.")
+                if any(old.get(key) != value for key, value in terms.items()):
+                    raise HTTPException(409, "A cotação já foi preparada com condições diferentes. Abra a cotação existente para revisar.")
                 return await rt.quotation_view(old)
             item = {"product_id": product["id"], "offer_id": offer["id"], "supplier_id": supplier["id"],
                     "product_name": q["product"], "supplier_name": q["supplier"], "quantity": q["quantity"],

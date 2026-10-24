@@ -96,6 +96,7 @@ class IntegratedWorkspaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(native["status"],"draft")
         self.assertEqual(self.ok(await self.req("POST","/quotes/COT-flow/handoff",json=terms))["id"],native["id"])
         self.assertEqual(await self.db.quotations.count_documents({}),1)
+        self.assertEqual((await self.req("POST","/quotes/COT-flow/handoff",json={**terms,"payment_terms":"Different terms"})).status_code,409)
         approved=self.ok(await self.client.post("/api/quotations/"+native["id"]+"/status",headers=self.headers(),
             json={"version":native["version"],"status":"approved","change_note":"Approve synthetic terms"}))
         self.assertTrue(approved["can_order"])
