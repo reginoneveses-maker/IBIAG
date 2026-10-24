@@ -106,7 +106,7 @@ jobs:
           node scripts/test-workspace-sessions.cjs
 
       - name: Install isolated UI verification tools
-        run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@1.56.1 esbuild@0.25.11
+        run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@^1.51.1 esbuild@0.25.11
       - name: Install local Chromium for document UI verification
         run: npx playwright install --with-deps chromium
       - name: Document versions interaction workflow

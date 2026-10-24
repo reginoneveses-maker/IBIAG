@@ -22,10 +22,15 @@ export async function appendSpecRevision(db:D1Database,bucket:R2Bucket,id:string
  auditStatement(db,user.userId,user.displayName,'new_spec_revision','spec',nextId),db.prepare('DELETE FROM write_guards WHERE id=?').bind(guard)];
  await bucket.put('specs/'+nextId,input.content,{httpMetadata:{contentType:'application/pdf'}});
  try{await db.batch(statements)}catch(error){
- // A transport error can follow a committed batch. Never delete a possibly committed file.
- let saved;try{saved=await db.prepare('SELECT spec_id FROM spec_revisions WHERE spec_id=? AND root_id=? AND revision=? AND sha256=?').bind(nextId,history.root,next,input.hash).first()}catch{throw error}
- if(!saved){try{await bucket.delete('specs/'+nextId)}catch{console.error('ExportHub: arquivo não referenciado requer revisão manual.');}
- if(String(error).includes('write_revision_guard'))throw new RequestDataError(409,'O documento já tem outra versão. Atualize o histórico antes de reenviar.');throw error;}
+ // Only a named transactional CHECK failure proves rollback. A missing read after
+ // a transport failure does not prove that a remote commit cannot still finish.
+ if(/CHECK constraint failed: write_revision_guard\b/.test(String(error))){
+  try{await bucket.delete('specs/'+nextId)}catch{console.error('ExportHub: arquivo não referenciado requer revisão manual.');}
+  throw new RequestDataError(409,'O documento já tem outra versão. Atualize o histórico antes de reenviar.');
  }
+ let saved;try{saved=await db.prepare('SELECT spec_id FROM spec_revisions WHERE spec_id=? AND root_id=? AND revision=? AND sha256=?').bind(nextId,history.root,next,input.hash).first()}catch{throw error}
+ if(!saved)throw error;
+ }
+
  return {id:nextId,rootId:history.root,revision:next,sha256:input.hash};
 }

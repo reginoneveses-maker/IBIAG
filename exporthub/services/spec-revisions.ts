@@ -17,6 +17,7 @@ export async function revisionUpload(request:Request){
 }
 export function validateRevisionIndex(revisions:SpecRevision[],specs:{id:string;product_id:string;kind:string;supplier:string}[]){
  const byId=new Map(specs.map(s=>[s.id,s])),ids=new Set<string>(),keys=new Set<string>();
+ if(byId.size!==specs.length)throw new Error('Identificadores documentais duplicados.');
  for(const r of revisions){const spec=byId.get(r.spec_id),root=byId.get(r.root_id),key=r.root_id+':'+r.revision;
  if(typeof r.spec_id!=='string'||typeof r.root_id!=='string'||typeof r.sha256!=='string'||typeof r.issued_on!=='string'||typeof r.valid_until!=='string'||!spec||!root||ids.has(r.spec_id)||keys.has(key)||!Number.isSafeInteger(r.revision)||r.revision<1||r.revision>500||(r.revision===1)!==(r.spec_id===r.root_id)||spec.product_id!==root.product_id||spec.kind!==root.kind||spec.supplier!==root.supplier||!/^([a-f0-9]{64})?$/.test(r.sha256)||(r.revision>1&&!r.sha256)||typeof r.change_note!=='string'||r.change_note.length<1||r.change_note.length>300)throw new Error('Histórico documental inconsistente.');
  if((r.issued_on&&!validDate(r.issued_on))||(r.valid_until&&!validDate(r.valid_until))||(r.issued_on&&r.valid_until&&r.valid_until<r.issued_on))throw new Error('Datas documentais inconsistentes.');
