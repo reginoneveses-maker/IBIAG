@@ -23,3 +23,15 @@ class BuyerQualificationTests(unittest.TestCase):
         rows=[{'url':'https://example.com/a','title':'Acerola supplier'},{'url':'https://www.example.com.:443/b','title':'Acerola supplier'}]
         with patch.object(discovery,'_search',return_value=rows),patch.object(discovery,'_scrape_business',return_value=business_page()):
             self.assertEqual(len(discovery.discover_buyers('Acerola','Portugal')),1)
+    def test_negative_ai_excerpt_does_not_override_published_sentence(self):
+        page=business_page()
+        page['markdown']='Acme Ingredients is a food manufacturer. We do not supply Acerola.'
+        page['json']['product_quote']='supply Acerola'
+        self.assertIsNone(discovery._verified_business({'url':'https://acme.test/product'},page,'Acerola','Portugal'))
+    def test_without_other_ingredient_does_not_discard_real_use(self):
+        for clause in ['Our drink contains Acerola without sugar.','We not only supply Acerola but also Mango.']:
+            page=business_page()
+            page['markdown']='Acme Ingredients is a food manufacturer. '+clause
+            page['json']['product_quote']=clause
+            page['json']['relationship']='user' if 'drink' in clause else 'seller'
+            self.assertIsNotNone(discovery._verified_business({'url':'https://acme.test/product'},page,'Acerola','Portugal'))

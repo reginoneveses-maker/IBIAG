@@ -259,10 +259,14 @@ def _page_text(markdown):
     return text
 
 
-def _unsupported_business_claim(clause):
-    normalized = _normalize(clause)
-    # Negative, hypothetical and generic uses do not prove the company's own activity.
-    return bool(re.search(r"\b(?:no longer|not|never|without|doesnt|don t|does not|do not|nao|sem|ne contient pas|sans)\b", normalized)
+def _unsupported_business_claim(clause, product):
+    normalized = _normalize(clause).replace("not only", "only")
+    # Tie negation to a commercial/use verb or to the requested ingredient.
+    # "Our drink contains Acerola without sugar" remains valid positive evidence.
+    negative_action = r"\b(?:no longer|not|never|doesnt|dont|don t|does not|do not|nao)\s+(?:\w+\s+){0,2}(?:sell|sells|supply|supplies|offer|offers|manufacture|manufactures|contain|contains|use|uses|using|utiliza|utilizamos|vendemos|fornecemos)\b"
+    ingredient = " ".join(_product_terms(_ingredient_language(_normalize(product))))
+    absent = bool(ingredient and re.search(r"\b(?:without|sem|sans)\s+(?:any\s+)?" + re.escape(ingredient) + r"\b", _ingredient_language(normalized)))
+    return bool(absent or re.search(negative_action, normalized)
         or re.search(r"\b(?:can be used|may be used|could be used|commonly used|typically used|potential uses|can contain|may contain|pode ser utilizad[oa]|pode conter)\b", normalized))
 
 
@@ -275,7 +279,7 @@ def _business_evidence(text, facts, product, relationship):
     # A single business clause is preferred over combining a heading and action.
     clauses = re.split(r"[\n.!?;]+", text)
     for clause in clauses:
-        if _unsupported_business_claim(clause): continue
+        if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
         for start in range(max(1, len(words) - 24)):
             quote = " ".join(words[start:start+25]).strip(" #*|-")
@@ -286,13 +290,13 @@ def _business_evidence(text, facts, product, relationship):
     # Product offer and a separate published CTA can substantiate a catalogue.
     actions = r"\b(?:request a quote|get a quote|request quotation|quote request|add to cart|buy now|order now|ordering|wholesale|solicitar cotacao|solicite cotacao|comprar|adicionar ao carrinho)\b"
     for clause in re.split(r"[\n.!?;]+", text):
-        if _unsupported_business_claim(clause): continue
+        if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
         for start in range(max(1, len(words) - 9)):
             action = " ".join(words[start:start+10]).strip(" #*|-")
             if not action or " " + _normalize(action) + " " not in normalized_text or not re.search(actions, _normalize(action)): continue
             for candidate in clauses:
-                if _unsupported_business_claim(candidate): continue
+                if _unsupported_business_claim(candidate, product): continue
                 words = candidate.strip().split()
                 for offset in range(max(1, len(words) - 13)):
                     heading = " ".join(words[offset:offset+14]).strip(" #*|-")

@@ -27,7 +27,7 @@ Nenhum merge na main, deploy, atualização da instalação, alteração em dado
 - 13 testes novos HTTP/regras/SQLite: scripts/test-health-integrity.cjs — passaram, sem skips.
 - D1 local real descartável: scripts/test-health-d1.cjs — passou; rollback integral de conflito, sem auditoria fantasma e saúde sem escrita.
 - Dez suítes preservadas do Claude passaram: CRM, navegação, uploads PDF, produto/cotação, variantes, preço unificado, planilha, sessões, membros (D1 local real) e verificação/restauração de backup em destino descartável. Nenhum backup de produção foi feito.
-- 40 testes Python: test_buyer_discovery, test_buyer_qualification, test_discovery_jobs — passaram; fontes/provedores simulados, sem consultas externas pagas. Python Windows executado em modo UTF-8.
+- 42 testes Python: test_buyer_discovery, test_buyer_qualification, test_discovery_jobs — passaram; fontes/provedores simulados, sem consultas externas pagas. Python Windows executado em modo UTF-8.
 - Demonstração: sete seções navegadas em Chromium local, 1440 e 390px, zero overflow horizontal, zero erro JavaScript e zero requisição externa. Capturas em demo/.
 - O CI foi ampliado para branches improvements/** e um job ExportHub. Estado do CI remoto deve ser consultado no PR; os testes locais NÃO equivalem à suíte completa MongoDB/Docker/React do repositório.
 
