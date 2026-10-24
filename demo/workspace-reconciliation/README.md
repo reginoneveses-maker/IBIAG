@@ -1,0 +1,1 @@
+Dados exclusivamente sintéticos para a análise offline e o ensaio de preservação. Consulte docs/RECONCILIATION_AND_QUOTE_CONTINUITY.md. Os .bin são anexos opacos de teste, não PDFs comerciais. example-plan.json é o resultado demonstrativo; businessReady=false. Nenhum registro real foi utilizado.

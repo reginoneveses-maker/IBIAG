@@ -1,0 +1,2 @@
+demo/workspace-reconciliation/exporthub.json -text
+demo/workspace-reconciliation/files/*.bin -text

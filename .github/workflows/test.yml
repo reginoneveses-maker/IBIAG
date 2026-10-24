@@ -35,6 +35,8 @@ jobs:
         run: python -m py_compile backend/server.py backend/comexstat_client.py backend/comexstat_market.py backend/backup.py
       - name: Backend tests
         run: pytest -q backend
+      - name: Offline preservation plan with synthetic inputs only
+        run: python backend/workspace_reconciliation.py --backup demo/workspace-reconciliation/exporthub.json --native-inventory demo/workspace-reconciliation/native-inventory.json --links demo/workspace-reconciliation/reviewed-links.json --files-manifest demo/workspace-reconciliation/files-manifest.json --files-root demo/workspace-reconciliation/files --output "$RUNNER_TEMP/ibiag-reconciliation-plan.json"
 
   frontend:
     runs-on: ubuntu-latest

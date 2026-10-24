@@ -1,0 +1,162 @@
+{
+  "format": "ibiag-workspace-reconciliation-v1",
+  "sourceSha256": "6676f688e4ac1f464a8e48918343035e56bc7917b3b826050aa045578a88f9c0",
+  "mode": "offline-preservation-plan",
+  "canStageSyntheticArchive": true,
+  "businessReady": false,
+  "businessWrites": false,
+  "identityWrites": false,
+  "sourceCollections": [
+    "commercial",
+    "products",
+    "shipments",
+    "documents",
+    "tasks",
+    "sectorRecords",
+    "unknownFutureModule"
+  ],
+  "sourceNodes": 14,
+  "sourceLinks": [
+    {
+      "from": "contact:person",
+      "field": "companyId",
+      "to": "company:c"
+    },
+    {
+      "from": "opportunity:o",
+      "field": "companyId",
+      "to": "company:c"
+    },
+    {
+      "from": "quote:q",
+      "field": "opportunityId",
+      "to": "opportunity:o"
+    },
+    {
+      "from": "shipment:ship",
+      "field": "opportunityId",
+      "to": "opportunity:o"
+    },
+    {
+      "from": "shipment:ship",
+      "field": "quoteId",
+      "to": "quote:q"
+    },
+    {
+      "from": "shipment:ship",
+      "field": "productId",
+      "to": "product:p"
+    },
+    {
+      "from": "shipment-document:doc",
+      "field": "shipmentId",
+      "to": "shipment:ship"
+    },
+    {
+      "from": "task:task",
+      "field": "opportunityId",
+      "to": "opportunity:o"
+    },
+    {
+      "from": "task:task",
+      "field": "recordId",
+      "to": "sector-record:sector"
+    },
+    {
+      "from": "sector-record:sector",
+      "field": "opportunityId",
+      "to": "opportunity:o"
+    },
+    {
+      "from": "sector-record:sector",
+      "field": "productId",
+      "to": "product:p"
+    },
+    {
+      "from": "sector-record:sector",
+      "field": "shipmentId",
+      "to": "shipment:ship"
+    },
+    {
+      "from": "spec:spec1",
+      "field": "product_id",
+      "to": "product:p"
+    },
+    {
+      "from": "crm-file:crm1",
+      "field": "opportunity_id",
+      "to": "opportunity:o"
+    },
+    {
+      "from": "sector-file:sector1",
+      "field": "record_id",
+      "to": "sector-record:sector"
+    }
+  ],
+  "attachments": [
+    {
+      "source": "crm-file:crm1",
+      "size": 31,
+      "sha256": "04f638eefe1bdbabf93ef99cf6008e4a743ea79418771f53b3080a9907af27ea",
+      "versionDigestChecked": false
+    },
+    {
+      "source": "sector-file:sector1",
+      "size": 29,
+      "sha256": "53e5ba6b9eba001923502e7e3f1dcd1216310b05b1521db70ce015ca1371cd7a",
+      "versionDigestChecked": false
+    },
+    {
+      "source": "spec:spec1",
+      "size": 44,
+      "sha256": "c0813ee9816785377b45c35543682b8014a289c82ec25db9b25396656ddbaa11",
+      "versionDigestChecked": true
+    }
+  ],
+  "reviewedLinks": [
+    {
+      "source": "company:c",
+      "collection": "leads",
+      "target": "buyer1"
+    },
+    {
+      "source": "product:p",
+      "collection": "products",
+      "target": "native-product"
+    },
+    {
+      "source": "product-profile:p",
+      "collection": "product_offers",
+      "target": "native-offer"
+    }
+  ],
+  "suggestions": [],
+  "blockers": [],
+  "conversionConstraints": [
+    {
+      "source": "contact:person",
+      "reasons": [
+        "standalone-contact-requires-lossless-native-model"
+      ]
+    },
+    {
+      "source": "quote:q",
+      "reasons": [
+        "review-memory-missing-preserve-approved-values",
+        "reviewed-offer-mapping-required"
+      ]
+    }
+  ],
+  "unmappedBusinessRecords": [
+    "opportunity:o",
+    "quote:q",
+    "shipment:ship"
+  ],
+  "limitations": [
+    "An archive is not an operational migration or approval of old prices.",
+    "Source-only export contains attachment indexes, not PDF bytes.",
+    "No user, role, invitation, paid service or backup setting is imported.",
+    "Filename/transport hashes alone do not prove the source document's authenticity."
+  ],
+  "planSha256": "9baf3a5342dc76769449000a2eaac5baf6013319dffb73396ddeef5ea6a8e5f7"
+}

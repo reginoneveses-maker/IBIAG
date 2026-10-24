@@ -608,7 +608,7 @@ def require_admin(user):
 async def get_admin_user(user=Depends(get_current_user)):
     return require_admin(user)
 
-from commercial_access import require_commercial
+from commercial_access import require_commercial, commercial_access
 async def get_commercial_user(user=Depends(get_current_user)):
     return require_commercial(user)
 
@@ -801,6 +801,8 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
         published = await db.documents.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
         if not published:
             published = await db.specs.find_one({"$or": [{"original_file_path": full_path}, {"ibiag_file_path": full_path}], "deleted_at": {"$in": [None, ""]}})
+        if not published and commercial_access(user):
+            published = await db.certifications.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
         if not published:
             raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)

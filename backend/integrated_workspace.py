@@ -2,6 +2,7 @@
 No migration, scheduled backup or external provider is invoked.
 """
 import asyncio
+import base64
 import hashlib
 import json
 import math
@@ -96,6 +97,8 @@ def profile_for(offer, product, supplier):
 def install(api, rt):
     admin = rt.get_commercial_user
     async def unique(collection, rid):
+        if not rt.dossier_valid_id(rid):
+            raise HTTPException(409, "Identificador ausente ou inválido no vínculo cadastral.")
         matches = await collection.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
         if len(matches) != 1:
             raise HTTPException(409, "Referência ausente ou duplicada. Revise o cadastro sem excluir registros.")
@@ -115,6 +118,68 @@ def install(api, rt):
     async def operators(user=Depends(admin)):
         rows = await rt.db.users.find({"active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "role": 1}).limit(250).to_list(250)
         return rows
+
+    @api.get("/integrated/offers/{oid}/context")
+    async def offer_context(oid: str, response: Response, user=Depends(admin)):
+        offer, product, supplier = await references(oid)
+        # Reuse the existing owner/private-file policy; do not independently
+        # authorize a path just because an offer mentions it.
+        malformed_links = 0
+        for field in ("spec_document_ids", "certificate_document_ids", "other_document_ids", "spec_ids", "certification_ids"):
+            values = offer.get(field, [])
+            if not isinstance(values, list) or any(not rt.dossier_valid_id(value) for value in values):
+                malformed_links += 1
+        linked = [] if malformed_links else await rt.product_offer_documents(oid, user=user)
+        from quality_dashboard import quality_rows, text
+        docs = [d for d in linked if d.get("link_type") == "document"]
+        certs = [d for d in linked if d.get("link_type") == "certification"]
+        findings = {}
+        try:
+            for row in quality_rows(certs, docs, [supplier], [product], datetime.now(rt.ZoneInfo("America/Fortaleza")).date()):
+                findings[(row["source"], row["id"])] = row
+        except (ValueError, TypeError, KeyError):
+            # An inconsistent index is a warning, never an automatic cleanup
+            # or an approval of the attachments.
+            findings = None
+        from collections import Counter
+        counts = Counter((d.get("link_type"), d.get("id")) for d in linked if isinstance(d.get("id"), str))
+        output = []
+        seen = set()
+        for doc in linked:
+            kind = doc["link_type"]
+            did = doc.get("id")
+            if not isinstance(did, str) or not did or counts[(kind, did)] != 1:
+                continue
+            seen.add((kind, did))
+            files = []
+            if kind == "spec":
+                for prefix, label in (("ibiag", "ficha IBIAG"), ("original", "ficha original (consulta interna)")):
+                    if text(doc.get(prefix + "_file_path"), 3000):
+                        files.append({"label": label, "file_path": text(doc[prefix + "_file_path"], 3000),
+                                      "file_name": text(doc.get(prefix + "_file_name"), 500) or "ficha.pdf"})
+            elif text(doc.get("file_path"), 3000):
+                files.append({"label": "certificado" if kind == "certification" else "documento",
+                              "file_path": text(doc["file_path"], 3000), "file_name": text(doc.get("file_name"), 500) or "documento"})
+            row = (findings or {}).get(("certification" if kind == "certification" else "document", did), {})
+            flags = row.get("flags", []) if findings is not None else ["data_review"]
+            if not files and "missing_file" not in flags:
+                flags = [*flags, "missing_file"]
+            output.append({"id": did, "kind": kind, "title": text(doc.get("title"), 500) or text(doc.get("name"), 500) or text(doc.get("product_name"), 500) or "Documento a revisar",
+                           "expiryDate": row.get("expiry_date", ""), "flags": flags, "files": files})
+        requested = set() if malformed_links else set(("document", v) for k in ("spec_document_ids", "certificate_document_ids", "other_document_ids") for v in offer.get(k, []))
+        if not malformed_links:
+            requested.update(("spec", v) for v in offer.get("spec_ids", []))
+            requested.update(("certification", v) for v in offer.get("certification_ids", []))
+        response.headers["Cache-Control"] = "private, no-store"
+        return {"offerId": oid,
+                "supplier": {k: text(supplier.get(k), 500) for k in ("id", "name", "contact", "email", "phone")},
+                "product": {"id": product["id"], "name": text(product.get("name"), 500)},
+                "conditions": {"MOQ registrado": text(offer.get("moq"),1000) or text(product.get("moq"),1000),
+                               "Embalagem registrada": text(offer.get("packaging"),1000) or text(product.get("packaging"),1000),
+                               "Paletização registrada": text(offer.get("palletization"),1000),
+                               "Prazo registrado": text(product.get("lead_time"),1000),
+                               "Pagamento registrado": text(product.get("payment_terms"),1000)},
+                "documents": output, "linksRequiringReview": len(requested - seen) + malformed_links}
 
     @api.get("/integrated/catalog")
     async def catalog(response: Response, q: str = Query("", max_length=160), user=Depends(admin)):
@@ -151,11 +216,27 @@ def install(api, rt):
         return {"customers": rows[:100], "hasMore": len(rows) > 100}
 
     @api.get("/integrated/workspace")
-    async def workspace(response: Response, user=Depends(admin)):
+    async def workspace(response: Response, quoteBefore: str = Query("", max_length=1000), user=Depends(admin)):
         response.headers["Cache-Control"] = "private, no-store"
         drafts = await rt.db.integrated_quote_drafts.find({"owner_id": user["id"]}, {"_id": 0, "draft": 1}).sort("updated_at", -1).limit(100).to_list(100)
-        quotes = await rt.db.integrated_quotes.find({"owner_id": user["id"]}, {"_id": 0, "quote": 1}).sort("created_at", -1).limit(100).to_list(100)
-        return {"drafts": [r["draft"] for r in drafts], "quotes": [r["quote"] for r in quotes]}
+        query = {"owner_id": user["id"]}
+        if quoteBefore:
+            try:
+                cursor = json.loads(base64.b64decode(quoteBefore + "=" * (-len(quoteBefore) % 4), altchars=b"-_", validate=True))
+                if not isinstance(cursor, dict) or set(cursor) != {"format", "owner", "at", "id"} or cursor["format"] != "native-quotes-v1" or cursor["owner"] != user["id"]:
+                    raise ValueError()
+                if not isinstance(cursor["at"], str) or len(cursor["at"]) > 100 or not isinstance(cursor["id"], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", cursor["id"]):
+                    raise ValueError()
+                datetime.fromisoformat(cursor["at"])
+                query["$or"] = [{"created_at": {"$lt": cursor["at"]}}, {"created_at": cursor["at"], "id": {"$lt": cursor["id"]}}]
+            except (ValueError, TypeError, KeyError):
+                raise HTTPException(400, "Página de cotações inválida. Recarregue os registros salvos.") from None
+        quotes = await rt.db.integrated_quotes.find(query, {"_id": 0, "quote": 1, "id": 1, "created_at": 1}).sort([("created_at", -1), ("id", -1)]).limit(101).to_list(101)
+        result = {"drafts": [r["draft"] for r in drafts], "quotes": [r["quote"] for r in quotes[:100]]}
+        if len(quotes) > 100:
+            last = quotes[99]
+            result["quoteNextCursor"] = base64.urlsafe_b64encode(json.dumps({"format": "native-quotes-v1", "owner": user["id"], "at": last["created_at"], "id": last["id"]}).encode()).decode().rstrip("=")
+        return result
 
     @api.put("/integrated/drafts/{did}")
     async def save_draft(did: str, body: DraftSave, user=Depends(admin)):

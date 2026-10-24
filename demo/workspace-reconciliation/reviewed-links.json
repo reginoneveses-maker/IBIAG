@@ -1,0 +1,17 @@
+[
+  {
+    "source": "company:c",
+    "collection": "leads",
+    "target": "buyer1"
+  },
+  {
+    "source": "product:p",
+    "collection": "products",
+    "target": "native-product"
+  },
+  {
+    "source": "product-profile:p",
+    "collection": "product_offers",
+    "target": "native-offer"
+  }
+]

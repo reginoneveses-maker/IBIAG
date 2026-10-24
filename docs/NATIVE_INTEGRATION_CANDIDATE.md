@@ -1,3 +1,5 @@
+Atualização posterior desta integração: [RECONCILIATION_AND_QUOTE_CONTINUITY.md](RECONCILIATION_AND_QUOTE_CONTINUITY.md).
+
 # Integração nativa de cotação — candidata em desenvolvimento, 24/10/2026
 
 ## Implementado

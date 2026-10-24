@@ -1,0 +1,35 @@
+{
+  "leads": [
+    {
+      "id": "buyer1",
+      "company": "Synthetic Buyer",
+      "country": "Portugal",
+      "contact_name": "Primary contact KEEP"
+    },
+    {
+      "id": "buyer2",
+      "company": "Synthetic Buyer",
+      "country": "Portugal"
+    }
+  ],
+  "products": [
+    {
+      "id": "native-product",
+      "name": "Existing ingredient"
+    }
+  ],
+  "product_offers": [
+    {
+      "id": "native-offer",
+      "product_id": "native-product",
+      "supplier_price": 99
+    }
+  ],
+  "quotations": [
+    {
+      "id": "native-quote",
+      "status": "approved",
+      "total_usd": 999
+    }
+  ]
+}

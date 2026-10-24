@@ -107,6 +107,32 @@ class IntegratedWorkspaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(order["source_quote_snapshot"]["source_integrated_snapshot"]["total"],4375)
         self.assertEqual((await self.client.get("/api/quotations/"+native["id"]+"/order-draft",headers=self.headers())).status_code,409)
         self.assertEqual(await server.all_finance_entries(),[])
+    async def test_quote_history_cursor_keeps_owner_scope_and_does_not_skip_when_new_quotes_arrive(self):
+        from datetime import datetime, timezone, timedelta
+        saved=self.ok(await self.req("POST","/quotes",json={"id":"COT-history-source","state":state()}))["quote"]
+        actor=(await self.db.integrated_quotes.find_one({"id":"COT-history-source"}))["owner_id"]
+        await self.db.integrated_quotes.delete_many({"owner_id":actor})  # synthetic fixture only
+        start=datetime(2026,1,1,tzinfo=timezone.utc)
+        rows=[{"_id":actor+":Q"+str(i),"id":"Q"+str(i),"owner_id":actor,"created_at":(start+timedelta(seconds=i)).isoformat(),"quote":{**saved,"id":"Q"+str(i)}} for i in range(205)]
+        await self.db.integrated_quotes.insert_many(rows)
+        first=self.ok(await self.req("GET","/workspace"))
+        self.assertEqual(len(first["quotes"]),100)
+        cursor=first["quoteNextCursor"]
+        await self.db.integrated_quotes.insert_one({"_id":actor+":new","id":"new","owner_id":actor,"created_at":"2099-01-01T00:00:00+00:00","quote":{**saved,"id":"new"}})
+        all_ids=[q["id"] for q in first["quotes"]]
+        while cursor:
+            page=self.ok(await self.req("GET","/workspace",params={"quoteBefore":cursor}))
+            all_ids.extend(q["id"] for q in page["quotes"])
+            cursor=page.get("quoteNextCursor")
+        self.assertEqual(len(all_ids),205)
+        self.assertEqual(len(set(all_ids)),205)
+        self.assertNotIn("new",all_ids)
+        self.assertEqual(self.ok(await self.req("GET","/workspace"))["quotes"][0]["id"],"new")
+        await self.db.users.insert_one({"id":"otheradmin","email":"otheradmin@example.com","role":"admin"})
+        foreign=await self.client.get("/api/integrated/workspace",headers=self.headers("otheradmin"),params={"quoteBefore":first["quoteNextCursor"]})
+        self.assertEqual(foreign.status_code,400)
+        self.assertEqual((await self.req("GET","/workspace",params={"quoteBefore":"not-a-valid-cursor"})).status_code,400)
+
     async def test_other_currencies_quote_without_invented_usd_conversion(self):
         for currency in ("BRL","EUR"):
             payload={"id":"COT-"+currency,"state":state(currency)}
