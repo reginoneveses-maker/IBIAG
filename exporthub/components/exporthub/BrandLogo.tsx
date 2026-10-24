@@ -1,0 +1,1 @@
+export default function BrandLogo(){return <><img className="ibiag-brand-logo" src="/brand/ibiag-logo.png" width={218} height={47} alt="IBIAG Ingredients"/><span className="ibiag-brand-caption">ExportHub <small>GESTÃO E OPERAÇÕES</small></span></>}

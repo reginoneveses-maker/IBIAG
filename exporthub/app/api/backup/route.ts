@@ -1,0 +1,5 @@
+import {recordAudit} from '@/db/audit';
+import {readAllCollections} from '@/db/collections';
+import {workspace,apiError} from '@/db/workspace';
+import {allProducts as products} from '@/data/product-catalog';
+export async function GET(){try{const {db,user}=await workspace('export');const records=await readAllCollections(db);const specs=await db.prepare('SELECT id,product_id,kind,supplier,filename,size,created_at FROM specs').all();const crmFiles=await db.prepare('SELECT id,opportunity_id,filename,size,created_at FROM crm_files').all();const sectorFiles=await db.prepare('SELECT id,record_id,filename,size,created_at FROM sector_files').all();await recordAudit(db,user,'export_data','backup','records');return Response.json({sectorFiles:sectorFiles.results,crmFiles:crmFiles.results,format:'exporthub-v1',exportedAt:new Date().toISOString(),products,records,specs:specs.results,note:'Este backup contém dados e índices dos specs e anexos comerciais e setoriais. Baixe os PDFs separadamente pelos links autenticados.'},{headers:{'Content-Disposition':'attachment; filename="ExportHub_backup.json"','Cache-Control':'private, no-store'}})}catch(e){return apiError(e)}}

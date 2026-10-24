@@ -1,0 +1,23 @@
+import {z} from 'zod';
+import type {Shipment,Task} from '@/types/exporthub';
+import type {Quote,Opportunity} from '@/types/commercial';
+import type {SectorRecord} from '@/types/sector-records';
+import {validDate} from './sector-records';
+export const operationInputSchema=z.object({quoteId:z.string().min(1).max(180),client:z.string().trim().min(1).max(180),origin:z.string().trim().min(1).max(180),destination:z.string().trim().min(1).max(180),country:z.string().trim().min(1).max(180),modal:z.enum(['Marítimo','Aéreo','Rodoviário']),date:z.string().refine(validDate,'Informe a saída planejada.'),eta:z.string().refine(validDate,'Informe a chegada planejada.'),paymentDue:z.string().refine(validDate,'Informe o prazo de recebimento.'),owner:z.string().trim().min(1).max(180),productId:z.string().max(180).default(''),confirmed:z.literal(true),quotedTotal:z.number().finite().nonnegative(),quotedQuantity:z.number().finite().positive(),quotedCurrency:z.enum(['BRL','USD','EUR'])}).refine(v=>v.eta>=v.date,'A chegada não pode ocorrer antes da saída.');
+export type OperationInput=z.infer<typeof operationInputSchema>;
+export function createOperationPlan(quote:Quote,deal:Opportunity|undefined,input:OperationInput,actor:string,now:string){
+if(quote.workbookPricing&&(quote.workbookPricing.mode!=='products'||quote.workbookPricing.unit!=='kg'||quote.workbookPricing.lines.length!==1))throw new Error('A criação de embarque exige uma cotação de um único produto em kg. Serviços e cálculos com múltiplos itens permanecem como cotações.');
+const parsed=operationInputSchema.parse(input);if(quote.operationId)throw new Error('Esta cotação já possui uma operação vinculada.');if(quote.id!==parsed.quoteId||quote.total!==parsed.quotedTotal||quote.quantity!==parsed.quotedQuantity||quote.currency!==parsed.quotedCurrency)throw new Error('A cotação mudou. Reabra os dados antes de criar a operação.');
+const shipment:Shipment={id:'EX-'+crypto.randomUUID(),client:parsed.client,origin:parsed.origin,destination:parsed.destination,country:parsed.country,modal:parsed.modal,eta:parsed.eta,status:'Pendente',value:quote.total,currency:parsed.quotedCurrency,date:parsed.date,cargo:quote.product+' · '+quote.quantity.toLocaleString('pt-BR')+' kg · '+quote.incoterm,progress:0,quoteId:quote.id,opportunityId:deal?.id||quote.opportunityId,productId:parsed.productId};
+const base={client:parsed.client,owner:parsed.owner,due:parsed.date,status:'Pendente' as const,productId:parsed.productId,opportunityId:deal?.id||quote.opportunityId,shipmentId:shipment.id,createdAt:now,updatedAt:now,history:[{at:now,owner:actor,action:'Criado a partir da cotação '+quote.id}]};
+const records:SectorRecord[]=[
+{...base,id:'PROC-'+crypto.randomUUID(),sectorId:'logistica',kind:'Booking',title:'Coordenar embarque · '+parsed.client,notes:'Planejamento interno. Confirmar coleta, booking, cut-off e disponibilidade com o agente. Cotação '+quote.id,fields:{origin:parsed.origin,destination:parsed.destination,modal:parsed.modal,departure:parsed.date,arrival:parsed.eta,reference:quote.id}},
+{...base,id:'PROC-'+crypto.randomUUID(),sectorId:'documentacao',kind:'Invoice',title:'Preparar Invoice · '+parsed.client,notes:'Revisar e anexar documento confirmado; este registro não emite uma Invoice automaticamente.',fields:{reference:quote.id,country:parsed.country}},
+{...base,id:'PROC-'+crypto.randomUUID(),sectorId:'documentacao',kind:'Packing List',title:'Preparar Packing List · '+parsed.client,notes:'Conferir volumes, pesos e medidas da carga antes de anexar o documento.',fields:{reference:quote.id,country:parsed.country}},
+{...base,id:'PROC-'+crypto.randomUUID(),sectorId:'financeiro',kind:'A receber',title:'Recebimento previsto · '+parsed.client,due:parsed.paymentDue,notes:'Previsão interna da cotação escolhida. Confirmar condições de pagamento, cobrança e liquidação. Não é registro bancário ou contábil oficial.',fields:{currency:parsed.quotedCurrency,amount:String(quote.total),reference:quote.id,counterparty:parsed.client}}
+];
+const tasks:Task[]=records.map(r=>({id:'T-'+crypto.randomUUID(),sectorId:r.sectorId,title:r.title,client:r.client,due:r.due,status:'Pendente',owner:r.owner,opportunityId:r.opportunityId||undefined,recordId:r.id,notes:'Operação '+shipment.id+' · cotação '+quote.id}));
+return {shipment,records,tasks,quote:{...quote,operationId:shipment.id},event:deal?{id:'EV-'+crypto.randomUUID(),opportunityId:deal.id,type:'Operação criada',text:shipment.id+' · '+quote.id,at:now,owner:actor}:undefined};
+}
+export function shipmentCurrency(ship:Shipment){return ship.currency||'USD'}
+export function shipmentTotal(ships:Shipment[],currency:string){return ships.filter(s=>shipmentCurrency(s)===currency).reduce((sum,s)=>sum+s.value,0)}
