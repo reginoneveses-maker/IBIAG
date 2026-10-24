@@ -1,3 +1,4 @@
+import {operationalDay} from '@/lib/operationalDay';
 
 import {useEffect,useRef,useState} from "react";
 import {api} from "@/AuthContext";
@@ -12,7 +13,7 @@ const defaults={quantity:"",unit:"g",lot:"",packaging:"",recipient:"",address:""
 const labels={quantity:"Quantidade da amostra",unit:"Unidade da amostra",lot:"Lote informado pelo fornecedor",packaging:"Embalagem da amostra",recipient:"Destinatário",address:"Endereço de entrega",destination_country:"País da entrega",delivery_method:"Forma de envio",carrier:"Transportadora ou responsável pela entrega",tracking_code:"Código de rastreio ou referência",expected_delivery:"Entrega prevista",follow_up_on:"Retorno previsto do comprador",cost_amount:"Custo total informado",cost_currency:"Moeda do custo",notes:"Observações"};
 const selectClass="w-full border rounded-md p-2 bg-white text-sm";
 const error=e=>typeof e.response?.data?.detail==="string"?e.response.data.detail:"Não foi possível concluir. Confira a conexão e recarregue.";
-const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);};
+const today=operationalDay;
 async function allLeads(){
  const rows=[];for(let offset=0;offset<25000;offset+=250){
   const r=await api.get("/leads",{params:{skip:offset,limit:250}});if(!Array.isArray(r.data))throw new Error("Invalid CRM response");

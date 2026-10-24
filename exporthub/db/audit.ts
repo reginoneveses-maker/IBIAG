@@ -1,0 +1,4 @@
+import type {ChatGPTUser} from '@/app/chatgpt-auth';
+export async function recordAudit(db:D1Database,user:ChatGPTUser,action:string,resourceType:string,resourceId:string){await db.prepare('INSERT INTO audit_events (id,at,user_id,actor,action,resource_type,resource_id) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),new Date().toISOString(),user.userId,user.displayName.slice(0,1000),action,resourceType,resourceId.slice(0,180)).run()}
+
+export function auditStatement(db:D1Database,userId:string,actor:string,action:string,resourceType:string,resourceId:string){return db.prepare('INSERT INTO audit_events (id,at,user_id,actor,action,resource_type,resource_id) VALUES (?,?,?,?,?,?,?)').bind(crypto.randomUUID(),new Date().toISOString(),userId,actor.slice(0,1000),action,resourceType,resourceId.slice(0,180))}

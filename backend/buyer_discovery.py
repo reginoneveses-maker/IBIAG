@@ -99,7 +99,7 @@ def _headers():
 
 def _extract_domain(url: str) -> str:
     try:
-        return urlparse(url or "").netloc.lower().removeprefix("www.")
+        return (urlparse(url or "").hostname or "").rstrip(".").encode("idna").decode("ascii").lower().removeprefix("www.")
     except Exception:
         return ""
 
@@ -259,6 +259,17 @@ def _page_text(markdown):
     return text
 
 
+def _unsupported_business_claim(clause, product):
+    normalized = _normalize(clause).replace("not only", "only")
+    # Tie negation to a commercial/use verb or to the requested ingredient.
+    # "Our drink contains Acerola without sugar" remains valid positive evidence.
+    negative_action = r"\b(?:no longer|not|never|doesnt|dont|don t|does not|do not|nao)\s+(?:\w+\s+){0,2}(?:sell|sells|supply|supplies|offer|offers|manufacture|manufactures|contain|contains|use|uses|using|utiliza|utilizamos|vendemos|fornecemos)\b"
+    ingredient = " ".join(_product_terms(_ingredient_language(_normalize(product))))
+    absent = bool(ingredient and re.search(r"\b(?:without|sem|sans)\s+(?:any\s+)?" + re.escape(ingredient) + r"\b", _ingredient_language(normalized)))
+    return bool(absent or re.search(negative_action, normalized)
+        or re.search(r"\b(?:can be used|may be used|could be used|commonly used|typically used|potential uses|can contain|may contain|pode ser utilizad[oa]|pode conter)\b", normalized))
+
+
 def _business_evidence(text, facts, product, relationship):
     cues = {
         "seller": r"\b(?:sell|sells|selling|sale|offer|offers|supplier|supplies|supply|distribute|distributes|distributor|wholesale|manufacture|manufactures|manufacturer|order|ordering|buy|cart|venda|vende|vendemos|fornece|fornecemos|fabricamos|distribui|distribuidor|comprar|carrinho|lieferant|kaufen|verkaufen|venden|venta|fournisseur|acheter)\b",
@@ -266,8 +277,9 @@ def _business_evidence(text, facts, product, relationship):
     }
     normalized_text = " " + _normalize(text) + " "
     # A single business clause is preferred over combining a heading and action.
-    clauses = [str(facts.get("product_quote") or "")] + re.split(r"[\n.!?;]+", text)
+    clauses = re.findall(r"[^\n.!?;]+[.!?;]?", text)
     for clause in clauses:
+        if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
         for start in range(max(1, len(words) - 24)):
             quote = " ".join(words[start:start+25]).strip(" #*|-")
@@ -277,12 +289,14 @@ def _business_evidence(text, facts, product, relationship):
     if relationship != "seller" or facts["page_type"] not in {"company_product", "company_catalog"}: return ""
     # Product offer and a separate published CTA can substantiate a catalogue.
     actions = r"\b(?:request a quote|get a quote|request quotation|quote request|add to cart|buy now|order now|ordering|wholesale|solicitar cotacao|solicite cotacao|comprar|adicionar ao carrinho)\b"
-    for clause in [str(facts.get("business_quote") or "")] + re.split(r"[\n.!?;]+", text):
+    for clause in re.findall(r"[^\n.!?;]+[.!?;]?", text):
+        if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
         for start in range(max(1, len(words) - 9)):
             action = " ".join(words[start:start+10]).strip(" #*|-")
             if not action or " " + _normalize(action) + " " not in normalized_text or not re.search(actions, _normalize(action)): continue
             for candidate in clauses:
+                if _unsupported_business_claim(candidate, product): continue
                 words = candidate.strip().split()
                 for offset in range(max(1, len(words) - 13)):
                     heading = " ".join(words[offset:offset+14]).strip(" #*|-")
@@ -337,6 +351,7 @@ def _verified_business(item, page, product, country):
             "country":company_country, "company_country":company_country, "country_verified":country_verified, "search_country":country, "product_interest":product, "source_url":url,
             "source_title":str(item.get("title") or ""), "source_description":quote,
             "product_relationship":relationship, "product_evidence":quote, "relationship_verified":True,
+            "buyer_qualification":"ingredient_user" if relationship == "user" else "seller_only", "purchasing_verified":False,
             "discovery_version":DISCOVERY_VERSION, "priority_score":_score(quote, product), "source":"firecrawl_company_page"}
 
 

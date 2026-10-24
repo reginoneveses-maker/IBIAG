@@ -1,0 +1,9 @@
+import {readRequestJSON} from '@/services/request-json';
+import {validateRecordLinks} from '@/db/record-integrity';
+import {preserveBeforeWrite} from '@/db/safety-backups';
+import {readCollection,writeCollectionsAtomic} from '@/db/collections';
+import {recordSchemas,sameOrigin} from '@/db/validation';
+import {workspace,apiError} from '@/db/workspace';
+const names=['tasks','commercial','activities','products','shipments','sectorRecords'];
+export async function GET(_:Request,{params}:{params:Promise<{collection:string}>}){try{const {db}=await workspace();const {collection}=await params;if(!names.includes(collection))return new Response(null,{status:404});const row=await readCollection(db,collection);return Response.json({data:row?row.payload:collection==='commercial'?{ops:[],quotes:[]}:[],revision:row?.revision??0},{headers:{'Cache-Control':'no-store'}})}catch(e){return apiError(e)}}
+export async function PUT(request:Request,{params}:{params:Promise<{collection:string}>}){try{const {db,bucket,user}=await workspace('write');const {collection}=await params;if(!names.includes(collection))return new Response(null,{status:404});if(!sameOrigin(request))return new Response(null,{status:403});const {data,revision}=await readRequestJSON(request,8*1024*1024);if(!recordSchemas[collection as keyof typeof recordSchemas].safeParse(data).success||!Number.isSafeInteger(revision)||revision<0)return Response.json({error:'Dados inválidos.'},{status:400});const references=await validateRecordLinks(db,[{name:collection,data}]);await preserveBeforeWrite(db,bucket,[collection]);const changed=await writeCollectionsAtomic(db,[{name:collection,data,revision}],user.userId,user.displayName,references);if(!changed)return Response.json({error:'Outro acesso alterou estes registros. Recarregue antes de salvar para não sobrescrever.'},{status:409});return Response.json({revision:revision+1})}catch(e){return apiError(e)}}

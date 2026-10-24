@@ -1,0 +1,14 @@
+export interface ZipEntry {name:string;size:number;body:()=>Promise<ReadableStream<Uint8Array>>}
+const table=Uint32Array.from({length:256},(_,n)=>{let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;return c>>>0});
+function crcChunk(crc:number,bytes:Uint8Array){for(const byte of bytes)crc=table[(crc^byte)&255]^(crc>>>8);return crc}
+function header(size:number){const bytes=new Uint8Array(size);return {bytes,view:new DataView(bytes.buffer)}}
+export function streamZip(entries:ZipEntry[]){
+async function* generate(){let offset=0;const central:Uint8Array[]=[];const encoder=new TextEncoder(),date=new Date(),time=(date.getUTCHours()<<11)|(date.getUTCMinutes()<<5)|(date.getUTCSeconds()>>1),dosDate=((date.getUTCFullYear()-1980)<<9)|((date.getUTCMonth()+1)<<5)|date.getUTCDate();
+for(const entry of entries){const name=encoder.encode(entry.name);if(name.length>65535||entry.size<0||entry.size>0xffffffff||offset>0xffffffff)throw new Error('Limite ZIP excedido');const local=header(30+name.length),v=local.view;v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x0808,true);v.setUint16(10,time,true);v.setUint16(12,dosDate,true);v.setUint16(26,name.length,true);local.bytes.set(name,30);const start=offset;offset+=local.bytes.length;yield local.bytes;
+let crc=0xffffffff,size=0;const reader=(await entry.body()).getReader();try{while(true){const result=await reader.read();if(result.done)break;const bytes=result.value;size+=bytes.byteLength;if(size>entry.size)throw new Error('Tamanho do arquivo mudou');crc=crcChunk(crc,bytes);offset+=bytes.byteLength;yield bytes}}finally{await reader.cancel().catch(()=>{});reader.releaseLock()}if(size!==entry.size)throw new Error('Arquivo incompleto');crc=(crc^0xffffffff)>>>0;
+const descriptor=header(16);descriptor.view.setUint32(0,0x08074b50,true);descriptor.view.setUint32(4,crc,true);descriptor.view.setUint32(8,size,true);descriptor.view.setUint32(12,size,true);offset+=16;yield descriptor.bytes;
+const dir=header(46+name.length),d=dir.view;d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,0x0808,true);d.setUint16(12,time,true);d.setUint16(14,dosDate,true);d.setUint32(16,crc,true);d.setUint32(20,size,true);d.setUint32(24,size,true);d.setUint16(28,name.length,true);d.setUint32(42,start,true);dir.bytes.set(name,46);central.push(dir.bytes)}
+const start=offset;for(const dir of central){offset+=dir.byteLength;yield dir}const end=header(22);end.view.setUint32(0,0x06054b50,true);end.view.setUint16(8,entries.length,true);end.view.setUint16(10,entries.length,true);end.view.setUint32(12,offset-start,true);end.view.setUint32(16,start,true);yield end.bytes;
+}
+const iterator=generate();return new ReadableStream<Uint8Array>({async pull(controller){try{const item=await iterator.next();if(item.done)controller.close();else controller.enqueue(item.value)}catch(e){controller.error(e)}},async cancel(){await iterator.return(undefined)}});
+}

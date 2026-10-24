@@ -460,7 +460,7 @@ const TradeIntel = () => {
                 </div>
                 {b.relationship_verified && <div className="mt-2 text-sm rounded bg-green-50 p-3 text-[#104496]">
                   <b>{b.product_relationship === "seller" ? "Vende / fornece o ingrediente" : "Utiliza o ingrediente em seus produtos"}</b>
-                  <div className="text-xs mt-1">Evidência no site: <q>{b.product_evidence}</q></div>
+                  <div className="text-xs mt-1">{b.product_relationship === "seller" ? "Fornecedor identificado; compra do ingrediente não comprovada." : "Potencial comprador pela aplicação; interesse de compra ainda não confirmado."}</div><div className="text-xs mt-1">Evidência no site: <q>{b.product_evidence}</q></div>
                 </div>}
                 {!b.relationship_verified && b.source_description && <div className="text-xs mt-2 text-[#104496]/70">{b.source_description}</div>}
                 <div className="text-xs mt-2 space-y-1">

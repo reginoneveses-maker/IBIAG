@@ -1,0 +1,6 @@
+import type {ReactNode} from 'react';
+export function StatusBadge({status}:{status:string}){return <span className={`badge ${status==='Em risco'?'risk':status==='Concluído'?'done':status==='Pendente'?'pending':'active'}`}>{status}</span>}
+export function Kpi({label,value,note,icon}:{label:string;value:string;note?:string;icon?:ReactNode}){return <div className="kpi"><div className="kpi-label">{label}{icon}</div><strong>{value}</strong>{note&&<small>{note}</small>}</div>}
+export function EmptyState({title='Nenhum resultado encontrado',description='Ajuste os filtros para encontrar outros itens.'}:{title?:string;description?:string}){return <div className="empty"><strong>{title}</strong><p>{description}</p></div>}
+export function Filter({value,onChange,options,label}:{value:string;onChange:(s:string)=>void;options:string[];label:string}){return <select aria-label={label} value={value} onChange={e=>onChange(e.target.value)}>{options.map(o=><option key={o}>{o}</option>)}</select>}
+export function DataTable({headers,children}:{headers:string[];children:ReactNode}){return <div className="table-scroll"><table><thead><tr>{headers.map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{children}</tbody></table></div>}

@@ -1,0 +1,1995 @@
+[
+  {
+    "id": "IBIAG-001",
+    "name": "Extrato de açaí em pó",
+    "originalName": "AÇAÍ EXTRACT POWDER",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 1,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-1.jpg",
+      "sourcePage": "https://www.plantextractwholesale.com/product/acai-berry-extract-suppliers-manufacturers.html",
+      "sourceName": "www.plantextractwholesale.com",
+      "form": "extrato de açaí em pó"
+    }
+  },
+  {
+    "id": "IBIAG-002",
+    "name": "Açaí liofilizado",
+    "originalName": "AÇAÍ FREEZE DRIED",
+    "forms": [
+      "Liofilizado"
+    ],
+    "categories": [
+      "Liofilizados"
+    ],
+    "organic": true,
+    "moq": "10 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 2,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "✓",
+      "other": "",
+      "organic": "✓",
+      "moq": "10 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-003",
+    "name": "Polpa de açaí 8% 12% e 14% de sólidos",
+    "originalName": "AÇAÍ PULP (8%, 12%, 14% SOLIDS)",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 3,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-004",
+    "name": "Açaí soft mix UHT",
+    "originalName": "AÇAÍ SOFT MIX",
+    "forms": [
+      "Mistura UHT"
+    ],
+    "categories": [
+      "Outros"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 4,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "UHT",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-005",
+    "name": "Sorbet de açaí",
+    "originalName": "AÇAÍ SORBET",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 5,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-006",
+    "name": "Extrato seco de acerola em pó 17% 21% e 25% vitamina C nativa",
+    "originalName": "ACEROLA DRY EXTRACT POWDER (17%, 21% 25% NATIVE VIT C)",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "20 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 6,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "20 KG"
+    },
+    "image": {
+      "path": "/products/product-6.jpg",
+      "sourcePage": "https://www.greenskybio.com/plant_extract/from-plant-to-extract-a-stepbystep-guide-to-preparing-plant-extracts.html",
+      "sourceName": "www.greenskybio.com",
+      "form": "extrato de acerola em pó, apresentado em prato com frutos"
+    }
+  },
+  {
+    "id": "IBIAG-007",
+    "name": "Acerola liofilizada 17% 30% e 40% vitamina C nativa",
+    "originalName": "ACEROLA FREEZE DRIED (17%, 30%, 40% NATIVE VIT C)",
+    "forms": [
+      "Liofilizado"
+    ],
+    "categories": [
+      "Liofilizados"
+    ],
+    "organic": true,
+    "moq": "10 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 7,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "✓",
+      "other": "",
+      "organic": "✓",
+      "moq": "10 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-008",
+    "name": "Suco de acerola",
+    "originalName": "ACEROLA JUICE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 8,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": {
+      "path": "/products/product-8.jpg",
+      "sourcePage": "https://www.uren.com/news/acai-acerola-and-aronia-superfruits/",
+      "sourceName": "www.uren.com",
+      "form": "suco de acerola servido"
+    }
+  },
+  {
+    "id": "IBIAG-009",
+    "name": "Maçã em pó",
+    "originalName": "APPLE POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "3 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 9,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "3 KG"
+    },
+    "image": {
+      "path": "/products/product-9.jpg",
+      "sourcePage": "https://www.exportersindia.com/product-detail/apple-powder-4692193172.htm",
+      "sourceName": "www.exportersindia.com",
+      "form": "maçã em pó em tigela, com maçã fresca ao lado"
+    }
+  },
+  {
+    "id": "IBIAG-010",
+    "name": "Extrato de alcachofra em pó",
+    "originalName": "ARTICHOKE EXTRACT POWDER",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 10,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-011",
+    "name": "Farinha de babaçu",
+    "originalName": "BABASSU FLOUR",
+    "forms": [
+      "Farinha"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "25 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 11,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Flour",
+      "organic": "",
+      "moq": "25 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-012",
+    "name": "Cajá e cajá umbu",
+    "originalName": "CAJA/ CAJA UMBU",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 12,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": {
+      "path": "/products/product-12.jpg",
+      "sourcePage": "https://www.terra.com.br/vida-e-estilo/degusta/receitas/suco-de-caja-aprenda-o-jeito-facil-de-como-fazer-a-bebida,fa0abcf990b17b9935a5a35c853f949c9rp2j0tn.html",
+      "sourceName": "www.terra.com.br",
+      "form": "suco de cajá preparado"
+    }
+  },
+  {
+    "id": "IBIAG-013",
+    "name": "Extrato de camu camu em pó",
+    "originalName": "CAMU CAMU EXTRACT POWDER",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 13,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-014",
+    "name": "Camu camu liofilizado em pó",
+    "originalName": "CAMU CAMU FREEZE DRIED POWDER",
+    "forms": [
+      "Pó",
+      "Liofilizado"
+    ],
+    "categories": [
+      "Pós e farinhas",
+      "Liofilizados"
+    ],
+    "organic": true,
+    "moq": "10 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 14,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "10 KG"
+    },
+    "image": {
+      "path": "/products/product-14.jpg",
+      "sourcePage": "https://www.naturalhealthmag.com.au/nourish/camu-camu-health-benefits-superfood",
+      "sourceName": "www.naturalhealthmag.com.au",
+      "form": "camu-camu liofilizado em pó em tigela"
+    }
+  },
+  {
+    "id": "IBIAG-015",
+    "name": "Suco de caju",
+    "originalName": "CASHEW JUICE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 15,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": {
+      "path": "/products/product-15.jpg",
+      "sourcePage": "https://www.irishfilmnyc.com/2021/06/cashew-fruit-juice-benefits.html",
+      "sourceName": "www.irishfilmnyc.com",
+      "form": "suco de caju servido"
+    }
+  },
+  {
+    "id": "IBIAG-016",
+    "name": "Castanha de caju",
+    "originalName": "CASHEW NUTS",
+    "forms": [
+      "Castanhas"
+    ],
+    "categories": [
+      "Outros"
+    ],
+    "organic": true,
+    "moq": "7,938 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 16,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Nuts",
+      "organic": "✓",
+      "moq": "7,938 KG"
+    },
+    "image": null,
+    "note": "MOQ 7,938 KG transcrito do original. Confirmar com a IBIAG antes de converter ou cotar."
+  },
+  {
+    "id": "IBIAG-017",
+    "name": "Catuaba",
+    "originalName": "CATUABA",
+    "forms": [
+      "Extrato em pó",
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 17,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-17.jpg",
+      "sourcePage": "https://www.ebay.com/itm/163829843392",
+      "sourceName": "www.ebay.com",
+      "form": "casca de catuaba cortada"
+    }
+  },
+  {
+    "id": "IBIAG-018",
+    "name": "Farinha de coco desengordurada e desidratada",
+    "originalName": "COCONUT FLOUR (DEGREASED DESICCATED)",
+    "forms": [
+      "Farinha"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "25 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 18,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Flour",
+      "organic": "",
+      "moq": "25 KG"
+    },
+    "image": {
+      "path": "/products/product-18.jpg",
+      "sourcePage": "https://www.zentrum-der-gesundheit.de/ernaehrung/ernaehrungsformen/glutenfreie-ernaehrung-uebersicht/kokosmehl",
+      "sourceName": "www.zentrum-der-gesundheit.de",
+      "form": "farinha de coco em tigela"
+    }
+  },
+  {
+    "id": "IBIAG-019",
+    "name": "Leite de coco concentrado",
+    "originalName": "COCONUT MILK CONCENTRATED",
+    "forms": [
+      "Leite concentrado"
+    ],
+    "categories": [
+      "Outros"
+    ],
+    "organic": false,
+    "moq": "20 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 19,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Milk",
+      "organic": "",
+      "moq": "20 KG"
+    },
+    "image": {
+      "path": "/products/product-19.jpg",
+      "sourcePage": "https://www.tridge.com/market-overview/coconut-milk/ES",
+      "sourceName": "www.tridge.com",
+      "form": "leite de coco em copo"
+    }
+  },
+  {
+    "id": "IBIAG-020",
+    "name": "Polpa integral de coco verde",
+    "originalName": "COCONUT PULP GREEN INTEGRAL",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "20 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 20,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "20 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-021",
+    "name": "Água de coco",
+    "originalName": "COCONUT WATER",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 21,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-022",
+    "name": "Semente de uva em pó",
+    "originalName": "GRAPE SEED POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "3 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 22,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "3 KG"
+    },
+    "image": {
+      "path": "/products/product-22.jpg",
+      "sourcePage": "https://teewerk.ch/products/traubenkerne-bio-gemahlen-traubenkernmehl",
+      "sourceName": "teewerk.ch",
+      "form": "semente de uva moída em pó em recipiente de vidro"
+    }
+  },
+  {
+    "id": "IBIAG-023",
+    "name": "Casca de uva em pó",
+    "originalName": "GRAPE SKIN POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "3KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 23,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "3KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-024",
+    "name": "Graviola",
+    "originalName": "GRAVIOLA (SOURSOP)",
+    "forms": [
+      "Suco NFC / purê",
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Sucos e polpas",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 24,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-025",
+    "name": "Complexo de café verde em pó",
+    "originalName": "GREEN COFFEE COMPLEX POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "5 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 25,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "5 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-026",
+    "name": "Extrato seco de café verde 10% cafeína",
+    "originalName": "GREEN COFFEE DRY EXTRACT 10% CAFFEINE",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 26,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-26.jpg",
+      "sourcePage": "https://www.greenskybio.com/blog4/bulk-purchase-of-green-coffee-bean-extract.html",
+      "sourceName": "www.greenskybio.com",
+      "form": "extrato de café verde em pó com grãos"
+    }
+  },
+  {
+    "id": "IBIAG-027",
+    "name": "Óleo de café verde",
+    "originalName": "GREEN COFFEE OIL",
+    "forms": [
+      "Óleo"
+    ],
+    "categories": [
+      "Óleos"
+    ],
+    "organic": false,
+    "moq": "5 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 27,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Oil",
+      "organic": "",
+      "moq": "5 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-028",
+    "name": "Extrato de guaraná em pó 10% e 22% cafeína",
+    "originalName": "GUARANÁ EXTRACT POWDER (10%, 22% CAFFEINE)",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 28,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-029",
+    "name": "Extrato fluido de guaraná 1,2% e 4–6% cafeína",
+    "originalName": "GUARANA FLUID EXTRACT (1,2%, 4-6% CAFFEINE)",
+    "forms": [
+      "Extrato fluido"
+    ],
+    "categories": [
+      "Extratos e chás"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 29,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "✓",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null,
+    "note": "O nome indica extrato fluido; o original também marca a coluna extrato em pó. Forma a confirmar no spec."
+  },
+  {
+    "id": "IBIAG-030",
+    "name": "Guaraná em pó",
+    "originalName": "GUARANÁ POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 30,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-30.jpg",
+      "sourcePage": "https://www.redcare-apotheke.ch/de/gesundheit/F00448343/amoseeds-guarana-en-poudre-bio.htm",
+      "sourceName": "www.redcare-apotheke.ch",
+      "form": "guaraná em pó com sementes"
+    }
+  },
+  {
+    "id": "IBIAG-031",
+    "name": "Semente de guaraná",
+    "originalName": "GUARANÁ SEED",
+    "forms": [
+      "Grãos"
+    ],
+    "categories": [
+      "Outros"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 31,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Grains",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-032",
+    "name": "Goiaba",
+    "originalName": "GUAVA",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 32,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": {
+      "path": "/products/product-32.jpg",
+      "sourcePage": "https://www.sayidaty.net/node/1391396",
+      "sourceName": "www.sayidaty.net",
+      "form": "suco de goiaba servido"
+    }
+  },
+  {
+    "id": "IBIAG-033",
+    "name": "Chá solúvel de hibisco",
+    "originalName": "HIBISCUS SOLUBLE TEA",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 33,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-034",
+    "name": "Jambu",
+    "originalName": "JAMBU (PARACRESS)",
+    "forms": [
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "10 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 34,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "10 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-035",
+    "name": "Limão",
+    "originalName": "LIME",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 35,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-036",
+    "name": "Alga Lithothamnion em pó",
+    "originalName": "LITHOTHAMNION ALGAE POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "25 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 36,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "25 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-037",
+    "name": "Suco de mandarina",
+    "originalName": "MANDARIN JUICE",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 37,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-038",
+    "name": "Suco de melão",
+    "originalName": "MELON JUICE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 38,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-039",
+    "name": "Moringa em pó",
+    "originalName": "MORINGA POWDER",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "20 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 39,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "20 KG"
+    },
+    "image": {
+      "path": "/products/product-39.jpg",
+      "sourcePage": "https://azada.shop/products/moringa-en-polvo-bio",
+      "sourceName": "azada.shop",
+      "form": "moringa em pó em colher de madeira"
+    }
+  },
+  {
+    "id": "IBIAG-040",
+    "name": "Muirapuama",
+    "originalName": "MUIRAPUAMA",
+    "forms": [
+      "Extrato em pó",
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 40,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-041",
+    "name": "Ora pro nóbis",
+    "originalName": "ORA PRO NOBIS (LEMON VINE)",
+    "forms": [
+      "Pó",
+      "Liofilizado"
+    ],
+    "categories": [
+      "Pós e farinhas",
+      "Liofilizados"
+    ],
+    "organic": false,
+    "moq": "10 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 41,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "✓",
+      "other": "",
+      "organic": "",
+      "moq": "10 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-042",
+    "name": "Laranja",
+    "originalName": "ORANGE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 42,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-043",
+    "name": "Polpa de mamão",
+    "originalName": "PAPAYA PULP",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 43,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-044",
+    "name": "Polpa de maracujá",
+    "originalName": "PASSION FRUIT PULP",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 44,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": {
+      "path": "/products/product-44.jpg",
+      "sourcePage": "https://orders.lynasfoodservice.com/categories/coffee-sauces-syrups-and-purees",
+      "sourceName": "orders.lynasfoodservice.com",
+      "form": "purê de maracujá"
+    }
+  },
+  {
+    "id": "IBIAG-045",
+    "name": "Pau d’arco",
+    "originalName": "PAU DA'ARCO",
+    "forms": [
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 45,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-45.jpg",
+      "sourcePage": "https://maliradaiholistic.com/pau-darco-bark-handroanthus-impetiginosus/",
+      "sourceName": "maliradaiholistic.com",
+      "form": "casca de pau d’arco cortada"
+    }
+  },
+  {
+    "id": "IBIAG-046",
+    "name": "Pfaffia paniculata ginseng brasileiro em pó",
+    "originalName": "PFAFFIA PANICULATA (BRAZILIAN GINSENG) POWDER",
+    "forms": [
+      "Pó",
+      "Cortado"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 46,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-047",
+    "name": "Suco de abacaxi",
+    "originalName": "PINEAPPLE JUICE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 47,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-048",
+    "name": "Pitaya",
+    "originalName": "PITAYA (DRAGON FRUIT)",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": true,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 48,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-049",
+    "name": "Quercetina",
+    "originalName": "QUERCETIN",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 49,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-49.jpg",
+      "sourcePage": "https://www.bolinherb.com/info/what-is-quercetin-powder-and-its-health-benefi-85531392.html",
+      "sourceName": "www.bolinherb.com",
+      "form": "quercetina em pó em recipiente de vidro"
+    }
+  },
+  {
+    "id": "IBIAG-050",
+    "name": "Rutina 70%",
+    "originalName": "RUTIN 70%",
+    "forms": [
+      "Pó"
+    ],
+    "categories": [
+      "Pós e farinhas"
+    ],
+    "organic": false,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 50,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "✓",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-50.jpg",
+      "sourcePage": "https://www.jxgreensky.com/products/79.html",
+      "sourceName": "www.jxgreensky.com",
+      "form": "rutina em pó em recipiente de vidro"
+    }
+  },
+  {
+    "id": "IBIAG-051",
+    "name": "Suco de morango",
+    "originalName": "STRAWBERRY JUICE",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 51,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-052",
+    "name": "Suco de tamarindo",
+    "originalName": "TAMARINDO JUICE",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 52,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-053",
+    "name": "Suco de tangerina",
+    "originalName": "TANGERINE JUICE",
+    "forms": [
+      "Suco NFC / purê"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 53,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-054",
+    "name": "Suco de melancia",
+    "originalName": "WATERMELON JUICE",
+    "forms": [
+      "Suco NFC / purê",
+      "Clarificado / concentrado"
+    ],
+    "categories": [
+      "Sucos e polpas"
+    ],
+    "organic": false,
+    "moq": "Sob consulta",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 54,
+    "sourceColumns": {
+      "singleNfcPuree": "✓",
+      "clarifiedConcentrated": "✓",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "",
+      "moq": "PLEASE REQUEST"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-055",
+    "name": "Erva mate 5/10 verde ou tostada",
+    "originalName": "YERBA MATE 5/10 GREEN/ ROASTED",
+    "forms": [
+      "Cortado"
+    ],
+    "categories": [
+      "Outros"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 55,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": {
+      "path": "/products/product-55.jpg",
+      "sourcePage": "https://thesdirect.com/products/mate-vert-fine-coupe-2-mm-bio-en-vrac-1-kg-origine-bresil",
+      "sourceName": "thesdirect.com",
+      "form": "erva mate verde cortada"
+    },
+    "note": "A indicação 5/10 foi preservada; unidade e significado a confirmar no spec."
+  },
+  {
+    "id": "IBIAG-056",
+    "name": "Extrato seco de erva mate 8 a 10%",
+    "originalName": "YERBA MATE DRY EXTRACT 8 a 10%",
+    "forms": [
+      "Extrato seco"
+    ],
+    "categories": [
+      "Extratos e chás"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 56,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null,
+    "note": "O nome informa 8 a 10%, sem identificar a substância ou parâmetro desse percentual."
+  },
+  {
+    "id": "IBIAG-057",
+    "name": "Folhas e talos de erva mate",
+    "originalName": "YERBA MATE LEAVES AND STEAMS",
+    "forms": [
+      "Cortado"
+    ],
+    "categories": [
+      "Extratos e chás"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 57,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "",
+      "powder": "",
+      "freezeDried": "",
+      "other": "Cut",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null
+  },
+  {
+    "id": "IBIAG-058",
+    "name": "Chá solúvel de erva mate verde ou tostada",
+    "originalName": "YERBA MATE SOLUBLE TEA GREEN/ ROASTED",
+    "forms": [
+      "Extrato em pó"
+    ],
+    "categories": [
+      "Extratos e chás",
+      "Pós e farinhas"
+    ],
+    "organic": true,
+    "moq": "100 KG",
+    "supplier": "Não informado",
+    "manufacturer": "Não informado",
+    "origin": "Não informado",
+    "price": null,
+    "shelfLife": "Não informado",
+    "storage": "Não informado",
+    "packaging": "Não informado",
+    "sourceRow": 58,
+    "sourceColumns": {
+      "singleNfcPuree": "",
+      "clarifiedConcentrated": "",
+      "powderExtract": "✓",
+      "powder": "",
+      "freezeDried": "",
+      "other": "",
+      "organic": "✓",
+      "moq": "100 KG"
+    },
+    "image": null
+  }
+]
