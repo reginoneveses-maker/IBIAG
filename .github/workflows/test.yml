@@ -90,6 +90,7 @@ jobs:
           npm run build
       - name: Security, health and source regression tests
         run: |
+          node scripts/test-quote-completion.cjs
           node scripts/test-crm-interchange.cjs
           node scripts/test-crm-interchange-d1.cjs
           node scripts/test-spec-revisions.cjs
@@ -115,11 +116,14 @@ jobs:
         run: |
           node scripts/test-spec-versions-ui.cjs
           node scripts/test-crm-interchange-ui.cjs
+          node scripts/test-quote-completion-ui.cjs
       - name: Document UI screenshots (synthetic data)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: spec-versions-review
-          path: exporthub/ui-review/*.png
+          path: |
+            exporthub/ui-review/*.png
+            exporthub/ui-review/*.pdf
           if-no-files-found: ignore
           retention-days: 1

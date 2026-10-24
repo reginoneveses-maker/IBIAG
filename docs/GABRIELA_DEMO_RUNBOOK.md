@@ -38,3 +38,7 @@ Esta ponte cobre empresas e contatos. Não apresentar como sincronização de pr
 ## Avaliação de Gabriela
 
 Observar se encontra empresa, oferta, cálculo e documentos sem orientação; se entende onde revisar pendências; se consegue voltar ao pedido pelo dossiê; e se a operação funciona com a tela estreita. Registrar dificuldades e prioridades antes da liberação. Não enviar e-mail/WhatsApp ou acionar pesquisa paga.
+
+## Ensaio com cadastro incompleto
+
+Na Precificação do ExportHub, abrir a conclusão manual: selecionar ingrediente sem preço/embalagem, preencher fornecedor e cliente fictícios, 1.000 kg, preço R$ 17,50/kg, margem 20%, despesas/indiretos 0 confirmados, EXW e fábrica nomeada. Confirmar embalagem incluída. Sem MOQ, prazo e medidas: mostrar avisos, sem bloquear a proposta. Resultado: R$ 21,875/kg e R$ 21.875,00 no total. Alterar para 1.500 kg e conferir recálculo. Salvar rascunho incompleto, recarregar e retomar. Revisar, salvar cotação, visualizar proposta IBIAG e imprimir/salvar PDF. Mostrar que cadastro só muda após a segunda confirmação e que a cotação salva mantém seus valores.
