@@ -95,6 +95,9 @@ const base = "http://127.0.0.1:8765";
     assert.equal(await page.locator('[data-testid^="product-card-"]').count(),20);
     await page.reload();
     const acaiPhoto=page.getByTestId("product-card-photo-0").locator("img");
+    // Reload may replace the initial registered URL with its bundled fallback.
+    // Wait for the final decoded photo before scroll stability checks.
+    await page.waitForFunction(()=>{const img=document.querySelector('[data-testid="product-card-photo-0"] img');return img?.src.includes("/static/media/")&&img.complete&&img.naturalWidth>0;});
     await acaiPhoto.scrollIntoViewIfNeeded();await acaiPhoto.evaluate(el=>el.decode());
     assert(await acaiPhoto.evaluate(el=>el.naturalWidth>0));
     await page.goto(base+"/gestao/precos");
