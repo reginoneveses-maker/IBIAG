@@ -90,6 +90,8 @@ jobs:
           npm run build
       - name: Security, health and source regression tests
         run: |
+          node scripts/test-spec-revisions.cjs
+          node scripts/test-spec-revisions-d1.cjs
           node scripts/test-health-integrity.cjs
           node scripts/test-health-d1.cjs
           node scripts/test-members.cjs
@@ -102,3 +104,18 @@ jobs:
           node scripts/test-unified-pricing.cjs
           node scripts/test-workbook-pricing.cjs
           node scripts/test-workspace-sessions.cjs
+
+      - name: Install isolated UI verification tools
+        run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@^1.51.1 esbuild@0.25.11
+      - name: Install local Chromium for document UI verification
+        run: npx playwright install --with-deps chromium
+      - name: Document versions interaction workflow
+        run: node scripts/test-spec-versions-ui.cjs
+      - name: Document UI screenshots (synthetic data)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec-versions-review
+          path: exporthub/ui-review/*.png
+          if-no-files-found: ignore
+          retention-days: 1

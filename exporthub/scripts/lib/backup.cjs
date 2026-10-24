@@ -47,7 +47,7 @@ function verifyBackup(zipBuffer){
  for(const name of ['commercial','products'])if(!byName[name])warnings.push('Coleção sem dados no backup: '+name);
  const files=Array.isArray(manifest.files)?manifest.files:(errors.push('Lista de PDFs ausente.'),[]),paths=new Set(),byId=new Map();
  for(const f of files){
-  if(paths.has(f.zipPath))errors.push('Caminho repetido no manifesto: '+f.zipPath);paths.add(f.zipPath);byId.set(f.id,f);
+  if(paths.has(f.zipPath))errors.push('Caminho repetido no manifesto: '+f.zipPath);paths.add(f.zipPath);if(byId.has(f.id))errors.push('Identificador de arquivo repetido: '+f.id);byId.set(f.id,f);
   const data=zip.entries.get(f.zipPath);
   if(!data)errors.push('PDF listado e ausente no ZIP: '+f.zipPath);
   else if(data.length!==f.size)errors.push(`Tamanho diferente do cadastro em ${f.zipPath}: ${data.length} ≠ ${f.size}`);
@@ -59,6 +59,13 @@ function verifyBackup(zipBuffer){
   const rows=list(manifest[key]);if(!Array.isArray(manifest[key]))errors.push('Lista ausente: '+key);
   for(const row of rows){if(!byId.has(row.id))errors.push(`Sem arquivo no manifesto para ${label} ${row.id}`);if(!ok.has(row[ref]))warnings.push(`${label} ${row.id} aponta para ${ref} inexistente: ${row[ref]}`)}
  }
+ const revisions=manifest.specRevisions||[];
+ if(manifest.documentVersioning&&manifest.documentVersioning!=='spec-revisions-v1')errors.push('Versionamento documental desconhecido.');
+ if((manifest.documentVersioning==='spec-revisions-v1'&&!Array.isArray(manifest.specRevisions))||(manifest.specRevisions&&!manifest.documentVersioning)||!Array.isArray(revisions))errors.push('Índice de versões documentais inválido.');
+ else try{
+  load(root+'/services/spec-revisions.ts').validateRevisionIndex(revisions,list(manifest.specs));
+  for(const r of revisions){const f=byId.get(r.spec_id),bytes=f&&zip.entries.get(f.zipPath);if(r.sha256&&(!bytes||sha(bytes)!==r.sha256))errors.push('Hash divergente na versão documental '+r.spec_id);}
+ }catch{errors.push('Histórico de versões documentais inconsistente.');}
  const summary={exportedAt:manifest.exportedAt,collections:records.length,specs:list(manifest.specs).length,crmFiles:list(manifest.crmFiles).length,sectorFiles:list(manifest.sectorFiles).length,files:files.length,bytes:files.reduce((s,f)=>s+(f.size||0),0)};
  return {errors,warnings,summary,manifest,zip};
 }
@@ -83,7 +90,7 @@ async function restoreBackup(zipBuffer,stateDir){
   const db=handle.env.DB,bucket=handle.env.BUCKET;
   const existing=await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='collections'").first();
   if(!existing)await applyMigrations(db);
-  const used=await Promise.all(['collections','specs','crm_files','sector_files'].map(t=>db.prepare(`SELECT COUNT(*) n FROM ${t}`).first()));
+  const used=await Promise.all(['collections','specs','crm_files','sector_files','spec_revisions'].map(t=>db.prepare(`SELECT COUNT(*) n FROM ${t}`).first()));
   const listed=await bucket.list({limit:1});
   if(used.some(r=>r.n>0)||listed.objects.length)throw new Error('O destino não está vazio. Use uma pasta de estado nova: a restauração nunca sobrescreve dados existentes.');
   const now=new Date().toISOString();
@@ -95,10 +102,14 @@ async function restoreBackup(zipBuffer,stateDir){
    await bucket.put(prefix+'/'+row.id,data,{httpMetadata:{contentType:'application/pdf'}});
    await db.prepare(sql).bind(...bind(row)).run();restoredFiles++;
   }
+  for(const r of manifest.specRevisions||[])await db.prepare('INSERT INTO spec_revisions (spec_id,root_id,revision,sha256,issued_on,valid_until,change_note) VALUES (?,?,?,?,?,?,?)').bind(r.spec_id,r.root_id,r.revision,r.sha256,r.issued_on,r.valid_until,r.change_note).run();
   // Conferência: o que foi gravado precisa ser idêntico ao backup.
   const problems=[];
   for(const r of manifest.records){const row=await db.prepare('SELECT revision FROM collections WHERE name=?').bind(r.name).first();if(!row||row.revision!==r.revision)problems.push('Revisão divergente: '+r.name);const read=await load(root+'/db/collections.ts').readCollection(db,r.name);if(!read||JSON.stringify(read.payload)!==JSON.stringify(r.payload))problems.push('Conteúdo divergente: '+r.name)}
   for(const [key,[prefix]] of Object.entries(tables))for(const row of manifest[key]||[]){const obj=await bucket.get(prefix+'/'+row.id),data=zip.entries.get(byId.get(row.id).zipPath);if(!obj||sha(Buffer.from(await obj.arrayBuffer()))!==sha(data))problems.push('PDF divergente: '+prefix+'/'+row.id)}
+  const restoredRevisions=(await db.prepare('SELECT spec_id,root_id,revision,sha256,issued_on,valid_until,change_note FROM spec_revisions ORDER BY root_id,revision').all()).results;
+  const expectedRevisions=[...(manifest.specRevisions||[])].sort((a,b)=>(a.root_id<b.root_id?-1:a.root_id>b.root_id?1:0)||a.revision-b.revision);
+  if(restoredRevisions.length!==expectedRevisions.length||restoredRevisions.some((r,i)=>Object.keys(r).some(k=>r[k]!==expectedRevisions[i][k])))problems.push('Histórico documental divergente.');
   if(problems.length)throw new Error('A conferência pós-restauração falhou:\n- '+problems.join('\n- '));
   return {collections:manifest.records.length,files:restoredFiles,warnings:check.warnings,summary:check.summary};
  }finally{await handle.dispose()}
