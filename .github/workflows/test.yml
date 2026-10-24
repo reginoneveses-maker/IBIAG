@@ -26,6 +26,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
       - name: Python syntax
@@ -90,6 +93,8 @@ jobs:
           npm run build
       - name: Security, health and source regression tests
         run: |
+          node scripts/build-native-integration.cjs
+          git diff --exit-code -- ../frontend/src/integration/quote-components.js ../backend/generated/quote-engine.cjs
           node scripts/test-draft-recovery.cjs
           node scripts/test-quote-completion.cjs
           node scripts/test-crm-interchange.cjs
@@ -113,11 +118,17 @@ jobs:
         run: npm install --no-save --package-lock=false --no-audit --no-fund playwright@^1.51.1 esbuild@0.25.11
       - name: Install local Chromium for document UI verification
         run: npx playwright install --with-deps chromium
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install synthetic native integration API
+        run: pip install -r ../backend/requirements.txt
       - name: Document versions interaction workflow
         run: |
           node scripts/test-spec-versions-ui.cjs
           node scripts/test-crm-interchange-ui.cjs
           node scripts/test-quote-completion-ui.cjs
+          node scripts/test-native-integration-ui.cjs
       - name: Document UI screenshots (synthetic data)
         if: always()
         uses: actions/upload-artifact@v4
@@ -144,5 +155,9 @@ jobs:
         run: node tools/test-release-preflight.cjs
       - name: Validate isolated candidate manifest without starting services
         run: docker compose -f compose.candidate.yaml config --quiet
+      - name: Build candidate API without starting services
+        run: |
+          docker build -f backend/Dockerfile -t ibiag-candidate-api:ci .
+          docker run --rm --network none --read-only --entrypoint node ibiag-candidate-api:ci --version
       - name: Report publication blockers without reading real environment
         run: node tools/release-preflight.cjs

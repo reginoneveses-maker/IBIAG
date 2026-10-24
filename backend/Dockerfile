@@ -1,6 +1,9 @@
-FROM python:3.11-slim
+FROM node:22-bookworm-slim AS quote_runtime
+FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 && rm -rf /var/lib/apt/lists/*
+COPY --from=quote_runtime /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 
 COPY backend/requirements.txt ./requirements.txt

@@ -3581,6 +3581,10 @@ async def health():
 @api.get("/")
 async def root(): return {"message": "IBIAG API", "status": "ok"}
 
+from integrated_workspace import install as install_integrated_workspace
+import sys
+install_integrated_workspace(api, sys.modules[__name__])
+
 app.include_router(api)
 
 logging.basicConfig(level=logging.INFO)

@@ -20,6 +20,7 @@ const groups = (module, t) => module === "gestao"
       ]},
       { title: "Comercial & CRM", items: [
         { to: "/prospects/pipeline", icon: Kanban, label: "Compradores & Pipeline" },
+        { to: "/gestao/cotacao-integrada", icon: Calculator, label: "Criar cotação IBIAG" },
         { to: "/prospects/tasks", icon: CheckSquare, label: "Tarefas & follow-ups" },
         { to: "/gestao/amostras", icon: FlaskConical, label: "Amostras" },
         { to: "/prospects/templates", icon: Mail, label: "Comunicações" },

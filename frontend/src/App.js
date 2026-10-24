@@ -1,3 +1,4 @@
+import {lazy,Suspense} from 'react';
 import CommercialJourney from '@/pages/gestao/CommercialJourney';
 import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -35,6 +36,8 @@ import Produtos from "@/pages/gestao/Produtos";
 import Precos from "@/pages/gestao/Precos";
 import Documentos from "@/pages/gestao/Documentos";
 
+const IntegratedQuotation=lazy(()=>import('@/pages/gestao/IntegratedQuotation'));
+
 const Protected = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen flex items-center justify-center text-[#0F382C]">Carregando...</div>;
@@ -61,6 +64,7 @@ function App() {
                 <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
                 <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
+                <Route path="cotacao-integrada" element={<AdminOnly><Suspense fallback={<p>Carregando calculadora IBIAG…</p>}><IntegratedQuotation /></Suspense></AdminOnly>} />
                 <Route path="roteiro" element={<AdminOnly><CommercialJourney /></AdminOnly>} />
                 <Route path="operacao" element={<AdminOnly><Operations /></AdminOnly>} />
                 <Route path="packing-lists" element={<AdminOnly><PackingLists /></AdminOnly>} />
