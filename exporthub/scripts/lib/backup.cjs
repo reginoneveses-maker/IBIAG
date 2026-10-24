@@ -61,7 +61,7 @@ function verifyBackup(zipBuffer){
  }
  const revisions=manifest.specRevisions||[];
  if(manifest.documentVersioning&&manifest.documentVersioning!=='spec-revisions-v1')errors.push('Versionamento documental desconhecido.');
- if((manifest.specRevisions&&!manifest.documentVersioning)||!Array.isArray(revisions))errors.push('Índice de versões documentais inválido.');
+ if((manifest.documentVersioning==='spec-revisions-v1'&&!Array.isArray(manifest.specRevisions))||(manifest.specRevisions&&!manifest.documentVersioning)||!Array.isArray(revisions))errors.push('Índice de versões documentais inválido.');
  else try{
   load(root+'/services/spec-revisions.ts').validateRevisionIndex(revisions,list(manifest.specs));
   for(const r of revisions){const f=byId.get(r.spec_id),bytes=f&&zip.entries.get(f.zipPath);if(r.sha256&&(!bytes||sha(bytes)!==r.sha256))errors.push('Hash divergente na versão documental '+r.spec_id);}
