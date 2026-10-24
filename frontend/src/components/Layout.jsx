@@ -109,7 +109,9 @@ const Layout = ({ module = "crm" }) => {
     } catch(e) {toast.error("Não foi possível gerar o backup. Nenhum dado foi alterado.");}
     finally {setBackupBusy(false);}
   };
-  const navGroups = groups(module, t);
+  const operator = user?.role === "user" && user?.commercial_profile === "commercial-operator-v1";
+  const commercialRoutes = new Set(["/gestao/cotacao-integrada","/prospects/pipeline","/prospects/tasks","/prospects/catalog","/prospects/templates","/gestao/operacao","/gestao/pedidos","/prospects/orders","/gestao/cotacoes","/gestao/invoices-comerciais","/gestao/packing-lists","/gestao/embarques","/gestao/dossie","/gestao/qualidade"]);
+  const navGroups = groups(module, t).map(group=>({...group,items:operator?group.items.filter(item=>commercialRoutes.has(item.to)):group.items})).filter(group=>group.items.length);
 
   const brand = module === "gestao"
     ? { name: "IBIAG", sub: "Gestão da empresa", Icon: Building2, bg: "bg-[#104496]", fg: "text-[#CAD51B]" }

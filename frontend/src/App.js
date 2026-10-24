@@ -1,3 +1,4 @@
+import CommercialOnly from "@/components/CommercialOnly";
 import {lazy,Suspense} from 'react';
 import CommercialJourney from '@/pages/gestao/CommercialJourney';
 import "@/App.css";
@@ -64,17 +65,17 @@ function App() {
                 <Route path="prospeccao" element={<AdminOnly><Specs /></AdminOnly>} />
                 <Route path="precos" element={<AdminOnly><Precos /></AdminOnly>} />
                 <Route path="documentos" element={<Documentos />} />
-                <Route path="cotacao-integrada" element={<AdminOnly><Suspense fallback={<p>Carregando calculadora IBIAG…</p>}><IntegratedQuotation /></Suspense></AdminOnly>} />
+                <Route path="cotacao-integrada" element={<CommercialOnly><Suspense fallback={<p>Carregando calculadora IBIAG…</p>}><IntegratedQuotation /></Suspense></CommercialOnly>} />
                 <Route path="roteiro" element={<AdminOnly><CommercialJourney /></AdminOnly>} />
-                <Route path="operacao" element={<AdminOnly><Operations /></AdminOnly>} />
-                <Route path="packing-lists" element={<AdminOnly><PackingLists /></AdminOnly>} />
-                <Route path="invoices-comerciais" element={<AdminOnly><CommercialInvoices /></AdminOnly>} />
-                <Route path="cotacoes" element={<AdminOnly><Quotations /></AdminOnly>} />
-                <Route path="embarques" element={<AdminOnly><Shipments /></AdminOnly>} />
-                <Route path="dossie" element={<AdminOnly><Dossier /></AdminOnly>} />
-                <Route path="qualidade" element={<AdminOnly><Quality /></AdminOnly>} />
+                <Route path="operacao" element={<CommercialOnly><Operations /></CommercialOnly>} />
+                <Route path="packing-lists" element={<CommercialOnly><PackingLists /></CommercialOnly>} />
+                <Route path="invoices-comerciais" element={<CommercialOnly><CommercialInvoices /></CommercialOnly>} />
+                <Route path="cotacoes" element={<CommercialOnly><Quotations /></CommercialOnly>} />
+                <Route path="embarques" element={<CommercialOnly><Shipments /></CommercialOnly>} />
+                <Route path="dossie" element={<CommercialOnly><Dossier /></CommercialOnly>} />
+                <Route path="qualidade" element={<CommercialOnly><Quality /></CommercialOnly>} />
                 <Route path="amostras" element={<AdminOnly><Samples /></AdminOnly>} />
-                <Route path="pedidos" element={<AdminOnly><Orders /></AdminOnly>} />
+                <Route path="pedidos" element={<CommercialOnly><Orders /></CommercialOnly>} />
                 <Route path="estoque" element={<AdminOnly><Inventory /></AdminOnly>} />
               </Route>
               <Route path="/prospects" element={<Protected><Layout module="crm" /></Protected>}>

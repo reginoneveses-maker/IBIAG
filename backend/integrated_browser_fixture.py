@@ -8,7 +8,7 @@ from mongomock_motor import AsyncMongoMockClient
 import server
 server.db=AsyncMongoMockClient()["ibiag_integrated_browser_fake"]
 async def seed():
-    await server.db.users.insert_one({"id":"demo","email":"synthetic@example.com","role":"admin","name":"Operadora fictícia"})
+    await server.db.users.insert_one({"id":"demo","email":"synthetic@example.com","role":"user","commercial_profile":"commercial-operator-v1","name":"Operadora fictícia"})
     await server.db.leads.insert_one({"id":"buyer","company":"Synthetic Buyer Portugal","country":"Portugal","owner_id":"demo"})
     await server.db.products.insert_one({"id":"ingredient","name":"Synthetic Acerola Powder","unit":"kg"})
     await server.db.suppliers.insert_one({"id":"supplier","name":"Synthetic Supplier"})

@@ -39,7 +39,7 @@ export default function Home() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-7">
-          <Link to="/gestao" data-testid="module-gestao" className="group relative overflow-hidden brand-module brand-module-primary rounded-3xl text-white p-8 sm:p-10 min-h-[280px] flex flex-col justify-between hover:-translate-y-1 transition-transform">
+          <Link to={user?.commercial_profile==="commercial-operator-v1"&&user?.role!=="admin"?"/gestao/cotacao-integrada":"/gestao"} data-testid="module-gestao" className="group relative overflow-hidden brand-module brand-module-primary rounded-3xl text-white p-8 sm:p-10 min-h-[280px] flex flex-col justify-between hover:-translate-y-1 transition-transform">
             <div className="absolute -right-12 -top-12 w-56 h-56 rounded-full bg-[#CAD51B]/15 blur-2xl" />
             <div>
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center"><Building2 className="w-6 h-6 text-[#CAD51B]" /></div>

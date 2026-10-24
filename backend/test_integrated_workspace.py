@@ -86,7 +86,8 @@ class IntegratedWorkspaceTests(unittest.IsolatedAsyncioTestCase):
         current=await self.db.product_offers.find_one({"id":"offer"})
         self.assertEqual(current["spec_document_ids"],["private-spec"])
         self.assertEqual(current["notes"],"KEEP")
-        self.assertEqual(self.ok(await self.req("GET","/catalog"))["offers"][0]["profile"]["cost"],"19")
+        self.assertEqual(float(self.ok(await self.req("GET","/catalog"))["offers"][0]["profile"]["cost"]),19)
+        self.assertEqual(current["supplier_price"],19)
         self.assertEqual((await self.req("PUT","/offers/offer/profile",json=body)).status_code,409)
     async def test_quote_to_native_approval_order_and_no_duplicate_handoff(self):
         self.ok(await self.req("POST","/quotes",json={"id":"COT-flow","state":state()}))

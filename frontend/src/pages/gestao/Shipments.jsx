@@ -30,7 +30,7 @@ export default function Shipments(){
     if(savingRef.current)return;
     const seq=++request.current;setOpening(true);setDetail(null);setOpenError("");
     setParams(current=>{const next=new URLSearchParams(current);next.delete("order");return next;},{replace:true});
-    try{const [order,directory]=await Promise.all([api.get(`/orders/${encodeURIComponent(id)}/shipment`),api.get("/auth/users")]);
+    try{const [order,directory]=await Promise.all([api.get(`/orders/${encodeURIComponent(id)}/shipment`),api.get("/integrated/operators")]);
       if(seq===request.current){apply(order.data);setUsers(directory.data.filter(u=>u.active!==false&&["admin","user"].includes(u.role||"user")));}
     }catch(e){if(seq===request.current)setOpenError(error(e));}
     finally{if(seq===request.current)setOpening(false);}

@@ -1,3 +1,4 @@
+import {hasCommercialAccess} from "@/components/CommercialOnly";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, useAuth } from "@/AuthContext";
 import { PageHeader, Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, toast, Plus } from "@/components/erp";
@@ -32,7 +33,7 @@ export default function Orders() {
     setParams(current=>{const next=new URLSearchParams(current);next.delete("lead");next.delete("price");next.delete("quote");return next;},{replace:true});
   },[setParams]);
   useEffect(()=>{
-    if((!requestedLead && !requestedPrice && !requestedQuote) || user?.role!=="admin")return;
+    if((!requestedLead && !requestedPrice && !requestedQuote) || !hasCommercialAccess(user))return;
     let active=true;
     const request=++sourceRequest.current;
     if(requestedQuote && (requestedLead||requestedPrice)){toast.error("Escolha uma única origem para o pedido. Nenhum pedido foi criado.");return;}
@@ -42,9 +43,9 @@ export default function Orders() {
     ]).then(([lead,price])=>{if(active && request===sourceRequest.current){setSourceLead(lead.data);open(null,lead.data,price.data);}})
       .catch(e=>{if(active && request===sourceRequest.current)toast.error((requestedPrice||requestedQuote)?(typeof e.response?.data?.detail==="string"?e.response.data.detail:"Não foi possível preparar o pedido a partir do cálculo. Nenhum pedido foi criado."):"Não foi possível abrir a empresa do CRM. Nenhum pedido foi criado.");});
     return ()=>{active=false;};
-  },[requestedLead,requestedPrice,requestedQuote,user?.role,open]);
+  },[requestedLead,requestedPrice,requestedQuote,user,open]);
   useEffect(()=>{
-    if(!dialog || user?.role!=="admin")return;
+    if(!dialog || !hasCommercialAccess(user))return;
     let active=true;
     setLoadingLeads(true);setLeadLoadError(false);
     (async()=>{
@@ -58,8 +59,9 @@ export default function Orders() {
       if(active)setLeads(all);
     })().catch(()=>{if(active)setLeadLoadError(true);}).finally(()=>{if(active)setLoadingLeads(false);});
     return ()=>{active=false;};
-  },[dialog,user?.role,retryLeads]);
-  const customerOptions=sourceLead&&!leads.some(l=>l.id===sourceLead.id)?[sourceLead,...leads]:leads;
+  },[dialog,user,retryLeads]);
+  const snapshotLead=sourceLead||(form.source_quote_id&&form.lead_id?{id:form.lead_id,company:form.customer,country:form.customer_country}:null);
+  const customerOptions=snapshotLead&&!leads.some(l=>l.id===snapshotLead.id)?[snapshotLead,...leads]:leads;
   const chooseCustomer=id=>{
     const lead=customerOptions.find(l=>l.id===id);
     setForm(f=>({...f,lead_id:id,customer:lead?.company||"",customer_country:lead?.country||""}));

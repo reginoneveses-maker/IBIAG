@@ -1,3 +1,5 @@
+Atualização posterior: veja [NATIVE_INTEGRATION_CANDIDATE.md](NATIVE_INTEGRATION_CANDIDATE.md). Este relatório registra a etapa anterior à integração nativa.
+
 # Preparação operacional e recuperação — 24/10/2026
 
 Continuação isolada do PR #60. Não é uma declaração de liberação. Código, dados reais, main e instalação permanecem preservados.

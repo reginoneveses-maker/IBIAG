@@ -77,18 +77,23 @@ def digest(value):
 def profile_for(offer, product, supplier):
     # Descriptive text is never parsed into invented numeric package dimensions.
     saved = offer.get("ibiag_quote_profile") or {}
+    identity = offer.get("ibiag_quote_profile_identity")
+    if identity and identity != {"productId": product["id"], "supplierId": supplier["id"], "unit": "kg"}:
+        saved = {}
     result = {k: v for k, v in saved.items() if isinstance(v, str)}
     result.update(id=offer["id"], supplier=supplier["name"], origin=product.get("origin", ""))
     price = offer.get("supplier_price")
-    if "cost" not in result and isinstance(price, (int, float)) and price > 0:
+    if isinstance(price, (int, float)) and price > 0:
         result.update(cost=str(price), priceCurrency="BRL", priceRate="1")
+    elif result.get("cost") != "0":
+        result.pop("cost", None)
     if product.get("payment_terms") and not result.get("paymentTerms"):
         result["paymentTerms"] = product["payment_terms"]
     result["nativeRevision"] = digest({"offer": offer, "product": product, "supplier": supplier})
     return result
 
 def install(api, rt):
-    admin = rt.get_admin_user
+    admin = rt.get_commercial_user
     async def unique(collection, rid):
         matches = await collection.find({"id": rid}, {"_id": 0}).limit(2).to_list(2)
         if len(matches) != 1:
@@ -104,6 +109,11 @@ def install(api, rt):
         if (offer.get("unit") or product.get("unit") or "kg") != "kg":
             raise HTTPException(400, "Este precificador usa kg. Utilize o módulo de preços para outra unidade.")
         return offer, product, supplier
+
+    @api.get("/integrated/operators")
+    async def operators(user=Depends(admin)):
+        rows = await rt.db.users.find({"active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "role": 1}).limit(250).to_list(250)
+        return rows
 
     @api.get("/integrated/catalog")
     async def catalog(response: Response, q: str = Query("", max_length=160), user=Depends(admin)):
@@ -235,7 +245,7 @@ def install(api, rt):
             now = rt.now_iso()
             await ensure_owned()
             query = {"id": oid, "updated_at": offer["updated_at"]} if "updated_at" in offer else {"id": oid, "updated_at": {"$exists": False}}
-            updates = {"ibiag_quote_profile": saved, "ibiag_quote_profile_review": {"by": user["id"], "at": now, "fields": sorted(body.patch), "previousPrice": offer.get("supplier_price"), "previousProfile": offer.get("ibiag_quote_profile", {})}, "updated_at": now}
+            updates = {"ibiag_quote_profile": saved, "ibiag_quote_profile_identity": {"productId": product["id"], "supplierId": supplier["id"], "unit": "kg"}, "ibiag_quote_profile_review": {"by": user["id"], "at": now, "fields": sorted(body.patch), "previousPrice": offer.get("supplier_price"), "previousProfile": offer.get("ibiag_quote_profile", {})}, "updated_at": now}
             if "cost" in body.patch:
                 updates["supplier_price"] = float(rt.decimal_number(body.patch["cost"]))
             result = await rt.db.product_offers.update_one(query, {"$set": updates})
