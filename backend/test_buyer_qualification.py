@@ -35,3 +35,6 @@ class BuyerQualificationTests(unittest.TestCase):
             page['json']['product_quote']=clause
             page['json']['relationship']='user' if 'drink' in clause else 'seller'
             self.assertIsNotNone(discovery._verified_business({'url':'https://acme.test/product'},page,'Acerola','Portugal'))
+    def test_literal_evidence_preserves_punctuation_for_crm_traceability(self):
+        result=discovery._verified_business({'url':'https://acme.test/product'},business_page(),'Acerola','Portugal')
+        self.assertEqual(result['product_evidence'],'We supply Acerola ingredients.')

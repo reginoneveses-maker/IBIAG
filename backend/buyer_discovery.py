@@ -277,7 +277,7 @@ def _business_evidence(text, facts, product, relationship):
     }
     normalized_text = " " + _normalize(text) + " "
     # A single business clause is preferred over combining a heading and action.
-    clauses = re.split(r"[\n.!?;]+", text)
+    clauses = re.findall(r"[^\n.!?;]+[.!?;]?", text)
     for clause in clauses:
         if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
@@ -289,7 +289,7 @@ def _business_evidence(text, facts, product, relationship):
     if relationship != "seller" or facts["page_type"] not in {"company_product", "company_catalog"}: return ""
     # Product offer and a separate published CTA can substantiate a catalogue.
     actions = r"\b(?:request a quote|get a quote|request quotation|quote request|add to cart|buy now|order now|ordering|wholesale|solicitar cotacao|solicite cotacao|comprar|adicionar ao carrinho)\b"
-    for clause in re.split(r"[\n.!?;]+", text):
+    for clause in re.findall(r"[^\n.!?;]+[.!?;]?", text):
         if _unsupported_business_claim(clause, product): continue
         words = clause.strip().split()
         for start in range(max(1, len(words) - 9)):
