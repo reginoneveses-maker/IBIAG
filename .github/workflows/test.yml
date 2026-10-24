@@ -90,6 +90,8 @@ jobs:
           npm run build
       - name: Security, health and source regression tests
         run: |
+          node scripts/test-crm-interchange.cjs
+          node scripts/test-crm-interchange-d1.cjs
           node scripts/test-spec-revisions.cjs
           node scripts/test-spec-revisions-d1.cjs
           node scripts/test-health-integrity.cjs

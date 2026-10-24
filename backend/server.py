@@ -1,3 +1,4 @@
+from crm_transfer import build_crm_transfer
 from order_dossier import dossier as build_order_dossier, valid_id as dossier_valid_id, DOC_FIELDS as DOSSIER_DOC_FIELDS, SHIPMENT_FIELDS as DOSSIER_SHIPMENT_FIELDS
 from quality_dashboard import quality_rows, quality_summary, DOC_TYPES as QUALITY_DOC_TYPES, FIELDS as QUALITY_FIELDS
 import math
@@ -2973,6 +2974,31 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
             imported += 1
 
     return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
+
+class CRMTransferExportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ids: List[str] = Field(min_length=1, max_length=25)
+
+    @field_validator("ids", mode="before")
+    @classmethod
+    def explicit_ids(cls, values):
+        if not isinstance(values, list) or any(not isinstance(v, str) or not v or len(v)>180 or any(ord(c)<32 for c in v) for v in values) or len(set(values))!=len(values):
+            raise ValueError("Escolha identificadores únicos válidos.")
+        return values
+
+@api.post("/crm-transfer/export")
+async def export_crm_transfer(body: CRMTransferExportBody, user=Depends(get_admin_user)):
+    fields={name:1 for name in ("id","company","country","website","industry","contact_name","email","phone")}
+    fields["_id"]=0
+    rows=await db.leads.find(lead_scope(user,{"id":{"$in":body.ids}}),fields).limit(26).to_list(26)
+    if len(rows)!=len(body.ids) or len({r.get("id") for r in rows})!=len(rows):
+        raise HTTPException(409,"Seleção ausente ou ambígua; revise as empresas.")
+    by_id={r["id"]:r for r in rows}
+    try: output=build_crm_transfer([by_id[i] for i in body.ids])
+    except ValueError: raise HTTPException(409,"Revise os campos antes de exportar.") from None
+    data=json.dumps(output,ensure_ascii=False).encode("utf-8")
+    if len(data)>2*1024*1024: raise HTTPException(413,"Reduza o lote.")
+    return Response(data,media_type="application/json",headers={"Content-Disposition":'attachment; filename="IBIAG_CRM_intercambio.json"',"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
 
 @api.get("/leads", response_model=List[Lead])
 async def list_leads(
