@@ -10,7 +10,7 @@ jest.mock("@/components/ui/dialog",()=>({Dialog:({open,children})=>open?<div>{ch
 const detail={id:"sale",customer:"Buyer",number:"S1",version:2,shipment:{},allowed_statuses:["planned"]};
 const shipment={reference:"SHIP-1",status:"planned",origin:"Santos",destination:"Lisboa",mode:"sea",responsible_id:"owner",planned_departure:"2020-10-02",planned_arrival:"2020-10-10",history:[{id:"event1",by:"admin",at:"2020-10-01",to_status:"planned",note:"Initial plan",changes:{origin:"Santos"}}]};
 const mount=(url="/gestao/embarques")=>render(<MemoryRouter initialEntries={[url]}><Shipments/></MemoryRouter>);
-beforeEach(()=>{jest.clearAllMocks();api.get.mockImplementation(path=>Promise.resolve({data:path==="/auth/users"?[{id:"owner",name:"Owner",active:true,role:"user"}]:path==="/orders/sale/shipment"?detail:[]}));});
+beforeEach(()=>{jest.clearAllMocks();api.get.mockImplementation(path=>Promise.resolve({data:path==="/integrated/operators"?[{id:"owner",name:"Owner",active:true,role:"user"}]:path==="/orders/sale/shipment"?detail:[]}));});
 afterEach(cleanup);
 
 test("opens deep link and saves only bounded logistics fields with current version",async()=>{
@@ -43,7 +43,7 @@ test("conflict retains entered fields and never retries the write automatically"
 });
 
 test("archived history is readonly and departure freezes route and real dates",async()=>{
-  api.get.mockImplementation(path=>Promise.resolve({data:path==="/auth/users"?[]:path==="/orders/sale/shipment"?{...detail,shipment:{...shipment,actual_departure:"2020-10-02"},allowed_statuses:[]}:[]}));
+  api.get.mockImplementation(path=>Promise.resolve({data:path==="/integrated/operators"?[]:path==="/orders/sale/shipment"?{...detail,shipment:{...shipment,actual_departure:"2020-10-02"},allowed_statuses:[]}:[]}));
   mount("/gestao/embarques?order=sale");await screen.findByText(/Histórico somente para consulta/);
   expect(screen.getByLabelText("Referência").matches(":disabled")).toBe(true);
   expect(screen.getByLabelText("Origem").readOnly).toBe(true);
@@ -64,7 +64,7 @@ test("list retries errors and forwards filters without showing stale rows",async
 });
 
 test("failed detail or directory load never opens an editable form",async()=>{
-  api.get.mockImplementation(path=>path==="/auth/users"?Promise.reject(new Error("offline")):Promise.resolve({data:path==="/orders/sale/shipment"?detail:[]}));
+  api.get.mockImplementation(path=>path==="/integrated/operators"?Promise.reject(new Error("offline")):Promise.resolve({data:path==="/orders/sale/shipment"?detail:[]}));
   mount("/gestao/embarques?order=sale");await screen.findByRole("alert");
   expect(screen.queryByLabelText("Referência")).toBeNull();expect(api.put).not.toHaveBeenCalled();
 });
