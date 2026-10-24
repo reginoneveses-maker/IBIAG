@@ -1,3 +1,4 @@
+from crm_transfer import build_crm_transfer
 from order_dossier import dossier as build_order_dossier, valid_id as dossier_valid_id, DOC_FIELDS as DOSSIER_DOC_FIELDS, SHIPMENT_FIELDS as DOSSIER_SHIPMENT_FIELDS
 from quality_dashboard import quality_rows, quality_summary, DOC_TYPES as QUALITY_DOC_TYPES, FIELDS as QUALITY_FIELDS
 import math
@@ -339,6 +340,8 @@ class OrderItem(BaseModel):
     unit: str = "kg"
     unit_price: float
 
+from sale_currency import sale_currency, sale_amount, sale_fields
+
 class SalesOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -356,6 +359,8 @@ class SalesOrder(BaseModel):
     products: str = ""
     incoterm: str = "FOB"
     total_usd: float = 0
+    currency: Literal["USD", "BRL", "EUR"] = "USD"
+    total_amount: float | None = None
     status: str = "draft"  # draft, confirmed, shipped, delivered, cancelled
     order_date: str = ""
     delivery_date: str = ""
@@ -607,6 +612,27 @@ def require_admin(user):
 async def get_admin_user(user=Depends(get_current_user)):
     return require_admin(user)
 
+from commercial_access import require_commercial, commercial_access
+async def get_commercial_user(user=Depends(get_current_user)):
+    return require_commercial(user)
+
+class CommercialProfileBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    profile: Literal["commercial-operator-v1", "none"]
+    confirmed: bool
+
+@api.patch("/auth/users/{uid}/commercial-profile")
+async def assign_commercial_profile(uid: str, body: CommercialProfileBody, user=Depends(get_admin_user)):
+    if not body.confirmed:
+        raise HTTPException(400, "Confirmação explícita obrigatória.")
+    record = await db.users.find_one_and_update({"id": uid, "role": "user"},
+        {"$set": {"commercial_profile": body.profile, "commercial_profile_review": {"by": user["id"], "at": now_iso()}},
+         "$inc": {"session_version": 1}}, return_document=ReturnDocument.AFTER,
+        projection={"_id": 0, "password_hash": 0})
+    if not record:
+        raise HTTPException(404, "Usuário comum não encontrado. Contas administrativas são preservadas.")
+    return record
+
 @api.post("/auth/register")
 async def register(body: RegisterBody):
     if os.environ.get("ALLOW_PUBLIC_REGISTRATION", "false").lower() != "true":
@@ -704,7 +730,7 @@ async def login(body: LoginBody, request: Request):
     if not user or not verify_pw(body.password, user["password_hash"]) or user.get("active", True) is not True:
         raise HTTPException(401, "Invalid credentials")
     token = create_token(user["id"], email, user.get("session_version", 0))
-    return {"access_token": token, "user": {"id": user["id"], "email": email, "name": user.get("name", ""), "role": user.get("role", "user")}}
+    return {"access_token": token, "user": {"id": user["id"], "email": email, "name": user.get("name", ""), "role": user.get("role", "user"), **({"commercial_profile": user["commercial_profile"]} if "commercial_profile" in user else {})}}
 
 @api.get("/auth/me")
 async def me(user=Depends(get_current_user)):
@@ -779,6 +805,8 @@ async def download_file(full_path: str, user=Depends(get_current_user)):
         published = await db.documents.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
         if not published:
             published = await db.specs.find_one({"$or": [{"original_file_path": full_path}, {"ibiag_file_path": full_path}], "deleted_at": {"$in": [None, ""]}})
+        if not published and commercial_access(user):
+            published = await db.certifications.find_one({"file_path": full_path, "deleted_at": {"$in": [None, ""]}})
         if not published:
             raise HTTPException(403, "Sem permissão para acessar este arquivo")
     data, ct = await get_object(full_path)
@@ -1259,7 +1287,7 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
             raise HTTPException(409, "Pedido alterado por outra operação. Recarregue antes de salvar.")
         stored_shipment = (previous or {}).get("shipment") or {}
         if shipment_input is not None:
-            require_admin(shipment_actor)
+            require_commercial(shipment_actor)
             try:
                 # Read the commercial fields from the locked current record,
                 # never from a second pre-lock read or the logistics request.
@@ -1284,6 +1312,10 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
                 if stored_shipment.get("status") != "cancelled" or order.status not in {"draft", "confirmed", "cancelled"}:
                     raise HTTPException(409, "Use o fluxo de embarque para alterar a situação deste pedido.")
         if previous:
+            if "currency" not in order.model_fields_set:
+                order.currency = sale_currency(previous)
+            if "total_amount" not in order.model_fields_set:
+                order.total_amount = previous.get("total_amount")
             stored_quote = previous.get("source_quote_id", "")
             if "source_quote_id" in order.model_fields_set and order.source_quote_id != stored_quote:
                 raise HTTPException(409, "A origem da cotação não pode ser trocada.")
@@ -1306,12 +1338,16 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
             quote_source = await order_quote_source(order.source_quote_id)
             if order.source_quote_revision != quote_source["source_quote_revision"]:
                 raise HTTPException(409, "A cotação mudou. Reabra a conferência.")
+            order.currency = sale_currency(quote_source)
+            order.total_amount = quote_source.get("total_amount")
             for key in ("lead_id", "customer", "customer_country", "incoterm", "source_quote_snapshot"):
                 setattr(order, key, quote_source[key])
             order.items = [OrderItem(**item) for item in quote_source["items"]]
             order.source_price_revision = ""
             order.source_price_snapshot = {}
         elif order.source_price_id:
+            order.currency = "USD"
+            order.total_amount = None
             order.source_quote_revision = 0
             order.source_quote_snapshot = {}
             if order.status != "draft":
@@ -1419,18 +1455,18 @@ async def save_purchase_workflow(purchase, create=False):
 
 # ============ SALES ORDERS ============
 @api.get("/orders", response_model=List[SalesOrder])
-async def list_ord(status: Optional[str] = None, archived: bool = False, user=Depends(get_admin_user)):
+async def list_ord(status: Optional[str] = None, archived: bool = False, user=Depends(get_commercial_user)):
     if archived: require_admin(user)
     q = {"deleted_at": {"$nin": [None, ""]}} if archived else {"deleted_at": {"$in": [None, ""]}}
     if status: q["status"] = status
     return await db.orders.find(q, {"_id": 0}).sort("order_date", -1).to_list(1000)
 
 @api.post("/orders", response_model=SalesOrder)
-async def create_ord(o: SalesOrder, user=Depends(get_admin_user)):
+async def create_ord(o: SalesOrder, user=Depends(get_commercial_user)):
     return await save_order_workflow(o, create=True)
 
 @api.put("/orders/{oid}", response_model=SalesOrder)
-async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_admin_user)):
+async def upd_ord(oid: str, o: SalesOrder, user=Depends(get_commercial_user)):
     o.id = oid
     return await save_order_workflow(o)
 
@@ -1439,14 +1475,14 @@ def shipment_order_view(record):
             "shipment": record.get("shipment") or {}, "allowed_statuses": shipment_statuses(record)}
 
 @api.get("/orders/{oid}/shipment")
-async def get_order_shipment(oid: str, user=Depends(get_admin_user)):
+async def get_order_shipment(oid: str, user=Depends(get_commercial_user)):
     record = await db.orders.find_one({"id": oid}, {"_id": 0})
     if not record:
         raise HTTPException(404, "Pedido não encontrado")
     return shipment_order_view(record)
 
 @api.put("/orders/{oid}/shipment")
-async def put_order_shipment(oid: str, body: ShipmentInput, user=Depends(get_admin_user)):
+async def put_order_shipment(oid: str, body: ShipmentInput, user=Depends(get_commercial_user)):
     record = await save_order_workflow(SalesOrder(id=oid, customer="", version=body.version),
                                        shipment_input=body, shipment_actor=user)
     return shipment_order_view(record)
@@ -1454,7 +1490,7 @@ async def put_order_shipment(oid: str, body: ShipmentInput, user=Depends(get_adm
 @api.get("/shipments")
 async def list_shipments(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
                          status: Optional[Literal["planned", "booked", "in_transit", "arrived", "delivered", "cancelled"]] = None,
-                         archived: bool = False, user=Depends(get_admin_user)):
+                         archived: bool = False, user=Depends(get_commercial_user)):
     query = {"shipment.status": status if status else {"$exists": True},
              "deleted_at": {"$nin": [None, ""]} if archived else {"$in": [None, ""]}}
     projection = {"_id": 0, **{key: 1 for key in ("id", "number", "customer", "status", "version")},
@@ -1543,7 +1579,7 @@ async def invoice_pdf_bytes(record):
     except (TypeError, ValueError, LayoutError): raise HTTPException(400, "Não foi possível renderizar o PDF. Revise tamanho, datas e conteúdo do documento.") from None
 
 @api.get("/orders/{oid}/commercial-invoice-draft")
-async def commercial_invoice_draft(oid: str, user=Depends(get_admin_user)):
+async def commercial_invoice_draft(oid: str, user=Depends(get_commercial_user)):
     source = await invoice_source(oid)
     linked = await db.commercial_invoices.find_one({"order_id": oid, "status": {"$in": ["draft", "approved"]}}, {"_id": 0, "id": 1})
     return {**source, "active_invoice_id": linked["id"] if linked else ""}
@@ -1551,18 +1587,18 @@ async def commercial_invoice_draft(oid: str, user=Depends(get_admin_user)):
 @api.get("/commercial-invoices")
 async def list_commercial_invoices(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
     status: Optional[Literal["draft", "approved", "cancelled"]] = None,
-    order_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_admin_user)):
+    order_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_commercial_user)):
     query = {}
     if status: query["status"] = status
     if order_id: query["order_id"] = order_id
     return await db.commercial_invoices.find(query, {"_id": 0, **{k: 1 for k in COMMERCIAL_INVOICE_SUMMARY}}).sort("id", 1).skip(skip).limit(limit).to_list(limit)
 
 @api.get("/commercial-invoices/{iid}")
-async def get_commercial_invoice(iid: str, user=Depends(get_admin_user)):
+async def get_commercial_invoice(iid: str, user=Depends(get_commercial_user)):
     return await invoice_view(await invoice_record(iid))
 
 @api.post("/commercial-invoices")
-async def create_commercial_invoice(body: CommercialInvoiceCreate, user=Depends(get_admin_user)):
+async def create_commercial_invoice(body: CommercialInvoiceCreate, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         if await db.commercial_invoices.find_one({"$or": [{"id": body.id}, {"reference": body.reference},
                 {"order_id": body.order_id, "status": {"$in": ["draft", "approved"]}}]}, {"_id": 1}):
@@ -1571,7 +1607,8 @@ async def create_commercial_invoice(body: CommercialInvoiceCreate, user=Depends(
         if source["source_order_version"] != body.source_order_version:
             raise HTTPException(409, "Pedido alterado. Reabra a conferência antes de salvar a invoice.")
         values = body.model_dump(exclude={"change_note"})
-        values.update(source, status="draft", customer=source["source_order_snapshot"]["customer"], total_usd=source["source_order_snapshot"]["total_usd"])
+        values.update(source, status="draft", customer=source["source_order_snapshot"]["customer"],
+                      **sale_fields(sale_currency(source["source_order_snapshot"]), float(sale_amount(source["source_order_snapshot"]))))
         check_invoice_details(values)
         record = checked_invoice_event(values, None, user, body.change_note)
         await ensure_owned()
@@ -1579,7 +1616,7 @@ async def create_commercial_invoice(body: CommercialInvoiceCreate, user=Depends(
         return await invoice_view(record)
 
 @api.put("/commercial-invoices/{iid}")
-async def edit_commercial_invoice(iid: str, body: CommercialInvoiceEdit, user=Depends(get_admin_user)):
+async def edit_commercial_invoice(iid: str, body: CommercialInvoiceEdit, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await invoice_record(iid)
         if previous["version"] != body.version: raise HTTPException(409, "Invoice alterada. Recarregue antes de salvar.")
@@ -1595,7 +1632,7 @@ async def edit_commercial_invoice(iid: str, body: CommercialInvoiceEdit, user=De
         return await invoice_view(record)
 
 @api.post("/commercial-invoices/{iid}/status")
-async def decide_commercial_invoice(iid: str, body: CommercialInvoiceDecision, user=Depends(get_admin_user)):
+async def decide_commercial_invoice(iid: str, body: CommercialInvoiceDecision, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await invoice_record(iid)
         if previous["version"] != body.version: raise HTTPException(409, "Invoice alterada. Recarregue antes da decisão.")
@@ -1620,7 +1657,7 @@ async def decide_commercial_invoice(iid: str, body: CommercialInvoiceDecision, u
         return await invoice_view(record)
 
 @api.get("/commercial-invoices/{iid}/pdf")
-async def download_commercial_invoice(iid: str, user=Depends(get_admin_user)):
+async def download_commercial_invoice(iid: str, user=Depends(get_commercial_user)):
     record = await invoice_record(iid)
     if record["status"] == "approved" and (await invoice_view(record))["source_changed"]:
         raise HTTPException(409, "Pedido incompatível com a invoice. Revise a operação antes de baixar.")
@@ -1671,7 +1708,7 @@ async def packing_pdf_bytes(record):
     except (TypeError, ValueError, LayoutError): raise HTTPException(400, "Não foi possível renderizar o PDF. Revise tamanho, datas e conteúdo do documento.") from None
 
 @api.get("/orders/{oid}/packing-list-draft")
-async def packing_list_draft(oid: str, user=Depends(get_admin_user)):
+async def packing_list_draft(oid: str, user=Depends(get_commercial_user)):
     source = await packing_source(oid)
     linked = await db.packing_lists.find_one({"order_id": oid, "status": {"$in": ["draft", "approved"]}}, {"_id": 0, "id": 1})
     return {**source, "active_packing_id": linked["id"] if linked else ""}
@@ -1679,18 +1716,18 @@ async def packing_list_draft(oid: str, user=Depends(get_admin_user)):
 @api.get("/packing-lists")
 async def list_packing_lists(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
     status: Optional[Literal["draft", "approved", "cancelled"]] = None,
-    order_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_admin_user)):
+    order_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_commercial_user)):
     query = {}
     if status: query["status"] = status
     if order_id: query["order_id"] = order_id
     return await db.packing_lists.find(query, {"_id": 0, **{k: 1 for k in PACKING_SUMMARY}}).sort("id", 1).skip(skip).limit(limit).to_list(limit)
 
 @api.get("/packing-lists/{iid}")
-async def get_packing_list(iid: str, user=Depends(get_admin_user)):
+async def get_packing_list(iid: str, user=Depends(get_commercial_user)):
     return await packing_view(await packing_record(iid))
 
 @api.post("/packing-lists")
-async def create_packing_list(body: PackingCreate, user=Depends(get_admin_user)):
+async def create_packing_list(body: PackingCreate, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         if await db.packing_lists.find_one({"$or": [{"id": body.id}, {"reference": body.reference},
                 {"order_id": body.order_id, "status": {"$in": ["draft", "approved"]}}]}, {"_id": 1}):
@@ -1707,7 +1744,7 @@ async def create_packing_list(body: PackingCreate, user=Depends(get_admin_user))
         return await packing_view(record)
 
 @api.put("/packing-lists/{iid}")
-async def edit_packing_list(iid: str, body: PackingEdit, user=Depends(get_admin_user)):
+async def edit_packing_list(iid: str, body: PackingEdit, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await packing_record(iid)
         if previous["version"] != body.version: raise HTTPException(409, "Packing alterada. Recarregue antes de salvar.")
@@ -1723,7 +1760,7 @@ async def edit_packing_list(iid: str, body: PackingEdit, user=Depends(get_admin_
         return await packing_view(record)
 
 @api.post("/packing-lists/{iid}/status")
-async def decide_packing_list(iid: str, body: PackingDecision, user=Depends(get_admin_user)):
+async def decide_packing_list(iid: str, body: PackingDecision, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await packing_record(iid)
         if previous["version"] != body.version: raise HTTPException(409, "Packing alterada. Recarregue antes da decisão.")
@@ -1748,7 +1785,7 @@ async def decide_packing_list(iid: str, body: PackingDecision, user=Depends(get_
         return await packing_view(record)
 
 @api.get("/packing-lists/{iid}/pdf")
-async def download_packing_list(iid: str, user=Depends(get_admin_user)):
+async def download_packing_list(iid: str, user=Depends(get_commercial_user)):
     record = await packing_record(iid)
     if record["status"] == "approved" and (await packing_view(record))["source_changed"]:
         raise HTTPException(409, "Pedido incompatível com a packing. Revise a operação antes de baixar.")
@@ -2068,12 +2105,13 @@ async def order_quote_source(qid):
     await quote_references(quote)
     snapshot = {key: value for key, value in quote.items() if key not in {"history", "history_archive"}}
     return {"source_quote_id": qid, "source_quote_revision": quote["version"], "source_quote_snapshot": snapshot,
-            **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items", "total_usd")}}
+            **sale_fields(sale_currency(quote), float(sale_amount(quote))),
+            **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items")}}
 
 @api.get("/quotations")
 async def list_quotations(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),
     status: Optional[Literal["draft", "approved", "cancelled"]] = None,
-    lead_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_admin_user)):
+    lead_id: str = Query("", max_length=200, pattern=r"^[^\x00]*$"), user=Depends(get_commercial_user)):
     query = {}
     if status: query["status"] = status
     if lead_id: query["lead_id"] = lead_id
@@ -2084,15 +2122,15 @@ async def list_quotations(skip: int = Query(0, ge=0), limit: int = Query(50, ge=
     return [{**q, "linked_order_id": mapped.get(q["id"], "")} for q in records]
 
 @api.get("/quotations/{qid}/order-draft")
-async def quotation_order_draft(qid: str, user=Depends(get_admin_user)):
+async def quotation_order_draft(qid: str, user=Depends(get_commercial_user)):
     return await order_quote_source(qid)
 
 @api.get("/quotations/{qid}")
-async def get_quotation(qid: str, user=Depends(get_admin_user)):
+async def get_quotation(qid: str, user=Depends(get_commercial_user)):
     return await quotation_view(await quote_record(qid))
 
 @api.post("/quotations")
-async def create_quotation(body: QuotationCreate, user=Depends(get_admin_user)):
+async def create_quotation(body: QuotationCreate, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         if await db.quotations.find_one({"$or": [{"id": body.id}, {"reference": body.reference}]}, {"_id": 1}):
             raise HTTPException(409, "Identificador ou referência da cotação já utilizado. Confira a lista.")
@@ -2111,7 +2149,7 @@ async def create_quotation(body: QuotationCreate, user=Depends(get_admin_user)):
         return await quotation_view(record)
 
 @api.put("/quotations/{qid}")
-async def edit_quotation(qid: str, body: QuotationEdit, user=Depends(get_admin_user)):
+async def edit_quotation(qid: str, body: QuotationEdit, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await quote_record(qid)
         if previous["version"] != body.version: raise HTTPException(409, "Cotação alterada. Recarregue antes de salvar.")
@@ -2127,7 +2165,7 @@ async def edit_quotation(qid: str, body: QuotationEdit, user=Depends(get_admin_u
         return await quotation_view(record)
 
 @api.post("/quotations/{qid}/status")
-async def change_quotation_status(qid: str, body: QuotationState, user=Depends(get_admin_user)):
+async def change_quotation_status(qid: str, body: QuotationState, user=Depends(get_commercial_user)):
     async with business_write_lock() as ensure_owned:
         previous = await quote_record(qid)
         if previous["version"] != body.version: raise HTTPException(409, "Cotação alterada. Recarregue antes de aprovar ou cancelar.")
@@ -2369,7 +2407,8 @@ async def compact_operation_history(kind, rid, container, version, ensure_owned)
 
 @api.get("/operations-history/{kind}/{rid}")
 async def get_operation_history(kind: Literal["quotation", "commercial_invoice", "packing_list", "shipment", "sample"], rid: str, response: Response,
-    limit: int = Query(20, ge=1, le=50), cursor: str = Query("", max_length=2048), user=Depends(get_admin_user)):
+    limit: int = Query(20, ge=1, le=50), cursor: str = Query("", max_length=2048), user=Depends(get_commercial_user)):
+    if kind == "sample": require_admin(user)
     if not rid or len(rid)>200 or "\x00" in rid: raise HTTPException(422, "Identificador inválido.")
     if kind == "quotation": record = await quote_record(rid)
     elif kind == "commercial_invoice": record = await invoice_record(rid)
@@ -2395,7 +2434,7 @@ async def quality_dashboard(response: Response,skip: int=Query(0,ge=0,le=10000),
     source: Optional[Literal["certification","document"]]=None,
     attention: Optional[Literal["expired","expiring","missing_expiry","invalid_dates","missing_file","missing_supplier","missing_product","data_review","without_findings"]]=None,
     supplier_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),
-    product_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),user=Depends(get_admin_user)):
+    product_id: str=Query("",max_length=200,pattern=r"^[^\x00-\x1f\x7f]*$"),user=Depends(get_commercial_user)):
     # One extra row prevents reporting silently truncated totals.
     cert_query={"supplier_id":supplier_id} if supplier_id else {}
     doc_query={"deleted_at":{"$in":[None,""]},"document_type":{"$in":list(QUALITY_DOC_TYPES)}}
@@ -2420,7 +2459,7 @@ async def quality_dashboard(response: Response,skip: int=Query(0,ge=0,le=10000),
 
 # ============ READ-ONLY ORDER DOSSIER ============
 @api.get("/orders/{oid}/dossier")
-async def get_order_dossier(oid: str,response: Response,user=Depends(get_admin_user)):
+async def get_order_dossier(oid: str,response: Response,user=Depends(get_commercial_user)):
     if not dossier_valid_id(oid): raise HTTPException(422,"Identificador de pedido inválido.")
     fields=tuple(k for k in OPERATION_ORDER_FIELDS if not k.startswith("shipment.")) + tuple("shipment."+k for k in DOSSIER_SHIPMENT_FIELDS) + ("version","source_quote_id","source_quote_revision","source_quote_snapshot.reference","deleted_at")
     matches=await db.orders.find({"id":oid},{"_id":0,**{k:1 for k in fields}}).limit(2).to_list(2)
@@ -2451,7 +2490,7 @@ async def order_operations(skip: int = Query(0, ge=0, le=1000), limit: int = Que
     status: Optional[Literal["draft", "confirmed", "shipped", "delivered", "cancelled"]] = None,
     attention: Optional[Literal["receivable_overdue", "shipment_overdue", "documents_pending", "shipment_missing", "data_review"]] = None,
     country: str = Query("", max_length=100, pattern=r"^[^\x00-\x1f\x7f]*$"),
-    date_from: str = Query("", max_length=10), date_to: str = Query("", max_length=10), user=Depends(get_admin_user)):
+    date_from: str = Query("", max_length=10), date_to: str = Query("", max_length=10), user=Depends(get_commercial_user)):
     try:
         start = operation_calendar(date_from) if date_from else None
         end = operation_calendar(date_to) if date_to else None
@@ -2539,7 +2578,7 @@ async def upd_stock(pid: str, body: StockUpd, user=Depends(get_admin_user)):
 
 # ============ PRODUCT PORTFOLIO OFFERS ============
 @api.get("/product-offers", response_model=List[ProductOffer])
-async def list_product_offers(product_id: Optional[str] = None, supplier_id: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_admin_user)):
+async def list_product_offers(product_id: Optional[str] = None, supplier_id: Optional[str] = None, active: Optional[bool] = None, user=Depends(get_commercial_user)):
     q = {}
     if product_id: q["product_id"] = product_id
     if supplier_id: q["supplier_id"] = supplier_id
@@ -2589,7 +2628,7 @@ async def update_product_offer(oid: str, o: ProductOffer, user=Depends(get_admin
         o.supplier_name = supplier["name"] if supplier else ""
         o.updated_at = now_iso()
         await ensure_owned()
-        await db.product_offers.replace_one({"id": oid}, o.model_dump())
+        await db.product_offers.replace_one({"id": oid}, {**existing, **o.model_dump()})
         return o
 
 @api.delete("/product-offers/{oid}")
@@ -2973,6 +3012,31 @@ async def import_leads(file: UploadFile = File(...), user=Depends(get_current_us
             imported += 1
 
     return LeadImportResult(imported=imported, updated=updated, skipped=skipped, errors=errors[:100])
+
+class CRMTransferExportBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ids: List[str] = Field(min_length=1, max_length=25)
+
+    @field_validator("ids", mode="before")
+    @classmethod
+    def explicit_ids(cls, values):
+        if not isinstance(values, list) or any(not isinstance(v, str) or not v or len(v)>180 or any(ord(c)<32 for c in v) for v in values) or len(set(values))!=len(values):
+            raise ValueError("Escolha identificadores únicos válidos.")
+        return values
+
+@api.post("/crm-transfer/export")
+async def export_crm_transfer(body: CRMTransferExportBody, user=Depends(get_admin_user)):
+    fields={name:1 for name in ("id","company","country","website","industry","contact_name","email","phone")}
+    fields["_id"]=0
+    rows=await db.leads.find(lead_scope(user,{"id":{"$in":body.ids}}),fields).limit(26).to_list(26)
+    if len(rows)!=len(body.ids) or len({r.get("id") for r in rows})!=len(rows):
+        raise HTTPException(409,"Seleção ausente ou ambígua; revise as empresas.")
+    by_id={r["id"]:r for r in rows}
+    try: output=build_crm_transfer([by_id[i] for i in body.ids])
+    except ValueError: raise HTTPException(409,"Revise os campos antes de exportar.") from None
+    data=json.dumps(output,ensure_ascii=False).encode("utf-8")
+    if len(data)>2*1024*1024: raise HTTPException(413,"Reduza o lote.")
+    return Response(data,media_type="application/json",headers={"Content-Disposition":'attachment; filename="IBIAG_CRM_intercambio.json"',"Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff"})
 
 @api.get("/leads", response_model=List[Lead])
 async def list_leads(
@@ -3554,6 +3618,10 @@ async def health():
 
 @api.get("/")
 async def root(): return {"message": "IBIAG API", "status": "ok"}
+
+from integrated_workspace import install as install_integrated_workspace
+import sys
+install_integrated_workspace(api, sys.modules[__name__])
 
 app.include_router(api)
 

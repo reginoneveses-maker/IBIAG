@@ -1,0 +1,5 @@
+{
+  "spec:spec1": "0.bin",
+  "crm-file:crm1": "1.bin",
+  "sector-file:sector1": "2.bin"
+}

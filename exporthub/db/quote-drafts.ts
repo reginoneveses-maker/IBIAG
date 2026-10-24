@@ -1,0 +1,21 @@
+import {preserveBeforeWrite} from './safety-backups';
+import {digest} from '@/services/crm-interchange';
+import {z} from 'zod';
+import {readCollection,writeCollectionsAtomic,splitPayload} from './collections';
+import {validateRecordLinks} from './record-integrity';
+import {recordSchemas} from './validation';
+import {quoteDraftSchema,type QuoteDraft} from '@/services/quote-completion';
+import {RequestDataError} from '@/services/request-json';
+export const saveDraftSchema=z.object({draft:quoteDraftSchema,expectedUpdatedAt:z.string().datetime().nullable(),requestId:z.string().uuid()}).strict();
+export async function saveDraft(db:D1Database,raw:z.infer<typeof saveDraftSchema>,user:{userId:string;displayName:string},bucket?:R2Bucket){
+ for(let attempt=0;attempt<3;attempt++){const current=await readCollection(db,'commercial'),data=current?.payload??{ops:[],quotes:[]};if(!recordSchemas.commercial.safeParse(data).success)throw new RequestDataError(409,'Os dados comerciais precisam de revisão.');const drafts:QuoteDraft[]=data.quoteDrafts||[],prior=drafts.find(d=>d.id===raw.draft.id);
+ if(prior?.writeToken===raw.requestId){if(await digest({title:prior.title,kind:prior.kind,data:prior.data})!==await digest({title:raw.draft.title,kind:raw.draft.kind,data:raw.draft.data}))throw new RequestDataError(409,'Esta confirmação pertence a outro conteúdo. Confira a versão salva.');return {draft:prior,data,revision:current?.revision??0,alreadySaved:true}}
+ if((prior?.updatedAt??null)!==raw.expectedUpdatedAt)throw new RequestDataError(409,'Este rascunho mudou em outra janela. Seu formulário foi preservado. Retome a versão salva ou salve uma cópia.');
+ const updatedAt=new Date(Math.max(Date.now(),prior?Date.parse(prior.updatedAt)+1:0)).toISOString(),draft={...raw.draft,updatedAt,writeToken:raw.requestId},next={...data,quoteDrafts:[draft,...drafts.filter(d=>d.id!==draft.id)]};if(!recordSchemas.commercial.safeParse(next).success||new TextEncoder().encode(JSON.stringify(next)).length>8*1024*1024||splitPayload(JSON.stringify(next)).length+4>35)throw new RequestDataError(413,'Limite de rascunhos ou tamanho atingido. Nenhum rascunho anterior foi removido.');const records=[{name:'commercial',data:next,revision:current?.revision??0}],references=await validateRecordLinks(db,records);
+ await preserveBeforeWrite(db,bucket,['commercial']);
+ try{if(await writeCollectionsAtomic(db,records,user.userId,user.displayName,references))return {draft,data:next,revision:(current?.revision??0)+1,alreadySaved:false}}
+ catch(error){try{const committed=await readCollection(db,'commercial'),saved=committed?.payload?.quoteDrafts?.find((d:QuoteDraft)=>d.id===draft.id&&d.writeToken===raw.requestId);if(saved)return {draft:saved,data:committed!.payload,revision:committed!.revision,alreadySaved:true}}catch{}throw error}
+ // Retry only a known revision guard rejection: no write occurred.
+ }
+ throw new RequestDataError(409,'O workspace continua mudando. Seu preenchimento foi preservado; tente salvar novamente.');
+}

@@ -1,0 +1,18 @@
+{
+  "format": "ibiag-crm-transfer-v1",
+  "source": "IBIAG",
+  "companies": [
+    {
+      "sourceId": "DEMO-PORTUGAL-001",
+      "name": "Demo Foods Portugal",
+      "country": "Portugal",
+      "website": "https://example.test",
+      "industry": "Alimentos",
+      "contact": {
+        "name": "Ana Demonstração",
+        "email": "ana@example.test",
+        "phone": ""
+      }
+    }
+  ]
+}

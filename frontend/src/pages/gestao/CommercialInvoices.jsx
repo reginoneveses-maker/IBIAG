@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/AuthContext";
 import { PageHeader, Button, Input, Textarea, Card, CardContent, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, toast } from "@/components/erp";
-import { priceMoney } from "@/lib/pricing";
+import {priceMoney} from "@/lib/pricing";
+import {saleCurrency,saleMoney} from "@/lib/saleCurrency";
 import { documentPreview } from "@/lib/api";
 const labels={draft:"Rascunho",approved:"Aprovada internamente",cancelled:"Cancelada"};
 const fields=[
@@ -17,7 +18,6 @@ const defaults={...Object.fromEntries(fields.map(([k])=>[k,""])),delivery_same_a
 const detailKeys=Object.keys(defaults).filter(k=>k!=="change_note");
 const selectClass="border rounded-md p-2 bg-white w-full text-sm";
 const error=e=>typeof e.response?.data?.detail==="string"?e.response.data.detail:"Não foi possível concluir. Recarregue e confira o documento.";
-const usd=v=>priceMoney(v,"USD");
 export default function CommercialInvoices(){
  const [params,setParams]=useSearchParams(),requestedOrder=params.get("order"),requestedInvoice=params.get("invoice");
  const [records,setRecords]=useState([]),[status,setStatus]=useState(""),[skip,setSkip]=useState(0),[retry,setRetry]=useState(0),[loading,setLoading]=useState(false),[listError,setListError]=useState(false);
@@ -62,17 +62,17 @@ export default function CommercialInvoices(){
  };
  const source=detail?.source_order_snapshot;
  return <div data-testid="commercial-invoices-page">
-  <PageHeader title="Commercial Invoice" subtitle="Documento comercial em USD vinculado ao pedido" action={<Link className="underline" to="/gestao/pedidos">Escolher pedido</Link>}/>
+  <PageHeader title="Commercial Invoice" subtitle="Documento comercial na moeda do pedido" action={<Link className="underline" to="/gestao/pedidos">Escolher pedido</Link>}/>
   <p className="text-sm mb-4">Prepare pelo pedido confirmado, confira os dados e o PDF e aprove explicitamente. Dados fiscais e de origem exigem conferência; nenhuma classificação ou declaração é inferida. Esta aprovação não envia o documento, assina digitalmente ou valida o desembaraço. O documento não cria outra conta financeira.</p>
   <Link className="underline text-sm" to="/gestao/documentos">Voltar à central de documentos</Link>
   <div className="flex flex-wrap gap-3 items-end my-4"><label>Situação da invoice<select aria-label="Situação da invoice" className={selectClass} value={status} onChange={e=>{setStatus(e.target.value);setSkip(0);}}><option value="">Todas</option>{Object.entries(labels).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label><Button variant="outline" onClick={()=>setRetry(n=>n+1)}>Atualizar lista</Button></div>
   {loading&&<p role="status">Carregando invoices…</p>}{listError&&<p role="alert">Não foi possível carregar as invoices. Use Atualizar lista.</p>}{!loading&&!listError&&!records.length&&<p>Nenhuma invoice nesta página.</p>}
-  <div className="space-y-3">{records.map(i=><Card key={i.id}><CardContent className="p-4 flex flex-wrap gap-3 items-center"><div className="flex-1"><strong>{i.reference} — {i.customer}</strong><p>{labels[i.status]} · emissão {i.issue_date}</p></div><strong>{usd(i.total_usd)}</strong><Button variant="outline" disabled={saving} onClick={()=>open(i.id)}>Abrir invoice</Button></CardContent></Card>)}</div>
+  <div className="space-y-3">{records.map(i=><Card key={i.id}><CardContent className="p-4 flex flex-wrap gap-3 items-center"><div className="flex-1"><strong>{i.reference} — {i.customer}</strong><p>{labels[i.status]} · emissão {i.issue_date}</p></div><strong>{saleMoney(i)}</strong><Button variant="outline" disabled={saving} onClick={()=>open(i.id)}>Abrir invoice</Button></CardContent></Card>)}</div>
   <div className="flex items-center gap-3 my-4"><Button disabled={!skip||loading} onClick={()=>setSkip(n=>Math.max(0,n-50))}>Anterior</Button><span>Página {skip/50+1}</span><Button disabled={records.length<50||loading} onClick={()=>setSkip(n=>n+50)}>Próxima</Button></div>
   {opening&&<p role="status">Conferindo pedido…</p>}{openError&&<p role="alert">{openError} Abra novamente pelo pedido ou pela lista.</p>}
   <Dialog open={!!detail} onOpenChange={v=>{if(!v)close();}}><DialogContent className="bg-white max-w-4xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{isNew?"Preparar Commercial Invoice":`Commercial Invoice ${detail?.reference}`}</DialogTitle></DialogHeader>
    {detail&&<><p>{isNew?"Conferência sem gravação automática":`${labels[detail.status]} · versão ${detail.version}`}</p>
-    <div className="rounded-lg bg-slate-50 p-4 space-y-2"><strong>{source.customer}</strong><p>Pedido {source.number||"sem referência comercial"} · {source.incoterm}</p>{source.items.map((i,n)=><p key={n}>{i.product_name} · {i.quantity} {i.unit} × USD {Number(i.unit_price).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:12})} = {usd(i.line_total)}</p>)}<strong>Total: {usd(source.total_usd)}</strong><p className="text-xs">Valores vêm do pedido. Frete e acréscimos devem estar no cálculo/pedido antes de preparar este documento. Custos e fornecedores internos são excluídos do PDF.</p></div>
+    <div className="rounded-lg bg-slate-50 p-4 space-y-2"><strong>{source.customer}</strong><p>Pedido {source.number||"sem referência comercial"} · {source.incoterm}</p>{source.items.map((i,n)=><p key={n}>{i.product_name} · {i.quantity} {i.unit} × {saleCurrency(source)} {Number(i.unit_price).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:12})} = {priceMoney(i.line_total,saleCurrency(source))}</p>)}<strong>Total: {saleMoney(source)}</strong><p className="text-xs">Valores vêm do pedido. Frete e acréscimos devem estar no cálculo/pedido antes de preparar este documento. Custos e fornecedores internos são excluídos do PDF.</p></div>
     <fieldset disabled={!editable||saving} className="grid sm:grid-cols-2 gap-3">
      {isNew&&<label>Referência da invoice<Input value={form.reference} maxLength={80} onChange={e=>change("reference",e.target.value)}/></label>}
      {fields.map(([key,title,max,type])=><label key={key}>{title}{type==="text"?<Textarea aria-label={title} value={form[key]} maxLength={max} readOnly={["payment_terms","delivery_terms"].includes(key)&&!!source[key]} onChange={e=>change(key,e.target.value)}/>:<Input aria-label={title} type={type||"text"} value={form[key]} maxLength={max} readOnly={key==="buyer_country"&&!!source.customer_country} onChange={e=>change(key,e.target.value)}/>}</label>)}

@@ -153,3 +153,25 @@ test("approved quotation opens readonly draft and sends revision without client 
  api.get.mockImplementation(path=>Promise.resolve({data:path==="/quotations/q1/order-draft"?source:path==="/leads"?[lead]:[]}));mount("/prospects/orders?quote=q1");await screen.findByTestId("order-quote-origin");expect(screen.getByLabelText("Empresa do CRM").disabled).toBe(true);expect(screen.getByLabelText("Incoterm").disabled).toBe(true);expect(screen.getByLabelText("Quantidade do item 1").disabled).toBe(true);expect(screen.getByLabelText("Situação do pedido").disabled).toBe(true);expect(api.post).not.toHaveBeenCalled();fireEvent.click(screen.getByTestId("save-order-button"));await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/orders",expect.objectContaining({source_quote_id:"q1",source_quote_revision:2,status:"draft",incoterm:"DAP"})));expect(api.post.mock.calls[0][1].source_quote_snapshot).toBeUndefined();
 });
 test("ambiguous quotation and price shortcuts cannot open or save an unintended order",async()=>{mount("/prospects/orders?quote=q1&price=p1");await waitFor(()=>expect(toast.error).toHaveBeenCalledWith("Escolha uma única origem para o pedido. Nenhum pedido foi criado."));expect(screen.queryByTestId("save-order-button")).toBeNull();expect(api.post).not.toHaveBeenCalled();});
+
+test("EUR quotation preserves denomination in readonly order and save request",async()=>{
+ const source={source_quote_id:"q-eur",source_quote_revision:1,source_quote_snapshot:{reference:"COT-EUR"},lead_id:"crm1",customer:"Existing Buyer",customer_country:"Portugal",incoterm:"EXW",currency:"EUR",total_amount:12.34,total_usd:0,items:[{product_id:"p",offer_id:"offer",quantity:2,unit:"kg",unit_price:6.17}]};
+ api.get.mockImplementation(path=>Promise.resolve({data:path==="/quotations/q-eur/order-draft"?source:path==="/leads"?[lead]:[]}));
+ mount("/prospects/orders?quote=q-eur");await screen.findByTestId("order-quote-origin");
+ expect(screen.getByLabelText("Moeda do pedido").value).toBe("EUR");expect(screen.getByLabelText("Moeda do pedido").disabled).toBe(true);
+ expect(screen.getByLabelText("Preço EUR do item 1").value).toBe("6.17");
+ fireEvent.click(screen.getByTestId("save-order-button"));
+ await waitFor(()=>expect(api.post).toHaveBeenCalledWith("/orders",expect.objectContaining({currency:"EUR",total_amount:12.34,total_usd:0})));
+});
+test("manual denomination change clears prices instead of reusing a USD offer price",async()=>{
+ const offer={id:"offer",product_id:"p",product_name:"Ingredient",supplier_name:"Supplier",sale_price_usd:5,unit:"kg"};
+ api.get.mockImplementation(path=>Promise.resolve({data:path==="/product-offers"?[offer]:[]}));
+ mount();fireEvent.click(screen.getByTestId("new-order-button"));fireEvent.click(screen.getByRole("button",{name:"Adicionar item"}));
+ await screen.findByRole("option",{name:/Ingredient/});
+ fireEvent.change(screen.getByLabelText("Oferta do item 1"),{target:{value:"offer"}});
+ expect(screen.getByLabelText("Preço USD do item 1").value).toBe("5");
+ fireEvent.change(screen.getByLabelText("Moeda do pedido"),{target:{value:"EUR"}});
+ expect(screen.getByLabelText("Preço EUR do item 1").value).toBe("");
+ fireEvent.change(screen.getByLabelText("Oferta do item 1"),{target:{value:"offer"}});
+ expect(screen.getByLabelText("Preço EUR do item 1").value).toBe("");
+});

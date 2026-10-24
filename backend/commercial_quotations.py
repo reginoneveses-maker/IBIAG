@@ -32,7 +32,7 @@ class QuotationState(BaseModel):
 
 TERMS = ("valid_until", "incoterm", "payment_terms", "delivery_terms", "notes")
 SUMMARY = ("id", "reference", "version", "status", "customer", "customer_country", "lead_id",
-           "valid_until", "incoterm", "total_usd", "updated_at")
+           "valid_until", "incoterm", "total_usd", "total_amount", "currency", "updated_at")
 
 def validate_terms(record, today):
     try:

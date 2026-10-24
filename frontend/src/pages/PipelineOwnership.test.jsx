@@ -25,6 +25,7 @@ test("ordinary user cannot see assignment control or request user directory",asy
   useAuth.mockReturnValue({user:{id:"alice",role:"user"}});
   mount(); await screen.findByRole("heading",{name:/Existing Company/});
   expect(screen.queryByLabelText("Responsável pelo cadastro")).toBeNull();
+  expect(screen.queryByRole("button",{name:"Exportar empresa para integração"})).toBeNull();
   expect(screen.queryByRole("link",{name:"Criar pedido para esta empresa"})).toBeNull();
   expect(api.get).not.toHaveBeenCalledWith("/auth/users");
 });
@@ -47,3 +48,6 @@ test("assignment failure preserves previous owner",async()=>{
   await waitFor(()=>expect(toast.error).toHaveBeenCalledWith("Não foi possível alterar o responsável."));
   expect(selector.value).toBe("");
 });
+
+test('admin exports only selected company and locks duplicate clicks',async()=>{useAuth.mockReturnValue({user:{id:'admin',role:'admin'}});let finish;api.post.mockImplementation(()=>new Promise(r=>finish=r));const oldCreate=URL.createObjectURL,oldRevoke=URL.revokeObjectURL;URL.createObjectURL=jest.fn(()=>'blob:synthetic');URL.revokeObjectURL=jest.fn();const click=jest.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{});try{mount();const button=await screen.findByRole('button',{name:'Exportar empresa para integração'});fireEvent.click(button);fireEvent.click(button);expect(api.post).toHaveBeenCalledTimes(1);expect(api.post).toHaveBeenCalledWith('/crm-transfer/export',{ids:['legacy']},{responseType:'blob'});finish({data:new Blob(['{}'])});await waitFor(()=>expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:synthetic'));expect(click).toHaveBeenCalledTimes(1)}finally{click.mockRestore();URL.createObjectURL=oldCreate;URL.revokeObjectURL=oldRevoke}});
+test('export error preserves company and allows explicit retry',async()=>{useAuth.mockReturnValue({user:{id:'admin',role:'admin'}});api.post.mockRejectedValue(new Error('fail'));mount();const button=await screen.findByRole('button',{name:'Exportar empresa para integração'});fireEvent.click(button);await waitFor(()=>expect(toast.error).toHaveBeenCalledWith('Não foi possível exportar a empresa. Confira os dados e tente novamente.'));expect(screen.getByRole('heading',{name:/Existing Company/})).toBeTruthy();expect(button.disabled).toBe(false);expect(api.put).not.toHaveBeenCalled()});

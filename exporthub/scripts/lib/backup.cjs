@@ -66,6 +66,9 @@ function verifyBackup(zipBuffer){
   load(root+'/services/spec-revisions.ts').validateRevisionIndex(revisions,list(manifest.specs));
   for(const r of revisions){const f=byId.get(r.spec_id),bytes=f&&zip.entries.get(f.zipPath);if(r.sha256&&(!bytes||sha(bytes)!==r.sha256))errors.push('Hash divergente na versão documental '+r.spec_id);}
  }catch{errors.push('Histórico de versões documentais inconsistente.');}
+ try{load(root+'/services/crm-interchange.ts').origins(byName.commercial||{})}catch{errors.push('Vínculos de origem do CRM inválidos.')}
+ if(manifest.crmInterchange&&manifest.crmInterchange!=='embedded-origins-v1')errors.push('Formato de origens desconhecido.');
+ if(manifest.crmInterchange==='embedded-origins-v1'&&(!Number.isSafeInteger(manifest.crmOriginCount)||manifest.crmOriginCount<0||manifest.crmOriginCount!==(byName.commercial?.interchangeLinks||[]).length))errors.push('Índice de origens ausente ou incompleto.');
  const summary={exportedAt:manifest.exportedAt,collections:records.length,specs:list(manifest.specs).length,crmFiles:list(manifest.crmFiles).length,sectorFiles:list(manifest.sectorFiles).length,files:files.length,bytes:files.reduce((s,f)=>s+(f.size||0),0)};
  return {errors,warnings,summary,manifest,zip};
 }

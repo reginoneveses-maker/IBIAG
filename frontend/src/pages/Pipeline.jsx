@@ -18,6 +18,8 @@ const emptyLead = { company: "", contact_name: "", email: "", phone: "", website
 const Pipeline = () => {
   const { t } = useLang();
   const { user } = useAuth();
+  const exportLock=useRef(false);const [exportingTransfer,setExportingTransfer]=useState(false);
+  async function exportTransfer(){if(!detailLead?.id||exportLock.current)return;exportLock.current=true;setExportingTransfer(true);try{const response=await api.post('/crm-transfer/export',{ids:[detailLead.id]},{responseType:'blob'});const url=URL.createObjectURL(new Blob([response.data],{type:'application/json'}));try{const a=document.createElement('a');a.href=url;a.download='IBIAG_CRM_intercambio.json';a.click()}finally{URL.revokeObjectURL(url)}}catch{toast.error('Não foi possível exportar a empresa. Confira os dados e tente novamente.')}finally{exportLock.current=false;setExportingTransfer(false)}}
   const [owners, setOwners] = useState([]);
   const [assigningOwner, setAssigningOwner] = useState(false);
   const [leads, setLeads] = useState([]);
@@ -320,6 +322,7 @@ const Pipeline = () => {
               {externalUrl(detailLead?.source_url) && <a className="underline" href={externalUrl(detailLead.source_url)} target="_blank" rel="noreferrer">Fonte da empresa</a>}
               {externalUrl(detailLead?.decision_source_url) && <a className="underline" href={externalUrl(detailLead.decision_source_url)} target="_blank" rel="noreferrer">Fonte do decisor</a>}
             </div>
+            {user?.role === "admin" && <Button variant="outline" disabled={exportingTransfer} onClick={exportTransfer}>Exportar empresa para integração</Button>}
             {user?.role === "admin" && <Link className="block underline text-sm" to={`/prospects/orders?lead=${encodeURIComponent(detailLead?.id || "")}`}>Criar pedido para esta empresa</Link>}
             <div className="text-sm">Telefone da empresa: {detailLead?.phone || "Não encontrado"}</div>
             <div className="text-xs">{detailLead?.enrichment_message}</div>

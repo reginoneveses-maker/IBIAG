@@ -1,0 +1,196 @@
+{
+   "format": "exporthub-v1",
+   "exportedAt": "2026-10-24T00:00:00.000Z",
+   "crmInterchange": "embedded-origins-v1",
+   "crmOriginCount": 0,
+   "documentVersioning": "spec-revisions-v1",
+   "products": [
+      {
+         "id": "p",
+         "name": "Synthetic ingredient",
+         "extraLegacyField": {
+            "keep": true
+         }
+      }
+   ],
+   "records": [
+      {
+         "name": "commercial",
+         "revision": 9,
+         "updated_at": "2026-10-24",
+         "payload": {
+            "companies": [
+               {
+                  "id": "c",
+                  "name": "Synthetic Buyer",
+                  "country": "Portugal",
+                  "notes": "PRESERVE"
+               }
+            ],
+            "contacts": [
+               {
+                  "id": "person",
+                  "companyId": "c",
+                  "name": "Second contact",
+                  "email": "person@example.test"
+               }
+            ],
+            "ops": [
+               {
+                  "id": "o",
+                  "companyId": "c",
+                  "company": "Synthetic Buyer",
+                  "contactIds": [
+                     "person"
+                  ]
+               }
+            ],
+            "quotes": [
+               {
+                  "id": "q",
+                  "opportunityId": "o",
+                  "product": "Synthetic ingredient",
+                  "supplier": "Synthetic Supplier",
+                  "quantity": 1000,
+                  "unitPrice": 1.23456789,
+                  "total": 1234.56789,
+                  "currency": "USD",
+                  "approvedLegacyNote": "DO NOT REPRICE"
+               }
+            ],
+            "quoteDrafts": [
+               {
+                  "id": "draft",
+                  "kind": "completion",
+                  "data": {
+                     "fields": {
+                        "cost": ""
+                     }
+                  }
+               }
+            ],
+            "interchangeLinks": [],
+            "unknownCommercialField": {
+               "keep": "exactly"
+            }
+         }
+      },
+      {
+         "name": "products",
+         "revision": 2,
+         "payload": [
+            {
+               "id": "p",
+               "supplier": "Synthetic Supplier",
+               "cost": "17.50",
+               "logistics": "LEGACY TEXT"
+            }
+         ]
+      },
+      {
+         "name": "shipments",
+         "revision": 3,
+         "payload": [
+            {
+               "id": "ship",
+               "quoteId": "q",
+               "opportunityId": "o",
+               "productId": "p",
+               "status": "Pendente"
+            }
+         ]
+      },
+      {
+         "name": "documents",
+         "revision": 1,
+         "payload": [
+            {
+               "id": "doc",
+               "shipmentId": "ship",
+               "type": "Invoice"
+            }
+         ]
+      },
+      {
+         "name": "tasks",
+         "revision": 1,
+         "payload": [
+            {
+               "id": "task",
+               "opportunityId": "o",
+               "recordId": "sector"
+            }
+         ]
+      },
+      {
+         "name": "sectorRecords",
+         "revision": 5,
+         "payload": [
+            {
+               "id": "sector",
+               "sectorId": "qualidade",
+               "productId": "p",
+               "shipmentId": "ship",
+               "opportunityId": "o",
+               "fields": {
+                  "custom": "KEEP"
+               },
+               "history": [
+                  {
+                     "at": "2026-10-01",
+                     "action": "Created"
+                  }
+               ]
+            }
+         ]
+      },
+      {
+         "name": "unknownFutureModule",
+         "revision": 1,
+         "payload": {
+            "nested": [
+               "keep all unknown fields"
+            ]
+         }
+      }
+   ],
+   "specs": [
+      {
+         "id": "spec1",
+         "product_id": "p",
+         "kind": "original",
+         "filename": "original.pdf",
+         "size": 44
+      }
+   ],
+   "crmFiles": [
+      {
+         "id": "crm1",
+         "opportunity_id": "o",
+         "filename": "commercial.pdf",
+         "size": 31
+      }
+   ],
+   "sectorFiles": [
+      {
+         "id": "sector1",
+         "record_id": "sector",
+         "filename": "document.pdf",
+         "size": 29
+      }
+   ],
+   "specRevisions": [
+      {
+         "spec_id": "spec1",
+         "root_id": "spec1",
+         "revision": 1,
+         "sha256": "c0813ee9816785377b45c35543682b8014a289c82ec25db9b25396656ddbaa11",
+         "issued_on": "",
+         "valid_until": "",
+         "change_note": "Original preserved"
+      }
+   ],
+   "unknownBackupField": {
+      "also": "preserved"
+   }
+}
