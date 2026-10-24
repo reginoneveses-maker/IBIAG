@@ -1,0 +1,226 @@
+{
+  "date": "2026-10-24",
+  "claude": "7d5ecb5524ec4c55844b3865d17836ee77d6c628",
+  "base": "ef5deeee6bec2355779af6c5c4ae3671f39fb2ea",
+  "checks": [
+    {
+      "number": 57,
+      "head": "operations/dossier-local-20261020",
+      "base": "operations/quality-local-20261020",
+      "sha": "2b838091a115555012c7ac7950d2c4ef9ebb3758",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 56,
+      "head": "operations/quality-local-20261020",
+      "base": "operations/samples-local-20261020",
+      "sha": "e3dfce9976a9ec6f12ae6fe4e95015d60c00fd0f",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 55,
+      "head": "operations/samples-local-20261020",
+      "base": "local/windows-first-20261020",
+      "sha": "d0dfe8467f5babe2a2c68e2460bd96e7c339696c",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 54,
+      "head": "local/windows-first-20261020",
+      "base": "operations/document-history-20261020",
+      "sha": "79a885f37e605c65aaec3ca2cd5c6be208c81bae",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 53,
+      "head": "operations/preservation-safe-copy-20261020",
+      "base": "operations/document-history-20261020",
+      "sha": "7d5814fcff086f0022ac71126c5ac9849da37f4a",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 52,
+      "head": "operations/document-history-20261020",
+      "base": "operations/operational-dashboard-20261020",
+      "sha": "43715ff26f66666b130d2a67c9d18ef68a8beab4",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 51,
+      "head": "operations/operational-dashboard-20261020",
+      "base": "operations/packing-list-20261020",
+      "sha": "bed8008ced775f236b27d0e8c69f2c920e0dd7a3",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 50,
+      "head": "operations/packing-list-20261020",
+      "base": "operations/commercial-invoice-20261019",
+      "sha": "7a102fb44f59731b8acf34783c2b3afd01bfc52d",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 49,
+      "head": "operations/commercial-invoice-20261019",
+      "base": "operations/commercial-quotation-20261019",
+      "sha": "08dcc7878d1d3e8d5d1bd478c8bd06aef73c4208",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 48,
+      "head": "operations/commercial-quotation-20261019",
+      "base": "design/ibiag-presentation-brand-20261019",
+      "sha": "8fc434745e2dc01f3ed7e5d76bab35b66a08e9fd",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 47,
+      "head": "design/ibiag-presentation-brand-20261019",
+      "base": "operations/order-shipment-20261019",
+      "sha": "37affcf752ae8c5c80456ae6839edbdaca662b9c",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 46,
+      "head": "operations/order-shipment-20261019",
+      "base": "operations/price-order-draft-20261019",
+      "sha": "887ed1eb95bc99770af386074fb0e6daa8f8dbca",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 45,
+      "head": "operations/price-order-draft-20261019",
+      "base": "operations/crm-order-link-20261019",
+      "sha": "d00d6d86c13d8fd632c1366241e300bee9f37b4c",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 44,
+      "head": "operations/crm-order-link-20261019",
+      "base": "security/stage1-integration-review-20261018",
+      "sha": "ff0ca9a5de5bafe4bec9c745ae45b585a4a43f02",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 28,
+      "head": "security/stage1-integration-review-20261018",
+      "base": "main",
+      "sha": "006da6db8953b18e249ad74b49dafcaa4e2e1e64",
+      "clean": true,
+      "conflicts": []
+    },
+    {
+      "number": 27,
+      "head": "security/discovery-credit-guard-20261018",
+      "base": "main",
+      "sha": "56b71535e5847038359c3dadc4d069cf95c453de",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (content): Merge conflict in backend/server.py"
+      ]
+    },
+    {
+      "number": 26,
+      "head": "security/crm-owner-isolation-20261018",
+      "base": "main",
+      "sha": "a2319a72a6123840b2f0ce065d70f63fdd315f89",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (add/add): Merge conflict in backend/crm_access.py",
+        "CONFLICT (content): Merge conflict in backend/server.py",
+        "CONFLICT (add/add): Merge conflict in backend/test_crm_access.py",
+        "CONFLICT (content): Merge conflict in frontend/src/pages/Pipeline.jsx",
+        "CONFLICT (add/add): Merge conflict in frontend/src/pages/PipelineOwnership.test.jsx"
+      ]
+    },
+    {
+      "number": 25,
+      "head": "security/password-input-validation-20261018",
+      "base": "main",
+      "sha": "4d438f0a2c4936c469451d83de5b2eb570a2ffc4",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (content): Merge conflict in backend/server.py"
+      ]
+    },
+    {
+      "number": 24,
+      "head": "security/task-owner-isolation-20261018",
+      "base": "main",
+      "sha": "22a57655ea838cdcc95f0b623f4e5022c3b3acf5",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (content): Merge conflict in backend/server.py",
+        "CONFLICT (content): Merge conflict in frontend/src/pages/Tasks.jsx"
+      ]
+    },
+    {
+      "number": 23,
+      "head": "security/bounded-import-uploads-20261018",
+      "base": "main",
+      "sha": "fd171071c46493973f73f140d341e16267ed74a6",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (content): Merge conflict in backend/server.py",
+        "CONFLICT (add/add): Merge conflict in backend/test_upload_limits.py",
+        "CONFLICT (add/add): Merge conflict in backend/upload_limits.py"
+      ]
+    },
+    {
+      "number": 21,
+      "head": "security/safe-api-errors-20261018",
+      "base": "main",
+      "sha": "7dd89ab308acbe0d36f9ccdfc185fde2762a318d",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (add/add): Merge conflict in backend/safe_errors.py",
+        "CONFLICT (content): Merge conflict in backend/server.py"
+      ]
+    },
+    {
+      "number": 20,
+      "head": "security/unique-session-tokens-20261018",
+      "base": "main",
+      "sha": "3827ba8a0e4503fcfb3f71777344cae3ed2cb93d",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (content): Merge conflict in backend/server.py",
+        "CONFLICT (add/add): Merge conflict in frontend/src/AuthContext.test.jsx"
+      ]
+    },
+    {
+      "number": 19,
+      "head": "security/login-ip-rate-limit-20261018",
+      "base": "main",
+      "sha": "9580a31bfc9e81f9009a4a2f5b684f29a6e35bf6",
+      "clean": false,
+      "conflicts": [
+        "CONFLICT (add/add): Merge conflict in backend/serve.py"
+      ]
+    },
+    {
+      "number": 58,
+      "head": "improvements/gabriela-demo-20261023",
+      "clean": true
+    },
+    {
+      "number": 59,
+      "head": "improvements/document-versions-20261023",
+      "clean": true
+    }
+  ]
+}
