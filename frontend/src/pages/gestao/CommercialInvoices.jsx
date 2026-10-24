@@ -62,7 +62,7 @@ export default function CommercialInvoices(){
  };
  const source=detail?.source_order_snapshot;
  return <div data-testid="commercial-invoices-page">
-  <PageHeader title="Commercial Invoice" subtitle="Documento comercial em USD vinculado ao pedido" action={<Link className="underline" to="/gestao/pedidos">Escolher pedido</Link>}/>
+  <PageHeader title="Commercial Invoice" subtitle="Documento comercial na moeda do pedido" action={<Link className="underline" to="/gestao/pedidos">Escolher pedido</Link>}/>
   <p className="text-sm mb-4">Prepare pelo pedido confirmado, confira os dados e o PDF e aprove explicitamente. Dados fiscais e de origem exigem conferência; nenhuma classificação ou declaração é inferida. Esta aprovação não envia o documento, assina digitalmente ou valida o desembaraço. O documento não cria outra conta financeira.</p>
   <Link className="underline text-sm" to="/gestao/documentos">Voltar à central de documentos</Link>
   <div className="flex flex-wrap gap-3 items-end my-4"><label>Situação da invoice<select aria-label="Situação da invoice" className={selectClass} value={status} onChange={e=>{setStatus(e.target.value);setSkip(0);}}><option value="">Todas</option>{Object.entries(labels).map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label><Button variant="outline" onClick={()=>setRetry(n=>n+1)}>Atualizar lista</Button></div>

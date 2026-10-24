@@ -36,7 +36,7 @@ test("approved quotation conditions are prefilled and readonly in the invoice",a
 test("EUR invoice shows original denomination and sends no monetary override",async()=>{
  const eur={...record,currency:"EUR",total_amount:8.53,total_usd:0,source_order_snapshot:{...snapshot,currency:"EUR",total_amount:8.53,total_usd:0}};
  api.get.mockImplementation(path=>Promise.resolve({data:path==="/commercial-invoices"?[eur]:eur}));mount();await open();
- expect(screen.getByText(/EUR 4.261512/)).toBeTruthy();
- expect(screen.queryByText(/USD 4.261512/)).toBeNull();
+ expect(await screen.findByText((_,element)=>element.tagName==="P"&&/EUR\s*4\.261512/.test(element.textContent))).toBeTruthy();
+ expect(screen.queryByText((_,element)=>element.tagName==="P"&&/USD\s*4\.261512/.test(element.textContent))).toBeNull();
  expect(api.post).not.toHaveBeenCalled();
 });
