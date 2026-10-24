@@ -133,6 +133,25 @@ class IntegratedWorkspaceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(foreign.status_code,400)
         self.assertEqual((await self.req("GET","/workspace",params={"quoteBefore":"not-a-valid-cursor"})).status_code,400)
 
+    async def test_saved_quote_retry_and_handoff_preserve_customer_identity(self):
+        payload={"id":"COT-identity","state":state()}
+        original=self.ok(await self.req("POST","/quotes",json=payload))["quote"]
+        before=await self.db.integrated_quotes.find_one({"id":payload["id"]})
+        terms={"valid_until":"2099-12-31","payment_terms":"Prepaid","delivery_terms":"Factory","change_note":"Reviewed"}
+        for changes in ({"company":"Different buyer"},{"company":"Original Buyer","country":"Different country"}):
+            await self.db.leads.update_one({"id":"lead1"},{"$set":changes})
+            replay=self.ok(await self.req("POST","/quotes",json=payload))
+            self.assertTrue(replay["alreadySaved"])
+            self.assertEqual(replay["quote"],original)
+            denied=await self.req("POST","/quotes/COT-identity/handoff",json=terms)
+            self.assertEqual(denied.status_code,409,denied.text)
+            self.assertEqual(await self.db.quotations.count_documents({}),0)
+            self.assertEqual(await self.db.integrated_quotes.find_one({"id":payload["id"]}),before)
+        await self.db.leads.update_one({"id":"lead1"},{"$set":before["customer_identity"]})
+        # Identity country is restored explicitly; unrelated contact edits are safe.
+        await self.db.leads.update_one({"id":"lead1"},{"$set":{"contact_name":"New contact"}})
+        self.ok(await self.req("POST","/quotes/COT-identity/handoff",json=terms))
+
     async def test_other_currencies_quote_without_invented_usd_conversion(self):
         for currency in ("BRL","EUR"):
             payload={"id":"COT-"+currency,"state":state(currency)}

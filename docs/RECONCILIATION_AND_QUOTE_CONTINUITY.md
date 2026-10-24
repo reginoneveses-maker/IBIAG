@@ -75,3 +75,11 @@ A CI repete os cenários aplicáveis com MongoDB real descartável, roda todos o
 - Homologação da Gabriela, sua conta definitiva, destino público/HTTPS, segredos, persistência e recuperação no destino continuam pendentes.
 
 Não é correto afirmar que resta somente publicar. Não houve merge na main, publicação, alteração de dados reais, ativação de cobrança ou backups automáticos.
+
+## Continuação: identidade comercial e retomada após resposta perdida
+
+A gravação repetida da mesma cotação agora reconhece o registro imutável antes de consultar novamente os vínculos do catálogo e CRM. Assim, uma alteração cadastral posterior não transforma uma gravação já concluída em falha de confirmação. Um conteúdo diferente com o mesmo ID continua rejeitado.
+
+Novas cotações guardam a identidade da empresa e o país do CRM separadamente do snapshot comercial. A preparação para pedido verifica esses dados novamente e recusa divergências, sem alterar a proposta, os valores ou o cadastro. Cotações anteriores continuam compatíveis e verificam o nome disponível no snapshot; não se inventa um país histórico. Alterações de contato não impedem a continuidade.
+
+Regressão automatizada cobre mudança de empresa, mudança de país, repetição após resposta perdida, ausência de pedido indevido, preservação exata do registro e retomada com identidade restaurada. O teste também é herdado pelo perfil comercial e pelas variantes MongoDB descartáveis da CI. Nenhum dado real foi utilizado. A CI do novo commit deve ser consultada antes de atribuir aprovação a esta continuação.

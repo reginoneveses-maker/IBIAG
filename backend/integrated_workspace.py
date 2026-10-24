@@ -277,12 +277,22 @@ def install(api, rt):
         quote["id"] = body.id
         offer_id = body.state.get("productId", "")
         lead_id = quote.get("opportunityId", "")
+        # A retry acknowledges the immutable record, even if the catalog changed
+        # after the original save. It must not rebind or recalculate that record.
+        key = user["id"] + ":" + body.id
+        fingerprint = digest(body.state)
+        old = await rt.db.integrated_quotes.find_one({"_id": key})
+        if old:
+            if old["fingerprint"] != fingerprint:
+                raise HTTPException(409, "Cotação revisada é imutável. Crie outra versão.")
+            return {"quote": old["quote"], "alreadySaved": True}
         refs = {}
         if offer_id:
             offer, product, supplier = await references(offer_id)
             refs.update(offer_id=offer_id, product_id=product["id"], supplier_id=supplier["id"])
         if lead_id:
             lead = await unique(rt.db.leads, lead_id)
+            refs["customer_identity"] = {"company": lead["company"], "country": lead.get("country", "")}
             if quote["customer"] != lead["company"]:
                 raise HTTPException(409, "Nome do cliente diverge do vínculo CRM. Revise ou selecione sem vínculo.")
         key = user["id"] + ":" + body.id
@@ -347,6 +357,11 @@ def install(api, rt):
                 raise HTTPException(400, "Vincule cliente e oferta em uma nova cotação antes de preparar o pedido.")
             offer, product, supplier = await references(record["offer_id"])
             lead = await unique(rt.db.leads, record["lead_id"])
+            identity = {"company": lead.get("company", ""), "country": lead.get("country", "")}
+            if q["customer"] != identity["company"] or (
+                "customer_identity" in record and record["customer_identity"] != identity
+            ):
+                raise HTTPException(409, "Cliente ou país do CRM mudou após a revisão. Gere uma nova versão da cotação; a proposta salva foi preservada.")
             if q["supplier"] != supplier["name"]:
                 raise HTTPException(409, "Fornecedor da proposta diverge da oferta. Revise o vínculo antes de criar o pedido.")
             if offer.get("product_id") != record["product_id"] or offer.get("supplier_id") != record["supplier_id"]:
