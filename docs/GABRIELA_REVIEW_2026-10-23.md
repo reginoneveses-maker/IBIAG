@@ -17,8 +17,9 @@ Nenhum merge na main, deploy, atualização da instalação, alteração em dado
 3. Saúde: GET /api/health e /saude, restritos ao proprietário. Consulta banco, presença de binding de armazenamento, revisões e resumo documental sem valores comerciais, notas, caminhos ou e-mails. Limites documentais retornam 413, sem resumo parcial. Não testa conteúdo/acessibilidade de PDFs nem disponibilidade de transportadoras.
 4. Qualidade: validade explícita em registros de documentação/qualidade, vencidos, janela de 30 dias, data inválida, certificação sem validade e ausência de referência de anexo. Não atribui validade a specs, não infere aprovação nem conformidade.
 5. Trade Intelligence React/Python: ignora negativas/hipóteses na cláusula publicada, não usa recorte sugerido pela IA para remover uma negação, normaliza domínio/porta/ponto final para deduplicar. Usuário do ingrediente é potencial comprador; vendedor permanece identificado como fornecedor. Compra/importação e intenção comercial nunca são presumidas.
-6. Rotina: atalhos CRM → cálculo/cotação → processo comercial → documentação → logística, reutilizando telas existentes. Nenhum recurso anterior foi retirado. A UI nova não cria um pedido formal adicional no ExportHub; conserva o modelo de operação existente.
-7. Cópias automáticas: código de preservação do Claude continua disponível, porém desativado por padrão. Somente ALLOW_AUTOMATIC_SAFETY_BACKUPS=true no servidor o habilita, mediante autorização separada. Exportação e recuperação manuais permanecem. Nenhuma variável publicada foi alterada.
+6. Datas de amostras: a criação usa America/Fortaleza, igual ao servidor, evitando que o navegador em UTC envie uma solicitação no futuro durante a noite brasileira. Há regressões para a virada de dia e offsets diferentes.
+7. Rotina: atalhos CRM → cálculo/cotação → processo comercial → documentação → logística, reutilizando telas existentes. Nenhum recurso anterior foi retirado. A UI nova não cria um pedido formal adicional no ExportHub; conserva o modelo de operação existente.
+8. Cópias automáticas: código de preservação do Claude continua disponível, porém desativado por padrão. Somente ALLOW_AUTOMATIC_SAFETY_BACKUPS=true no servidor o habilita, mediante autorização separada. Exportação e recuperação manuais permanecem. Nenhuma variável publicada foi alterada.
 
 ## Verificação executada localmente
 
