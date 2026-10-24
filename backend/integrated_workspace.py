@@ -13,6 +13,7 @@ from pathlib import Path
 from fastapi import Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
 from pymongo.errors import DuplicateKeyError
+from sale_currency import sale_fields
 
 ENGINE = Path(__file__).parent / "generated" / "quote-engine.cjs"
 slots = asyncio.Semaphore(4)
@@ -351,8 +352,6 @@ def install(api, rt):
             record = await rt.db.integrated_quotes.find_one({"_id": user["id"] + ":" + qid})
             if not record: raise HTTPException(404, "Cotação não encontrada.")
             q = record["quote"]
-            if q["currency"] != "USD":
-                raise HTTPException(400, "O pedido legado exige USD. Gere outra cotação em USD com câmbio confirmado; valores salvos não serão convertidos automaticamente.")
             if not record.get("offer_id") or not record.get("lead_id"):
                 raise HTTPException(400, "Vincule cliente e oferta em uma nova cotação antes de preparar o pedido.")
             offer, product, supplier = await references(record["offer_id"])
@@ -385,7 +384,7 @@ def install(api, rt):
                     "unit": "kg", "unit_price": q["unitPrice"]}
             native = {**terms, "id": native_id, "reference": native_id, "lead_id": lead["id"],
                       "customer": q["customer"], "customer_country": lead.get("country", ""), "items": [item],
-                      "total_usd": q["total"], "status": "draft", "source_integrated_quote_id": qid,
+                      **sale_fields(q["currency"], q["total"]), "status": "draft", "source_integrated_quote_id": qid,
                       "source_integrated_owner": user["id"], "source_integrated_snapshot": q}
             result = rt.checked_quote_event(native, None, user, body.change_note)
             await ensure_owned()

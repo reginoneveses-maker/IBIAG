@@ -6,6 +6,7 @@ movements or financial entries. Database writes are serialized by the API.
 """
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from datetime import date
+from sale_currency import sale_currency, sale_amount, sale_fields
 
 ORDER_STATUSES = {"draft", "confirmed", "shipped", "delivered", "cancelled"}
 PURCHASE_STATUSES = {"ordered", "received", "paid", "cancelled"}
@@ -34,6 +35,9 @@ def valid_date(value, label, required=False):
 
 def normalize_order(body, previous, products, offers, *, frozen_items=None):
     result=dict(body)
+    currency=sale_currency(result)
+    if previous and currency != sale_currency(previous):
+        raise ValueError("A moeda do pedido salvo não pode ser alterada. Crie outro rascunho.")
     status=result.get("status", "draft")
     if status not in ORDER_STATUSES:
         raise ValueError("Situação do pedido inválida")
@@ -42,6 +46,8 @@ def normalize_order(body, previous, products, offers, *, frozen_items=None):
     if previous and previous.get("status") in {"shipped", "delivered"}:
         if status not in {"shipped", "delivered"} or (previous["status"]=="delivered" and status!="delivered"):
             raise ValueError("Pedido embarcado não pode ser revertido. Registre a devolução separadamente.")
+        if sale_amount(result) != sale_amount(previous):
+            raise ValueError("Valor de pedido embarcado não pode ser alterado")
         for field in ("items", "track_stock", "total_usd"):
             if result.get(field) != previous.get(field):
                 raise ValueError("Itens e valores de pedido embarcado não podem ser alterados")
@@ -63,7 +69,7 @@ def normalize_order(body, previous, products, offers, *, frozen_items=None):
         if not offer or offer.get("product_id") != product["id"] or (not offer.get("active", True) and not grandfathered):
             raise ValueError("Selecione uma oferta ativa do produto e fornecedor")
         qty=number(raw.get("quantity"), "Quantidade", positive=True)
-        price=number(raw.get("unit_price"), "Preço unitário USD", positive=True)
+        price=number(raw.get("unit_price"), "Preço unitário " + currency, positive=True)
         unit=str(raw.get("unit") or offer.get("unit") or product.get("unit") or "kg")
         if result.get("track_stock") and unit != (product.get("unit") or "kg"):
             raise ValueError("A unidade do pedido deve coincidir com a unidade do estoque")
@@ -84,13 +90,15 @@ def normalize_order(body, previous, products, offers, *, frozen_items=None):
     if len(items)>100:
         raise ValueError("Limite de 100 itens por pedido")
     if items:
-        result["total_usd"]=money(total)
+        result.update(sale_fields(currency,money(total)))
         result["products"]="; ".join(f'{x["product_name"]} ({x["supplier_name"]}): {x["quantity"]:g} {x["unit"]}' for x in items)
     else:
-        result["total_usd"]=money(number(result.get("total_usd"), "Total USD"))
+        result.update(sale_fields(currency,money(sale_amount(result))))
     if previous and previous.get("finance_paid"):
-        if result["total_usd"]!=previous.get("total_usd") or any(result.get(f)!=previous.get(f) for f in ("receivable_due_date", "customer")):
+        if sale_amount(result)!=sale_amount(previous) or any(result.get(f)!=previous.get(f) for f in ("receivable_due_date", "customer")):
             raise ValueError("Valor e vencimento de pedido pago não podem ser alterados")
+    if currency == "USD":
+        result.pop("total_amount",None)
     result["items"]=items
     result["order_date"]=valid_date(result.get("order_date"), "Data do pedido",status!="draft")
     result["delivery_date"]=valid_date(result.get("delivery_date"), "Data de entrega")
@@ -200,7 +208,7 @@ def linked_finance(orders, purchases):
             continue
         result.append({"id":"order:"+record["id"],"source_order_id":record["id"],"kind":"receivable",
                        "description":"Pedido "+(record.get("number") or record["id"]),"party":record["customer"],
-                       "amount":record["total_usd"],"currency":"USD","due_date":record.get("receivable_due_date", ""),
+                       "amount":float(sale_amount(record)),"currency":sale_currency(record),"due_date":record.get("receivable_due_date", ""),
                        "paid":record.get("finance_paid",False),"paid_date":record.get("finance_paid_date", ""),
                        "category":"Venda","created_at":record.get("created_at", "")})
     for record in purchases:

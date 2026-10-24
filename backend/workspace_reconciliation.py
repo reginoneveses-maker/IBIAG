@@ -208,7 +208,7 @@ def plan_reconciliation(raw, native=None, links=None, files=None):
         if node["kind"] != "quote": continue
         row = node["record"]
         reasons = []
-        if row.get("currency") != "USD": reasons.append("legacy-downstream-requires-confirmed-usd")
+        if row.get("currency") not in {"USD", "BRL", "EUR"}: reasons.append("unsupported-downstream-currency")
         review = row.get("completionReview")
         state = review.get("inputState") if isinstance(review, dict) else None
         if not isinstance(state, dict):
@@ -229,7 +229,7 @@ def plan_reconciliation(raw, native=None, links=None, files=None):
         target = mapping_by_source.get(node["key"])
         if target:
             existing = native_index[target["collection"]][target["target"]][0]
-            if row.get("currency") != "USD" or existing.get("total_usd") != row.get("total"):
+            if existing.get("currency", "USD") != row.get("currency") or existing.get("total_usd" if row.get("currency") == "USD" else "total_amount") != row.get("total"):
                 reasons.append("existing-native-snapshot-differs")
         if reasons: conversion_constraints.append({"source": node["key"], "reasons": reasons})
     plan = {"format": "ibiag-workspace-reconciliation-v1", "sourceSha256": sha(raw),

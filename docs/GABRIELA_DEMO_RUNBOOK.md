@@ -42,3 +42,8 @@ Observar se encontra empresa, oferta, cálculo e documentos sem orientação; se
 ## Ensaio com cadastro incompleto
 
 Na Precificação do ExportHub, abrir a conclusão manual: selecionar ingrediente sem preço/embalagem, preencher fornecedor e cliente fictícios, 1.000 kg, preço R$ 17,50/kg, margem 20%, despesas/indiretos 0 confirmados, EXW e fábrica nomeada. Confirmar embalagem incluída. Sem MOQ, prazo e medidas: mostrar avisos, sem bloquear a proposta. Resultado: R$ 21,875/kg e R$ 21.875,00 no total. Alterar para 1.500 kg e conferir recálculo. Salvar rascunho incompleto, recarregar e retomar. Revisar, salvar cotação, visualizar proposta IBIAG e imprimir/salvar PDF. Mostrar que cadastro só muda após a segunda confirmação e que a cotação salva mantém seus valores.
+
+
+## Continuidade em três moedas (somente dados sintéticos)
+
+Repetir a mesma venda fictícia em USD, BRL e EUR. Usar os valores explicitamente confirmados da calculadora, sem buscar cotações externas. Salvar/retomar o rascunho e revisar a proposta IBIAG antes de preparar a aprovação. Aprovar internamente e gerar um pedido por proposta; confirmar o pedido com datas fictícias realistas. Conferir a mesma moeda/total no recebível e no PDF da Commercial Invoice; conferir que o Packing List não contém preços. Registrar o planejamento do embarque e conferir o dossiê. As permissões comerciais permanecem limitadas: o recebível é conferido pelo administrador no ensaio, sem conceder financeiro à operadora. Ver docs/MULTICURRENCY_CANDIDATE.md.

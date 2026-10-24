@@ -8,7 +8,7 @@ STATUSES = ('draft','confirmed','shipped','delivered','cancelled')
 ATTENTION = ('receivable_overdue','shipment_overdue','documents_pending','shipment_missing','data_review')
 ELIGIBLE = {'confirmed','shipped','delivered'}
 ORDER_FIELDS = ('id','number','customer','customer_country','order_date','receivable_due_date','status','workflow_enabled',
-    'finance_paid','lead_id','incoterm','items','total_usd','source_quote_snapshot.payment_terms','source_quote_snapshot.delivery_terms',
+    'finance_paid','lead_id','incoterm','items','total_usd','total_amount','currency','source_quote_snapshot.payment_terms','source_quote_snapshot.delivery_terms',
     'shipment.status','shipment.reference','shipment.planned_departure','shipment.planned_arrival',
     'shipment.actual_departure','shipment.actual_arrival','shipment.actual_delivery')
 DOC_FIELDS = ('id','order_id','status','source_order_revision')

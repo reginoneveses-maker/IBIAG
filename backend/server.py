@@ -340,6 +340,8 @@ class OrderItem(BaseModel):
     unit: str = "kg"
     unit_price: float
 
+from sale_currency import sale_currency, sale_amount, sale_fields
+
 class SalesOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -357,6 +359,8 @@ class SalesOrder(BaseModel):
     products: str = ""
     incoterm: str = "FOB"
     total_usd: float = 0
+    currency: Literal["USD", "BRL", "EUR"] = "USD"
+    total_amount: float | None = None
     status: str = "draft"  # draft, confirmed, shipped, delivered, cancelled
     order_date: str = ""
     delivery_date: str = ""
@@ -1308,6 +1312,10 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
                 if stored_shipment.get("status") != "cancelled" or order.status not in {"draft", "confirmed", "cancelled"}:
                     raise HTTPException(409, "Use o fluxo de embarque para alterar a situação deste pedido.")
         if previous:
+            if "currency" not in order.model_fields_set:
+                order.currency = sale_currency(previous)
+            if "total_amount" not in order.model_fields_set:
+                order.total_amount = previous.get("total_amount")
             stored_quote = previous.get("source_quote_id", "")
             if "source_quote_id" in order.model_fields_set and order.source_quote_id != stored_quote:
                 raise HTTPException(409, "A origem da cotação não pode ser trocada.")
@@ -1330,12 +1338,16 @@ async def save_order_workflow(order, create=False, shipment_input=None, shipment
             quote_source = await order_quote_source(order.source_quote_id)
             if order.source_quote_revision != quote_source["source_quote_revision"]:
                 raise HTTPException(409, "A cotação mudou. Reabra a conferência.")
+            order.currency = sale_currency(quote_source)
+            order.total_amount = quote_source.get("total_amount")
             for key in ("lead_id", "customer", "customer_country", "incoterm", "source_quote_snapshot"):
                 setattr(order, key, quote_source[key])
             order.items = [OrderItem(**item) for item in quote_source["items"]]
             order.source_price_revision = ""
             order.source_price_snapshot = {}
         elif order.source_price_id:
+            order.currency = "USD"
+            order.total_amount = None
             order.source_quote_revision = 0
             order.source_quote_snapshot = {}
             if order.status != "draft":
@@ -1595,7 +1607,8 @@ async def create_commercial_invoice(body: CommercialInvoiceCreate, user=Depends(
         if source["source_order_version"] != body.source_order_version:
             raise HTTPException(409, "Pedido alterado. Reabra a conferência antes de salvar a invoice.")
         values = body.model_dump(exclude={"change_note"})
-        values.update(source, status="draft", customer=source["source_order_snapshot"]["customer"], total_usd=source["source_order_snapshot"]["total_usd"])
+        values.update(source, status="draft", customer=source["source_order_snapshot"]["customer"],
+                      **sale_fields(sale_currency(source["source_order_snapshot"]), float(sale_amount(source["source_order_snapshot"]))))
         check_invoice_details(values)
         record = checked_invoice_event(values, None, user, body.change_note)
         await ensure_owned()
@@ -2092,7 +2105,8 @@ async def order_quote_source(qid):
     await quote_references(quote)
     snapshot = {key: value for key, value in quote.items() if key not in {"history", "history_archive"}}
     return {"source_quote_id": qid, "source_quote_revision": quote["version"], "source_quote_snapshot": snapshot,
-            **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items", "total_usd")}}
+            **sale_fields(sale_currency(quote), float(sale_amount(quote))),
+            **{key: quote[key] for key in ("lead_id", "customer", "customer_country", "incoterm", "items")}}
 
 @api.get("/quotations")
 async def list_quotations(skip: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=250),

@@ -1,5 +1,6 @@
 """Render only explicitly selected invoice fields; no URLs, uploads or HTML input."""
 import io
+from sale_currency import sale_currency, sale_amount, sale_fields
 import json
 from pathlib import Path
 from decimal import Decimal
@@ -34,7 +35,8 @@ def public_invoice(record):
             "buyer_reference", "notes", "declaration", "signatory", "status", "version")
     data = {k: record.get(k, "") for k in keys}
     data.update(customer=source["customer"], order_number=source.get("number", ""), incoterm=source["incoterm"],
-                total_usd=source["total_usd"], currency="USD")
+                **sale_fields(sale_currency(source),float(sale_amount(source))))
+    data["currency"] = sale_currency(source)
     data["items"] = [{**{k: item[k] for k in ("product_name", "quantity", "unit", "unit_price", "line_total")},
                        "origin_country": record["customs"][i]["origin_country"], "hs_code": record["customs"][i]["hs_code"]}
                       for i, item in enumerate(source["items"])]
@@ -94,15 +96,15 @@ def render_invoice(record):
                       block("BUYER", [data["customer"], data["buyer_address"], data["buyer_country"], "Tax ID: " + (data["buyer_tax_id"] or "Not provided")])]], colWidths=[WIDTH/2]*2)
     parties.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#F3F6FA")),("BOX",(0,0),(-1,-1),0.5,colors.HexColor("#DDE5EF")),("LEFTPADDING",(0,0),(-1,-1),10),("RIGHTPADDING",(0,0),(-1,-1),10),("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10)]))
     story.extend([parties, Spacer(1,14), p("SHIP TO", label), p(data["ship_to_name"]), p(data["ship_to_address"]), p(data["ship_to_country"]), Spacer(1,12)])
-    meta = f"Incoterm: {data['incoterm']} - {data['incoterm_place'] or 'Not provided'}\nBuyer reference: {data['buyer_reference'] or 'Not provided'}\nOrder reference: {data['order_number'] or 'Not provided'}\nCurrency: USD"
+    meta = f"Incoterm: {data['incoterm']} - {data['incoterm_place'] or 'Not provided'}\nBuyer reference: {data['buyer_reference'] or 'Not provided'}\nOrder reference: {data['order_number'] or 'Not provided'}\nCurrency: {data['currency']}"
     story.extend([p(meta), Spacer(1,14)])
-    rows = [[p(t,label) for t in ("GOODS / ORIGIN / HS", "QUANTITY", "UNIT USD", "AMOUNT USD")]]
+    rows = [[p(t,label) for t in ("GOODS / ORIGIN / HS", "QUANTITY", "UNIT " + data["currency"], "AMOUNT " + data["currency"])]]
     for item in data["items"]:
         desc=f"{item['product_name']}\nOrigin: {item['origin_country'] or 'Not provided'}\nHS/NCM: {item['hs_code'] or 'Not provided'}"
         rows.append([p(desc),p(f"{precise(item['quantity'])} {item['unit']}", right),p(precise(item["unit_price"],2),right),p(f"{item['line_total']:,.2f}",right)])
     table = Table(rows, colWidths=[WIDTH*.49,WIDTH*.17,WIDTH*.17,WIDTH*.17], repeatRows=1, hAlign="LEFT", splitByRow=1)
     table.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("BACKGROUND",(0,0),(-1,0),colors.HexColor("#EBF0F8")),("LINEBELOW",(0,0),(-1,0),1,BLUE),("LINEBELOW",(0,1),(-1,-1),0.3,colors.HexColor("#DDE5EF")),("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
-    story.extend([table, Spacer(1,12), p(f"TOTAL USD  {data['total_usd']:,.2f}", ParagraphStyle("total",parent=right,fontName="InvoiceBold",fontSize=13,leading=18,textColor=BLUE)), Spacer(1,18)])
+    story.extend([table, Spacer(1,12), p(f"TOTAL {data['currency']}  {sale_amount(data):,.2f}", ParagraphStyle("total",parent=right,fontName="InvoiceBold",fontSize=13,leading=18,textColor=BLUE)), Spacer(1,18)])
     for title, key in (("PAYMENT TERMS","payment_terms"),("DELIVERY TERMS","delivery_terms"),("COMMERCIAL NOTES","notes"),("DECLARATION","declaration")):
         if data[key]: story.extend([KeepTogether([p(title,label),p(data[key])]),Spacer(1,12)])
     story.extend([p("AUTHORIZED REPRESENTATIVE",label),p(data["signatory"]),p("Typed name. No electronic or handwritten signature is generated.",small)])

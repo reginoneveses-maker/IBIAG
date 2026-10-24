@@ -1,5 +1,7 @@
 # Continuidade da cotação e conciliação do acervo — 24/10/2026
 
+Atualização posterior: docs/MULTICURRENCY_CANDIDATE.md descreve o suporte a USD/BRL/EUR. As referências abaixo à restrição USD registram a etapa anterior.
+
 Continuação do PR #60, branch improvements/crm-import-20261024. Esta etapa não publica nem importa dados reais.
 
 ## Cotação: fornecedor, fichas e certificados

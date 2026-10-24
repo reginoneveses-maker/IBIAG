@@ -153,13 +153,55 @@ class IntegratedWorkspaceTests(unittest.IsolatedAsyncioTestCase):
         self.ok(await self.req("POST","/quotes/COT-identity/handoff",json=terms))
 
     async def test_other_currencies_quote_without_invented_usd_conversion(self):
+        import io
+        from pypdf import PdfReader
+        from sale_currency import sale_amount
         for currency in ("BRL","EUR"):
             payload={"id":"COT-"+currency,"state":state(currency)}
-            self.ok(await self.req("POST","/quotes",json=payload))
-            response=await self.req("POST","/quotes/"+payload["id"]+"/handoff",json={
-              "valid_until":"2099-12-31","payment_terms":"Prepaid","delivery_terms":"Factory","change_note":"Reviewed"})
-            self.assertEqual(response.status_code,400)
-        self.assertEqual(await self.db.quotations.count_documents({}),0)
+            quote=self.ok(await self.req("POST","/quotes",json=payload))["quote"]
+            terms={"valid_until":"2099-12-31","payment_terms":"Prepaid","delivery_terms":"Factory","change_note":"Reviewed"}
+            native=self.ok(await self.req("POST","/quotes/"+payload["id"]+"/handoff",json=terms))
+            self.assertEqual(native["currency"],currency)
+            self.assertEqual(native["total_usd"],0)
+            self.assertEqual(native["total_amount"],quote["total"])
+            approved=self.ok(await self.client.post("/api/quotations/"+native["id"]+"/status",headers=self.headers(),json={"version":native["version"],"status":"approved","change_note":"Confirmed terms"}))
+            source=self.ok(await self.client.get("/api/quotations/"+native["id"]+"/order-draft",headers=self.headers()))
+            oid="order-"+currency
+            order=self.ok(await self.client.post("/api/orders",headers=self.headers(),json={**source,"id":oid,"status":"draft"}))
+            self.assertEqual(order["currency"],currency)
+            self.assertEqual(float(sale_amount(order)),quote["total"])
+            bad=await self.client.put("/api/orders/"+oid,headers=self.headers(),json={**order,"currency":"USD"})
+            self.assertEqual(bad.status_code,400,bad.text)
+            order=self.ok(await self.client.put("/api/orders/"+oid,headers=self.headers(),json={**order,"status":"confirmed","number":oid,"order_date":"2026-10-19","receivable_due_date":"2099-12-31"}))
+            finance=[f for f in await server.all_finance_entries() if f.get("source_order_id")==oid]
+            self.assertEqual([(f["currency"],f["amount"]) for f in finance],[(currency,quote["total"])])
+            invoice_source=self.ok(await self.client.get("/api/orders/"+oid+"/commercial-invoice-draft",headers=self.headers()))
+            public=invoice_source["source_order_snapshot"]
+            self.assertEqual(public["currency"],currency)
+            self.assertEqual(float(sale_amount(public)),quote["total"])
+            body={"id":"inv-"+currency,"reference":"CI-"+currency,"order_id":oid,"source_order_version":order["version"],"issue_date":"2026-10-19","seller_name":"Synthetic IBIAG","seller_tax_id":"TEST","seller_address":"Example street","seller_country":"Brazil","buyer_address":"Example buyer","buyer_country":order["customer_country"],"incoterm_place":"Factory","payment_terms":"Prepaid","delivery_terms":"Factory","signatory":"Synthetic operator","customs":[{"index":0,"origin_country":"Brazil","hs_code":"11063010"}],"change_note":"Reviewed document"}
+            invoice=self.ok(await self.client.post("/api/commercial-invoices",headers=self.headers(),json=body))
+            self.ok(await self.client.post("/api/commercial-invoices/"+invoice["id"]+"/status",headers=self.headers(),json={"version":invoice["version"],"status":"approved","details_confirmed":True,"change_note":"Confirmed document"}))
+            pdf=await self.client.get("/api/commercial-invoices/"+invoice["id"]+"/pdf",headers=self.headers())
+            self.assertEqual(pdf.status_code,200,pdf.text[:80] if pdf.status_code!=200 else "")
+            text="\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages)
+            self.assertIn("Currency: "+currency,text)
+            self.assertIn("TOTAL "+currency,text)
+            self.assertNotIn("TOTAL USD",text)
+            packing_source=self.ok(await self.client.get("/api/orders/"+oid+"/packing-list-draft",headers=self.headers()))
+            self.assertNotIn("total_amount",str(packing_source))
+            packing={k:v for k,v in body.items() if k in server.PACKING_DETAILS}
+            packing.update(id="pl-"+currency,reference="PL-"+currency,order_id=oid,source_order_version=order["version"],change_note="Packing review",packages=[{"marks":"TEST","packaging":"Bags","package_count":40,"net_kg":"1000","gross_kg":"1040","volume_m3":"2","allocations":[{"index":0,"quantity":"1000"}]}])
+            document=self.ok(await self.client.post("/api/packing-lists",headers=self.headers(),json=packing))
+            self.ok(await self.client.post("/api/packing-lists/"+document["id"]+"/status",headers=self.headers(),json={"version":document["version"],"status":"approved","details_confirmed":True,"change_note":"Confirmed packing"}))
+            shipment={"version":order["version"],"status":"planned","reference":"SHIP-"+currency,"origin":"Factory","destination":"Buyer","mode":"sea","responsible_id":"admin","planned_departure":"2026-10-24","planned_arrival":"2026-11-10","change_note":"Synthetic planning"}
+            shipped=self.ok(await self.client.put("/api/orders/"+oid+"/shipment",headers=self.headers(),json=shipment))
+            stored=await self.db.orders.find_one({"id":oid})
+            self.assertEqual(stored["currency"],currency)
+            self.assertEqual(float(sale_amount(stored)),quote["total"])
+            preserved=await self.db.integrated_quotes.find_one({"id":payload["id"]})
+            self.assertEqual(preserved["quote"],quote)
+        self.assertEqual(await self.db.quotations.count_documents({}),2)
     async def test_manual_unregistered_quote_can_finish_and_duplicate_references_are_not_deleted(self):
         data=state();data["productId"]="";data["fields"]["opportunityId"]=""
         self.ok(await self.req("POST","/quotes",json={"id":"COT-manual","state":data}))

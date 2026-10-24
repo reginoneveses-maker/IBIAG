@@ -131,6 +131,8 @@ jobs:
           node scripts/test-crm-interchange-ui.cjs
           node scripts/test-quote-completion-ui.cjs
           node scripts/test-native-integration-ui.cjs
+          TEST_SALE_CURRENCY=BRL node scripts/test-native-integration-ui.cjs
+          TEST_SALE_CURRENCY=EUR node scripts/test-native-integration-ui.cjs
       - name: Document UI screenshots (synthetic data)
         if: always()
         uses: actions/upload-artifact@v4

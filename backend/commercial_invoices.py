@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from business_workflow import number, money
+from sale_currency import sale_currency, sale_amount, sale_fields
 
 TEXT = r"^[^\x00-\x08\x0b-\x1f\x7f]*$"
 class StrictInput(BaseModel):
@@ -57,7 +58,7 @@ class InvoiceDecision(StrictInput):
     change_note: str = Field(min_length=3, max_length=300, pattern=TEXT)
 
 DETAILS = tuple(k for k in InvoiceDetails.model_fields if k != "change_note")
-SUMMARY = ("id", "reference", "order_id", "version", "status", "issue_date", "customer", "total_usd", "updated_at")
+SUMMARY = ("id", "reference", "order_id", "version", "status", "issue_date", "customer", "total_usd", "total_amount", "currency", "updated_at")
 INCOTERMS = {"EXW", "FOB", "FCA", "CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP"}
 
 def commercial_snapshot(order):
@@ -76,7 +77,7 @@ def commercial_snapshot(order):
     if not 1 <= len(items) <= 100:
         raise ValueError("Pedido deve conter de1 a100 itens.")
     total = money(sum((Decimal(str(i["line_total"])) for i in items), Decimal(0)))
-    if total > 1e12 or total != money(number(order.get("total_usd"), "Total", True)):
+    if total > 1e12 or total != money(sale_amount(order)):
         raise ValueError("Total do pedido não corresponde aos itens. Revise o pedido.")
     if order.get("incoterm") not in INCOTERMS or not isinstance(order.get("customer"), str) or not order["customer"].strip():
         raise ValueError("Revise cliente e Incoterm do pedido.")
@@ -88,8 +89,9 @@ def commercial_snapshot(order):
     quote = order.get("source_quote_snapshot") or {}
     if not isinstance(quote, dict) or any(not isinstance(quote.get(k,""), str) or len(quote.get(k,""))>1000 or not re.fullmatch(TEXT,quote.get(k,"")) for k in ("payment_terms","delivery_terms")):
         raise ValueError("Revise as condições comerciais da cotação vinculada.")
-    result.update(items=items, total_usd=total, currency="USD",
+    result.update(items=items, **sale_fields(sale_currency(order),total),
                   payment_terms=quote.get("payment_terms", ""), delivery_terms=quote.get("delivery_terms", ""))
+    result["currency"] = sale_currency(order)
     return result
 
 def revision(snapshot):
